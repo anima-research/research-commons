@@ -1,15 +1,24 @@
 <template>
   <div class="min-h-screen bg-gray-50">
-    <header class="bg-white border-b border-gray-200 p-4">
-      <div class="max-w-4xl mx-auto flex items-center justify-between">
-        <h1 class="text-2xl font-bold">Submit Conversation</h1>
-        <button @click="router.push('/')" class="text-gray-600 hover:text-gray-900">
-          ← Back
-        </button>
-      </div>
-    </header>
+    <LeftSidebar :show="showMobileSidebar" @navigate="handleNavigate" @close="showMobileSidebar = false" />
 
-    <div class="max-w-4xl mx-auto p-8">
+    <!-- Mobile hamburger -->
+    <button
+      v-if="isMobile"
+      @click="showMobileSidebar = true"
+      class="fixed top-4 left-4 z-30 p-2 bg-white rounded-lg shadow-lg border border-gray-200 lg:hidden"
+    >
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+
+    <div class="lg:ml-64">
+      <header class="bg-white border-b border-gray-200 p-4">
+        <h1 class="text-xl font-bold">📤 Submit Conversation</h1>
+      </header>
+
+      <div class="max-w-4xl mx-auto p-8">
       <div class="bg-white rounded-lg shadow p-6">
         <div class="mb-6">
           <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -92,14 +101,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { submissionsAPI } from '@/services/api'
 import type { Message } from '@/types'
+import LeftSidebar from '@/components/LeftSidebar.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+const showMobileSidebar = ref(false)
+const isMobile = ref(window.innerWidth < 1024)
+
+onMounted(() => {
+  window.addEventListener('resize', checkMobile)
+})
+
+function checkMobile() {
+  isMobile.value = window.innerWidth < 1024
+}
+
+function handleNavigate(route: string) {
+  router.push(route)
+}
 
 const title = ref('')
 const sourceType = ref<'json-upload' | 'arc-certified' | 'discord' | 'other'>('json-upload')

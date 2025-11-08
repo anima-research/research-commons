@@ -29,13 +29,23 @@ const router = createRouter({
     {
       path: '/topics',
       name: 'topics',
-      component: () => import('@/views/TopicsView.vue')
+      component: () => import('@/views/TopicsManagementView.vue')
     },
     {
       path: '/topics/:id',
       name: 'topic',
       component: () => import('@/views/TopicView.vue'),
       props: true
+    },
+    {
+      path: '/ontologies',
+      name: 'ontologies',
+      component: () => import('@/views/OntologiesView.vue')
+    },
+    {
+      path: '/criteria',
+      name: 'criteria',
+      component: () => import('@/views/CriteriaView.vue')
     }
   ]
 })

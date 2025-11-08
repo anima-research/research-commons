@@ -22,7 +22,10 @@ export const authAPI = {
     api.post<{ user: User; token: string }>('/auth/register', { email, password, name }),
   
   login: (email: string, password: string) =>
-    api.post<{ user: User; token: string }>('/auth/login', { email, password })
+    api.post<{ user: User; token: string }>('/auth/login', { email, password }),
+  
+  refresh: () =>
+    api.post<{ user: User; token: string }>('/auth/refresh')
 }
 
 export const submissionsAPI = {
@@ -37,6 +40,9 @@ export const submissionsAPI = {
   
   update: (id: string, updates: { description?: string; tags?: string[] }) =>
     api.patch<Submission>(`/submissions/${id}`, updates),
+  
+  delete: (id: string) =>
+    api.delete<{ success: boolean }>(`/submissions/${id}`),
   
   getMessages: (id: string) =>
     api.get<{ messages: Message[] }>(`/submissions/${id}/messages`),
@@ -98,8 +104,17 @@ export const researchAPI = {
   getTopics: () =>
     api.get<{ topics: Topic[] }>('/research/topics'),
   
-  createTopic: (name: string, description: string) =>
-    api.post<Topic>('/research/topics', { name, description }),
+  getTopic: (id: string) =>
+    api.get<Topic>(`/research/topics/${id}`),
+  
+  createTopic: (data: { name: string; description: string; default_ontologies?: string[] }) =>
+    api.post<Topic>('/research/topics', data),
+  
+  updateTopic: (id: string, updates: Partial<Topic>) =>
+    api.patch<Topic>(`/research/topics/${id}`, updates),
+  
+  deleteTopic: (id: string) =>
+    api.delete<{ success: boolean }>(`/research/topics/${id}`),
   
   getCriteria: () =>
     api.get<{ criteria: Criterion[] }>('/research/criteria'),

@@ -1,41 +1,43 @@
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- Header -->
-    <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
-      <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <h1 class="text-2xl font-bold">🧬 Research Commons</h1>
-          <span class="text-sm text-gray-500">Anima Labs</span>
-        </div>
-        
-        <div class="flex items-center gap-4">
-          <router-link to="/topics" class="text-gray-700 hover:text-indigo-600">
-            Topics
-          </router-link>
+    <!-- Left Sidebar -->
+    <LeftSidebar 
+      :show="showMobileSidebar"
+      @navigate="handleNavigate"
+      @close="showMobileSidebar = false"
+    />
+
+    <!-- Mobile hamburger -->
+    <button
+      v-if="isMobile"
+      @click="showMobileSidebar = true"
+      class="fixed top-4 left-4 z-30 p-2 bg-white rounded-lg shadow-lg border border-gray-200 lg:hidden"
+    >
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+
+    <!-- Main content area (with left margin on desktop) -->
+    <div class="lg:ml-64">
+      <!-- Header -->
+      <header class="bg-white border-b border-gray-200 sticky top-0 z-20">
+        <div class="px-4 py-4 flex items-center justify-between">
+          <h1 class="text-xl font-bold">Submissions</h1>
           <router-link 
             v-if="authStore.isAuthenticated()"
             to="/submit" 
-            class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+            class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
           >
-            Submit +
-          </router-link>
-          <div v-if="authStore.isAuthenticated()" class="flex items-center gap-2">
-            <span class="text-sm text-gray-700">{{ authStore.user?.name }}</span>
-            <button @click="authStore.logout()" class="text-sm text-gray-500 hover:text-gray-700">
-              Logout
-            </button>
-          </div>
-          <router-link v-else to="/login" class="text-indigo-600 hover:text-indigo-700">
-            Login
+            📤 Submit
           </router-link>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <!-- Filters -->
-    <div class="max-w-7xl mx-auto px-4 py-4">
-      <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
-        <div class="flex flex-wrap gap-4">
+      <!-- Filters -->
+      <div class="px-4 py-4">
+        <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div class="flex flex-wrap gap-4">
           <select class="px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500">
             <option>All Topics</option>
             <option>Deprecation Attitudes</option>
@@ -62,19 +64,19 @@
         </div>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="text-center py-12 text-gray-500">
-        Loading submissions...
-      </div>
+        <!-- Loading State -->
+        <div v-if="loading" class="text-center py-12 text-gray-500">
+          Loading submissions...
+        </div>
 
-      <!-- Submission Cards -->
-      <div v-else class="space-y-4">
-        <div
-          v-for="submission in submissions"
-          :key="submission.id"
-          @click="router.push(`/submissions/${submission.id}`)"
-          class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer p-6"
-        >
+        <!-- Submission Cards -->
+        <div v-else class="space-y-4">
+          <div
+            v-for="submission in submissions"
+            :key="submission.id"
+            @click="router.push(`/submissions/${submission.id}`)"
+            class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer p-6"
+          >
           <!-- Header with avatars -->
           <div class="flex items-start gap-3 mb-3">
             <div class="flex -space-x-2">
@@ -116,21 +118,22 @@
             <span>⭐ {{ mockRating }}/5 ({{ mockRatingCount }} ratings)</span>
           </div>
 
-          <!-- Tags -->
-          <div class="flex flex-wrap gap-2">
-            <span
-              v-for="tag in submission.metadata.tags"
-              :key="tag"
-              class="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded"
-            >
-              #{{ tag }}
-            </span>
+            <!-- Tags -->
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="tag in submission.metadata.tags"
+                :key="tag"
+                class="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded"
+              >
+                #{{ tag }}
+              </span>
+            </div>
           </div>
-        </div>
 
-        <!-- Empty state -->
-        <div v-if="submissions.length === 0" class="text-center py-12 text-gray-500">
-          No submissions yet. Be the first to contribute!
+          <!-- Empty state -->
+          <div v-if="submissions.length === 0" class="text-center py-12 text-gray-500">
+            No submissions yet. Be the first to contribute!
+          </div>
         </div>
       </div>
     </div>
@@ -143,9 +146,25 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { submissionsAPI } from '@/services/api'
 import type { Submission } from '@/types'
+import LeftSidebar from '@/components/LeftSidebar.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+const showMobileSidebar = ref(false)
+const isMobile = ref(window.innerWidth < 1024)
+
+onMounted(() => {
+  window.addEventListener('resize', checkMobile)
+})
+
+function checkMobile() {
+  isMobile.value = window.innerWidth < 1024
+}
+
+function handleNavigate(route: string) {
+  router.push(route)
+}
 
 const searchQuery = ref('')
 const submissions = ref<Submission[]>([])

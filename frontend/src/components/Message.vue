@@ -1,12 +1,37 @@
 <template>
   <div 
     class="message-row relative"
-    :class="{ 'selection-mode': selectionMode }"
+    :class="{ 'selection-mode': selectionMode, 'has-annotation': hasAnnotation }"
     :data-message-id="message.id"
     @click="onMessageClick"
     @mouseenter="showActions = true"
     @mouseleave="showActions = false"
   >
+    <!-- Annotation indicators (dotted lines on right edge) -->
+    <div v-if="hasAnnotation" class="absolute right-0 top-0 bottom-0 w-8 pointer-events-none">
+      <!-- Top indicator line -->
+      <svg class="absolute top-0 right-0 w-8 h-0.5">
+        <line
+          x1="0" y1="0"
+          x2="32" y2="0"
+          stroke="#9CA3AF"
+          stroke-width="1.5"
+          stroke-dasharray="4 2"
+        />
+      </svg>
+      
+      <!-- Bottom indicator line -->
+      <svg class="absolute bottom-0 right-0 w-8 h-0.5">
+        <line
+          x1="0" y1="0"
+          x2="32" y2="0"
+          stroke="#9CA3AF"
+          stroke-width="1.5"
+          stroke-dasharray="4 2"
+        />
+      </svg>
+    </div>
+
     <!-- Checkbox column (appears in selection mode) -->
     <div v-if="selectionMode" class="checkbox-column absolute left-0 top-4 w-10 flex items-center justify-center">
       <input
@@ -109,6 +134,7 @@ interface Props {
   message: Message
   selectionMode?: boolean
   isSelected?: boolean
+  hasAnnotation?: boolean
   hasBranches?: boolean
   branchIndex?: number
   branchCount?: number
@@ -117,6 +143,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   selectionMode: false,
   isSelected: false,
+  hasAnnotation: false,
   hasBranches: false,
   branchIndex: 0,
   branchCount: 1

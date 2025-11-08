@@ -61,6 +61,24 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function refreshSession() {
+    if (!token.value) return false
+    
+    try {
+      const response = await authAPI.refresh()
+      user.value = response.data.user
+      token.value = response.data.token
+      localStorage.setItem('auth_token', response.data.token)
+      localStorage.setItem('auth_user', JSON.stringify(response.data.user))
+      return true
+    } catch (err: any) {
+      console.error('Session refresh failed:', err)
+      // If refresh fails, logout
+      logout()
+      return false
+    }
+  }
+
   function hasRole(role: User['roles'][0]): boolean {
     return user.value?.roles.includes(role) ?? false
   }
@@ -76,6 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     restoreSession,
+    refreshSession,
     hasRole,
     isAuthenticated
   }

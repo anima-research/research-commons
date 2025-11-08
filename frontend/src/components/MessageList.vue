@@ -31,6 +31,7 @@
         :message="msg"
         :selection-mode="selectionMode"
         :is-selected="selectedMessageIds.has(msg.id)"
+        :has-annotation="hasAnnotation(msg.id)"
         @toggle-select="toggleMessageSelection"
         @text-selected="onTextSelected"
         @annotate-message="onAnnotateMessage"
@@ -69,9 +70,12 @@ import type { Message as MessageType } from '@/types'
 
 interface Props {
   messages: MessageType[]
+  annotatedMessageIds?: Set<string>
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  annotatedMessageIds: () => new Set()
+})
 
 const emit = defineEmits<{
   'annotate-message': [messageId: string]
@@ -159,6 +163,10 @@ function exitSelectionMode() {
   selectedMessageIds.value.clear()
   pendingSelection.value = null
   emit('selection-mode-changed', false)
+}
+
+function hasAnnotation(messageId: string): boolean {
+  return props.annotatedMessageIds.has(messageId)
 }
 
 function proceedToAnnotation() {

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { AppContext } from '../index.js';
 import { authenticateToken, AuthRequest, requireRole } from '../middleware/auth.js';
-import { CreateTopicRequestSchema, CreateCriterionRequestSchema } from '../types/research.js';
+import { CreateTopicRequestSchema, CreateCriterionRequestSchema, Topic } from '../types/research.js';
 
 export function createResearchRoutes(context: AppContext): Router {
   const router = Router();
@@ -13,6 +13,21 @@ export function createResearchRoutes(context: AppContext): Router {
       res.json({ topics });
     } catch (error) {
       console.error('Get topics error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Get topic by ID
+  router.get('/topics/:id', async (req, res) => {
+    try {
+      const topic = await context.researchStore.getTopic(req.params.id);
+      if (!topic) {
+        res.status(404).json({ error: 'Topic not found' });
+        return;
+      }
+      res.json(topic);
+    } catch (error) {
+      console.error('Get topic error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -35,6 +50,43 @@ export function createResearchRoutes(context: AppContext): Router {
         console.error('Create topic error:', error);
         res.status(500).json({ error: 'Internal server error' });
       }
+    }
+  });
+
+  // Update topic (requires researcher role)
+  router.patch('/topics/:id', authenticateToken, requireRole('researcher'), async (req: AuthRequest, res) => {
+    try {
+      const topic = await context.researchStore.getTopic(req.params.id);
+      if (!topic) {
+        res.status(404).json({ error: 'Topic not found' });
+        return;
+      }
+
+      const updates: Partial<Topic> = {};
+      if (req.body.name !== undefined) updates.name = req.body.name;
+      if (req.body.description !== undefined) updates.description = req.body.description;
+      if (req.body.default_ontologies !== undefined) updates.default_ontologies = req.body.default_ontologies;
+
+      const updated = await context.researchStore.updateTopic(req.params.id, updates);
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Update topic error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Delete topic (requires researcher role)
+  router.delete('/topics/:id', authenticateToken, requireRole('researcher'), async (req: AuthRequest, res) => {
+    try {
+      const deleted = await context.researchStore.deleteTopic(req.params.id);
+      if (!deleted) {
+        res.status(404).json({ error: 'Topic not found' });
+        return;
+      }
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Delete topic error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 

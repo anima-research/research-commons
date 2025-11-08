@@ -8,8 +8,17 @@
           <button @click="router.push('/')" class="text-gray-600 hover:text-gray-900">
             ← Back to Browse
           </button>
-          <div v-if="authStore.isAuthenticated()" class="text-sm text-gray-700">
-            {{ authStore.user?.name }}
+          <div class="flex items-center gap-3">
+            <button
+              v-if="canDeleteSubmission"
+              @click="handleDeleteSubmission"
+              class="text-xs text-red-600 hover:text-red-700 px-2 py-1 border border-red-300 rounded hover:bg-red-50"
+            >
+              🗑️ Delete Submission
+            </button>
+            <div v-if="authStore.isAuthenticated()" class="text-sm text-gray-700">
+              {{ authStore.user?.name }}
+            </div>
           </div>
         </div>
       </div>
@@ -169,6 +178,7 @@
           <MessageList
             v-if="messages.length > 0"
             :messages="messages"
+            :annotated-message-ids="annotatedMessageIds"
             @annotate-message="handleAnnotateMessage"
             @start-multi-select="handleStartMultiSelect"
             @selection-mode-changed="showSelectionToolbar = $event"
@@ -268,6 +278,12 @@ const canEditSubmission = computed(() => {
          authStore.user.roles.includes('admin')
 })
 
+const canDeleteSubmission = computed(() => {
+  if (!authStore.user || !submission.value) return false
+  return submission.value.submitter_id === authStore.user.id || 
+         authStore.user.roles.includes('admin')
+})
+
 const canModerate = computed(() => {
   if (!authStore.user) return false
   return authStore.user.roles.includes('researcher') || 
@@ -278,6 +294,23 @@ const contentPaddingTop = computed(() => {
   const base = headerHeight.value + 20 // 20px extra spacing
   const toolbar = showSelectionToolbar.value ? 60 : 0
   return `${base + toolbar}px`
+})
+
+// Track which messages have annotations
+const annotatedMessageIds = computed(() => {
+  const ids = new Set<string>()
+  for (const sel of selections.value) {
+    ids.add(sel.start_message_id)
+    // If spans multiple, add all in range
+    if (sel.end_message_id !== sel.start_message_id) {
+      const startIdx = messages.value.findIndex(m => m.id === sel.start_message_id)
+      const endIdx = messages.value.findIndex(m => m.id === sel.end_message_id)
+      for (let i = startIdx; i <= endIdx && i >= 0; i++) {
+        ids.add(messages.value[i].id)
+      }
+    }
+  }
+  return ids
 })
 
 
@@ -623,6 +656,26 @@ async function handleDeleteRating(ratingId: string) {
     }
   } catch (err) {
     console.error('Failed to delete rating:', err)
+  }
+}
+
+async function handleDeleteSubmission() {
+  const confirmed = confirm(
+    'Delete this submission?\n\n' +
+    'This will mark it as deleted and remove it from browse listings. ' +
+    'The data will be preserved for archival purposes.\n\n' +
+    'This action cannot be undone.'
+  )
+  
+  if (!confirmed) return
+  
+  try {
+    await submissionsAPI.delete(submissionId)
+    // Navigate back to browse
+    router.push('/')
+  } catch (err: any) {
+    console.error('Failed to delete submission:', err)
+    alert('Failed to delete submission: ' + (err.response?.data?.error || err.message))
   }
 }
 

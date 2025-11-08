@@ -76,7 +76,10 @@ export const SubmissionSchema = z.object({
     model_summary: z.array(z.string()).optional(),
     tags: z.array(z.string()).optional()
   }).passthrough(), // Allow additional fields
-  submitted_at: z.date()
+  submitted_at: z.date(),
+  deleted: z.boolean().optional(),
+  deleted_at: z.date().optional(),
+  deleted_by: z.string().uuid().optional()
 });
 
 export type Submission = z.infer<typeof SubmissionSchema>;

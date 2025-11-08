@@ -30,6 +30,13 @@ export class ResearchStore {
           created_at: new Date(event.data.created_at)
         };
         this.topics.set(topic.id, topic);
+      } else if (event.type === 'topic_updated') {
+        const topic = this.topics.get(event.data.id);
+        if (topic) {
+          this.topics.set(event.data.id, { ...topic, ...event.data.updates });
+        }
+      } else if (event.type === 'topic_deleted') {
+        this.topics.delete(event.data.id);
       }
     }
 
@@ -73,6 +80,36 @@ export class ResearchStore {
 
   async getAllTopics(): Promise<Topic[]> {
     return Array.from(this.topics.values());
+  }
+
+  async updateTopic(id: string, updates: Partial<Topic>): Promise<Topic | null> {
+    const topic = this.topics.get(id);
+    if (!topic) return null;
+
+    const updated = { ...topic, ...updates };
+    this.topics.set(id, updated);
+
+    await this.topicsFile.appendEvent({
+      timestamp: new Date(),
+      type: 'topic_updated',
+      data: { id, updates }
+    });
+
+    return updated;
+  }
+
+  async deleteTopic(id: string): Promise<boolean> {
+    if (!this.topics.has(id)) return false;
+
+    this.topics.delete(id);
+
+    await this.topicsFile.appendEvent({
+      timestamp: new Date(),
+      type: 'topic_deleted',
+      data: { id }
+    });
+
+    return true;
   }
 
   // Criterion methods

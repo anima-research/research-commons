@@ -16,9 +16,9 @@
         class="absolute pointer-events-none"
         :style="{ 
           left: '-32px',
-          top: '0',
+          top: getSvgTop(pos) + 'px',
           width: '32px',
-          height: Math.max(pos.height, Math.abs(pos.idealTop - pos.actualTop) + pos.height) + 'px'
+          height: getSvgHeight(pos) + 'px'
         }"
       >
         <!-- Top line: from top-left of card to ideal top position -->
@@ -168,14 +168,41 @@ function getCriterionName(criterionId: string) {
   return 'Criterion'
 }
 
+function getSvgTop(pos: LayoutPosition): number {
+  // SVG should start at the topmost point we need to draw
+  const displacement = pos.actualTop - pos.idealTop
+  return displacement > 0 ? -displacement : 0
+}
+
+function getSvgHeight(pos: LayoutPosition): number {
+  // SVG needs to contain:
+  // - The full card height
+  // - Any displacement upward (idealTop above actualTop)
+  // - Any ideal message extent beyond card bottom
+  const displacement = pos.actualTop - pos.idealTop
+  const idealMessageHeight = pos.idealBottom - pos.idealTop
+  
+  // When pushed down, need: displacement + card height + any ideal message extent beyond
+  // When aligned, need: max of card height or message height
+  const needed = Math.max(
+    pos.height + Math.abs(displacement),  // Card + displacement
+    idealMessageHeight + Math.abs(displacement) // Or full extent
+  )
+  
+  return needed + 20 // Add padding for curves
+}
+
 function getTopLinePath(pos: LayoutPosition): string {
+  const displacement = pos.actualTop - pos.idealTop
+  
   const startX = 32 // Right edge (card side)
-  const startY = 0  // Top of card (actual)
+  // startY is relative to SVG top (which may be offset)
+  const startY = displacement > 0 ? displacement : 0  // Top of card in SVG space
   const endX = 0    // Left edge (conversation side)
-  const endY = pos.idealTop - pos.actualTop // Ideal top (relative to card position)
+  const endY = 0    // Ideal top is always at SVG top
   
   // If aligned, straight line
-  if (Math.abs(endY) < 2) {
+  if (Math.abs(startY - endY) < 2) {
     return `M ${startX},${startY} L ${endX},${startY}`
   }
   
@@ -184,16 +211,15 @@ function getTopLinePath(pos: LayoutPosition): string {
 }
 
 function getBottomLinePath(pos: LayoutPosition): string {
-  const startX = 32 // Right edge (card side)
-  const startY = pos.height  // Bottom of card (actual)
-  const endX = 0    // Left edge (conversation side)
+  const displacement = pos.actualTop - pos.idealTop
   
-  // Calculate where ideal bottom should be (relative to card)
-  const idealMessageBottom = pos.idealBottom - pos.actualTop
-  const endY = idealMessageBottom
+  const startX = 32 // Right edge (card side)
+  const startY = (displacement > 0 ? displacement : 0) + pos.height  // Bottom of card in SVG space
+  const endX = 0    // Left edge (conversation side)
+  const endY = pos.idealBottom - pos.idealTop  // Ideal bottom relative to ideal top (which is at SVG y=0)
   
   // If aligned, straight line
-  if (Math.abs(endY - startY) < 2) {
+  if (Math.abs(startY - endY) < 2) {
     return `M ${startX},${startY} L ${endX},${startY}`
   }
   

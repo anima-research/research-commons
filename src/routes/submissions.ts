@@ -193,9 +193,8 @@ export function createSubmissionRoutes(context: AppContext): Router {
         return;
       }
 
-      // TODO: Implement soft delete or mark as deleted
-      // For now just return success
-      res.status(200).json({ success: true, message: 'Deletion not yet implemented' });
+      await context.submissionStore.deleteSubmission(req.params.submissionId, req.userId!);
+      res.status(200).json({ success: true });
     } catch (error) {
       console.error('Delete submission error:', error);
       res.status(500).json({ error: 'Internal server error' });

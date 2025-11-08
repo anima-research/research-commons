@@ -211,6 +211,20 @@ export class SubmissionStore {
   }
 
   /**
+   * Soft delete submission
+   */
+  async deleteSubmission(submissionId: string, deletedBy: string): Promise<void> {
+    const submission = await this.getSubmission(submissionId);
+    if (!submission) return;
+
+    submission.deleted = true;
+    submission.deleted_at = new Date();
+    submission.deleted_by = deletedBy;
+
+    await this.updateSubmission(submissionId, submission);
+  }
+
+  /**
    * Get messages for a submission
    */
   async getMessages(submissionId: string): Promise<Message[]> {
@@ -256,14 +270,14 @@ export class SubmissionStore {
   }
 
   /**
-   * List all submissions (loads metadata only)
+   * List all submissions (loads metadata only, excludes deleted)
    */
   async listSubmissions(): Promise<Submission[]> {
     const submissions: Submission[] = [];
     
     for (const submissionId of this.submissionIndex) {
       const submission = await this.getSubmission(submissionId);
-      if (submission) {
+      if (submission && !submission.deleted) {
         submissions.push(submission);
       }
     }
