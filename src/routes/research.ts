@@ -24,7 +24,8 @@ export function createResearchRoutes(context: AppContext): Router {
       const topic = await context.researchStore.createTopic(
         data.name,
         data.description,
-        req.userId!
+        req.userId!,
+        data.default_ontologies || []
       );
       res.status(201).json(topic);
     } catch (error: any) {

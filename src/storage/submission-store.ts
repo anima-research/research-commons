@@ -176,16 +176,38 @@ export class SubmissionStore {
       return null;
     }
 
+    // Replay all events to get current state
     const submissionEvent = events.find(e => e.type === 'submission_created');
-    if (!submissionEvent) {
-      return null;
+    if (!submissionEvent) return null;
+    
+    let submission = submissionEvent.data as Submission;
+    
+    // Apply updates
+    const updateEvents = events.filter(e => e.type === 'submission_updated');
+    for (const event of updateEvents) {
+      const updates = event.data.updates;
+      if (updates.metadata) {
+        submission.metadata = { ...submission.metadata, ...updates.metadata };
+      }
     }
 
-    const submission = submissionEvent.data as Submission;
     this.submissions.set(submissionId, submission);
     this.lastAccessed.set(submissionId, new Date());
 
     return submission;
+  }
+
+  /**
+   * Update submission metadata
+   */
+  async updateSubmission(submissionId: string, updates: Submission): Promise<void> {
+    await this.store.appendEvent(submissionId, 'metadata.jsonl', {
+      timestamp: new Date(),
+      type: 'submission_updated',
+      data: { updates }
+    });
+
+    this.submissions.set(submissionId, updates);
   }
 
   /**
@@ -210,38 +232,8 @@ export class SubmissionStore {
     return messages;
   }
 
-  /**
-   * Add a rating to a submission
-   */
-  async addRating(rating: Rating): Promise<void> {
-    await this.store.appendEvent(rating.submission_id, 'ratings.jsonl', {
-      timestamp: new Date(),
-      type: 'rating_added',
-      data: rating
-    });
-
-    // Update cache if loaded
-    if (this.ratings.has(rating.submission_id)) {
-      this.ratings.get(rating.submission_id)!.push(rating);
-    }
-  }
-
-  /**
-   * Get ratings for a submission
-   */
-  async getRatings(submissionId: string): Promise<Rating[]> {
-    if (this.ratings.has(submissionId)) {
-      return this.ratings.get(submissionId)!;
-    }
-
-    const events = await this.store.loadEvents(submissionId, 'ratings.jsonl');
-    const ratings = events
-      .filter(e => e.type === 'rating_added')
-      .map(e => e.data as Rating);
-
-    this.ratings.set(submissionId, ratings);
-    return ratings;
-  }
+  // Note: Ratings no longer stored in event store - moved to SQLite
+  // These methods are kept for backward compatibility but deprecated
 
   /**
    * Unload inactive submissions from memory

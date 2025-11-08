@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Selection, Comment, Rating } from '../types/annotation.js';
+import { SubmissionOntology } from '../types/ontology.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,6 +68,11 @@ export class AnnotationDatabase {
     return rows.map(row => this.rowToSelection(row));
   }
 
+  deleteSelection(id: string): void {
+    // Foreign keys with CASCADE will handle comments, ratings, and tags
+    this.db.prepare('DELETE FROM selections WHERE id = ?').run(id);
+  }
+
   private rowToSelection(row: any): Selection {
     return {
       id: row.id,
@@ -77,25 +83,54 @@ export class AnnotationDatabase {
       end_message_id: row.end_message_id,
       end_offset: row.end_offset,
       label: row.label,
+      annotation_tags: [], // Will be populated separately
       created_at: new Date(row.created_at)
     };
+  }
+  
+  // Selection tag methods
+  applyTags(selectionId: string, tagIds: string[], taggedBy: string): void {
+    const stmt = this.db.prepare(`
+      INSERT OR IGNORE INTO selection_tags (selection_id, tag_id, tagged_by, tagged_at)
+      VALUES (?, ?, ?, ?)
+    `);
+    
+    const now = new Date().toISOString();
+    for (const tagId of tagIds) {
+      stmt.run(selectionId, tagId, taggedBy, now);
+    }
+  }
+  
+  removeTag(selectionId: string, tagId: string): void {
+    this.db.prepare('DELETE FROM selection_tags WHERE selection_id = ? AND tag_id = ?')
+      .run(selectionId, tagId);
+  }
+  
+  getTagsForSelection(selectionId: string): string[] {
+    const rows = this.db.prepare('SELECT tag_id FROM selection_tags WHERE selection_id = ?')
+      .all(selectionId);
+    return rows.map((row: any) => row.tag_id);
+  }
+  
+  getSelectionWithTags(id: string): Selection | null {
+    const selection = this.getSelection(id);
+    if (!selection) return null;
+    selection.annotation_tags = this.getTagsForSelection(id);
+    return selection;
   }
 
   // Comment methods
   createComment(comment: Comment): void {
     const stmt = this.db.prepare(`
       INSERT INTO comments (
-        id, submission_id, author_id, target_id, target_type,
-        parent_id, content, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, selection_id, author_id, parent_id, content, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       comment.id,
-      comment.submission_id,
+      comment.selection_id,
       comment.author_id,
-      comment.target_id,
-      comment.target_type,
       comment.parent_id ?? null,
       comment.content,
       comment.created_at.toISOString(),
@@ -108,13 +143,8 @@ export class AnnotationDatabase {
     return row ? this.rowToComment(row) : null;
   }
 
-  getCommentsBySubmission(submissionId: string): Comment[] {
-    const rows = this.db.prepare('SELECT * FROM comments WHERE submission_id = ? ORDER BY created_at').all(submissionId);
-    return rows.map(row => this.rowToComment(row));
-  }
-
-  getCommentsByTarget(targetId: string, targetType: string): Comment[] {
-    const rows = this.db.prepare('SELECT * FROM comments WHERE target_id = ? AND target_type = ? ORDER BY created_at').all(targetId, targetType);
+  getCommentsBySelection(selectionId: string): Comment[] {
+    const rows = this.db.prepare('SELECT * FROM comments WHERE selection_id = ? ORDER BY created_at').all(selectionId);
     return rows.map(row => this.rowToComment(row));
   }
 
@@ -135,10 +165,8 @@ export class AnnotationDatabase {
   private rowToComment(row: any): Comment {
     return {
       id: row.id,
-      submission_id: row.submission_id,
+      selection_id: row.selection_id,
       author_id: row.author_id,
-      target_id: row.target_id,
-      target_type: row.target_type,
       parent_id: row.parent_id,
       content: row.content,
       created_at: new Date(row.created_at),
@@ -150,20 +178,16 @@ export class AnnotationDatabase {
   createRating(rating: Rating): void {
     const stmt = this.db.prepare(`
       INSERT INTO ratings (
-        id, submission_id, rater_id, target_id, target_type,
-        criterion_id, score, comment_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, selection_id, rater_id, criterion_id, score, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       rating.id,
-      rating.submission_id,
+      rating.selection_id,
       rating.rater_id,
-      rating.target_id,
-      rating.target_type,
       rating.criterion_id,
       rating.score,
-      rating.comment_id ?? null,
       rating.created_at.toISOString(),
       rating.updated_at?.toISOString() ?? null
     );
@@ -174,13 +198,8 @@ export class AnnotationDatabase {
     return row ? this.rowToRating(row) : null;
   }
 
-  getRatingsBySubmission(submissionId: string): Rating[] {
-    const rows = this.db.prepare('SELECT * FROM ratings WHERE submission_id = ? ORDER BY created_at').all(submissionId);
-    return rows.map(row => this.rowToRating(row));
-  }
-
-  getRatingsByTarget(targetId: string, targetType: string): Rating[] {
-    const rows = this.db.prepare('SELECT * FROM ratings WHERE target_id = ? AND target_type = ? ORDER BY created_at').all(targetId, targetType);
+  getRatingsBySelection(selectionId: string): Rating[] {
+    const rows = this.db.prepare('SELECT * FROM ratings WHERE selection_id = ? ORDER BY created_at').all(selectionId);
     return rows.map(row => this.rowToRating(row));
   }
 
@@ -189,9 +208,9 @@ export class AnnotationDatabase {
     return rows.map(row => this.rowToRating(row));
   }
 
-  updateRating(id: string, score: number, commentId?: string): void {
-    this.db.prepare('UPDATE ratings SET score = ?, comment_id = ?, updated_at = ? WHERE id = ?')
-      .run(score, commentId ?? null, new Date().toISOString(), id);
+  updateRating(id: string, score: number): void {
+    this.db.prepare('UPDATE ratings SET score = ?, updated_at = ? WHERE id = ?')
+      .run(score, new Date().toISOString(), id);
   }
 
   deleteRating(id: string): void {
@@ -201,16 +220,52 @@ export class AnnotationDatabase {
   private rowToRating(row: any): Rating {
     return {
       id: row.id,
-      submission_id: row.submission_id,
+      selection_id: row.selection_id,
       rater_id: row.rater_id,
-      target_id: row.target_id,
-      target_type: row.target_type,
       criterion_id: row.criterion_id,
       score: row.score,
-      comment_id: row.comment_id,
       created_at: new Date(row.created_at),
       updated_at: row.updated_at ? new Date(row.updated_at) : undefined
     };
+  }
+  
+  // Submission ontology methods
+  attachOntology(submissionOntology: SubmissionOntology): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO submission_ontologies (
+        id, submission_id, ontology_id, attached_by, attached_at,
+        usage_permissions, is_default
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    stmt.run(
+      submissionOntology.id,
+      submissionOntology.submission_id,
+      submissionOntology.ontology_id,
+      submissionOntology.attached_by,
+      submissionOntology.attached_at.toISOString(),
+      submissionOntology.usage_permissions,
+      submissionOntology.is_default ? 1 : 0
+    );
+  }
+  
+  getSubmissionOntologies(submissionId: string): SubmissionOntology[] {
+    const rows = this.db.prepare('SELECT * FROM submission_ontologies WHERE submission_id = ?')
+      .all(submissionId);
+    return rows.map((row: any) => ({
+      id: row.id,
+      submission_id: row.submission_id,
+      ontology_id: row.ontology_id,
+      attached_by: row.attached_by,
+      attached_at: new Date(row.attached_at),
+      usage_permissions: row.usage_permissions,
+      is_default: row.is_default === 1
+    }));
+  }
+  
+  detachOntology(submissionId: string, ontologyId: string): void {
+    this.db.prepare('DELETE FROM submission_ontologies WHERE submission_id = ? AND ontology_id = ?')
+      .run(submissionId, ontologyId);
   }
 
   close(): void {

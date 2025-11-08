@@ -51,15 +51,15 @@
 
         <!-- Content -->
         <div 
-          class="message-text text-gray-800"
+          class="message-text text-gray-800 prose prose-sm max-w-none"
           @mouseup="onTextSelect"
           ref="contentEl"
         >
           <template v-for="(block, idx) in message.content_blocks" :key="idx">
-            <span v-if="block.type === 'text'">{{ block.text }}</span>
+            <div v-if="block.type === 'text'" v-html="renderMarkdown(block.text || '')" />
             <div v-else-if="block.type === 'thinking'" class="thinking-block bg-gray-100 p-2 rounded my-2 text-sm">
               <div class="text-gray-500 mb-1">Thinking:</div>
-              <div class="text-gray-700">{{ block.thinking?.content }}</div>
+              <div class="text-gray-700" v-html="renderMarkdown(block.thinking?.content || '')" />
             </div>
           </template>
         </div>
@@ -77,14 +77,20 @@
             v-if="showActions || actionsExpanded"
             class="message-actions absolute right-0 bottom-2 flex gap-1 bg-white rounded-lg shadow-lg border border-gray-300 px-2 py-1.5"
           >
-            <button @click="startAnnotation" class="px-2 py-1 text-xs hover:bg-gray-100 rounded">
-              🎯 Annotate
+            <button 
+              @click="annotateMessage" 
+              class="px-3 py-1 text-xs hover:bg-indigo-50 rounded flex items-center gap-1 text-indigo-700"
+              title="Create annotation for this message"
+            >
+              📌 Annotate
             </button>
-            <button @click="commentOnMessage" class="px-2 py-1 text-xs hover:bg-gray-100 rounded">
-              💬 Comment
-            </button>
-            <button @click="rateMessage" class="px-2 py-1 text-xs hover:bg-gray-100 rounded">
-              ⭐ Rate
+            <div class="w-px bg-gray-200" />
+            <button 
+              @click="startMultiSelect" 
+              class="px-3 py-1 text-xs hover:bg-gray-100 rounded flex items-center gap-1"
+              title="Select multiple messages"
+            >
+              ☑️ Multi-select
             </button>
           </div>
         </transition>
@@ -97,6 +103,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Avatar from './Avatar.vue'
 import type { Message } from '@/types'
+import { renderMarkdown } from '@/utils/markdown'
 
 interface Props {
   message: Message
@@ -118,9 +125,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   'toggle-select': [messageId: string]
   'text-selected': [messageId: string, text: string, start: number, end: number]
-  'start-annotation': [messageId: string]
-  'comment-message': [messageId: string]
-  'rate-message': [messageId: string]
+  'annotate-message': [messageId: string]
+  'start-multi-select': [messageId: string]
   'prev-branch': []
   'next-branch': []
 }>()
@@ -171,19 +177,14 @@ function onTextSelect(event: MouseEvent) {
   }
 }
 
-function startAnnotation() {
+function annotateMessage() {
   actionsExpanded.value = false
-  emit('start-annotation', props.message.id)
+  emit('annotate-message', props.message.id)
 }
 
-function commentOnMessage() {
+function startMultiSelect() {
   actionsExpanded.value = false
-  emit('comment-message', props.message.id)
-}
-
-function rateMessage() {
-  actionsExpanded.value = false
-  emit('rate-message', props.message.id)
+  emit('start-multi-select', props.message.id)
 }
 
 function formatTime(timestamp?: string) {

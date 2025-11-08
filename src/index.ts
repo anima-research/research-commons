@@ -5,10 +5,12 @@ import { SubmissionStore } from './storage/submission-store.js';
 import { AnnotationDatabase } from './database/db.js';
 import { UserStore } from './services/user-store.js';
 import { ResearchStore } from './services/research-store.js';
+import { OntologyStore } from './services/ontology-store.js';
 import { createAuthRoutes } from './routes/auth.js';
 import { createSubmissionRoutes } from './routes/submissions.js';
 import { createAnnotationRoutes } from './routes/annotations.js';
 import { createResearchRoutes } from './routes/research.js';
+import { createOntologyRoutes } from './routes/ontologies.js';
 
 dotenv.config();
 
@@ -22,6 +24,7 @@ export interface AppContext {
   annotationDb: AnnotationDatabase;
   userStore: UserStore;
   researchStore: ResearchStore;
+  ontologyStore: OntologyStore;
 }
 
 async function main() {
@@ -38,16 +41,19 @@ async function main() {
   const annotationDb = new AnnotationDatabase(DATABASE_PATH);
   const userStore = new UserStore(DATA_PATH);
   const researchStore = new ResearchStore(DATA_PATH);
+  const ontologyStore = new OntologyStore(DATA_PATH);
 
   await submissionStore.init();
   await userStore.init();
   await researchStore.init();
+  await ontologyStore.init();
 
   const context: AppContext = {
     submissionStore,
     annotationDb,
     userStore,
-    researchStore
+    researchStore,
+    ontologyStore
   };
 
   // Routes
@@ -55,6 +61,7 @@ async function main() {
   app.use('/api/submissions', createSubmissionRoutes(context));
   app.use('/api/annotations', createAnnotationRoutes(context));
   app.use('/api/research', createResearchRoutes(context));
+  app.use('/api/ontologies', createOntologyRoutes(context));
 
   // Health check
   app.get('/health', (req, res) => {
@@ -73,6 +80,7 @@ async function main() {
     annotationDb.close();
     await userStore.close();
     await researchStore.close();
+    await ontologyStore.close();
     process.exit(0);
   });
 }

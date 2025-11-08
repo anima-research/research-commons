@@ -46,6 +46,27 @@ export function createSubmissionRoutes(context: AppContext): Router {
         } : undefined
       );
 
+      // Auto-attach all public ontologies
+      const allOntologies = await context.ontologyStore.getAllOntologies();
+      const publicOntologies = allOntologies.filter(o => o.permissions === 'public');
+      
+      for (const ontology of publicOntologies) {
+        try {
+          const { v4: uuidv4 } = await import('uuid');
+          context.annotationDb.attachOntology({
+            id: uuidv4(),
+            submission_id: submission.id,
+            ontology_id: ontology.id,
+            attached_by: req.userId!,
+            attached_at: new Date(),
+            usage_permissions: 'anyone',
+            is_default: true
+          });
+        } catch (err) {
+          console.error('Failed to auto-attach ontology:', ontology.name, err);
+        }
+      }
+
       res.status(201).json(submission);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -76,6 +97,44 @@ export function createSubmissionRoutes(context: AppContext): Router {
     }
   });
 
+  // Update submission metadata
+  router.patch('/:submissionId', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Check permissions
+      const user = await context.userStore.getUserById(req.userId!);
+      const canEdit = submission.submitter_id === req.userId! || 
+                      user?.roles.includes('researcher') ||
+                      user?.roles.includes('admin');
+      
+      if (!canEdit) {
+        res.status(403).json({ error: 'Not authorized to edit this submission' });
+        return;
+      }
+
+      // Update metadata
+      if (req.body.description !== undefined) {
+        submission.metadata.description = req.body.description;
+      }
+      if (req.body.tags !== undefined) {
+        submission.metadata.tags = req.body.tags;
+      }
+
+      await context.submissionStore.updateSubmission(req.params.submissionId, submission);
+
+      res.json(submission);
+    } catch (error) {
+      console.error('Update submission error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // Get submission messages
   router.get('/:submissionId/messages', async (req, res) => {
     try {
@@ -97,13 +156,48 @@ export function createSubmissionRoutes(context: AppContext): Router {
     }
   });
 
-  // Get submission ratings
-  router.get('/:submissionId/ratings', async (req, res) => {
+  // Get all selections for submission (with their tags, comments, ratings)
+  router.get('/:submissionId/selections', async (req, res) => {
     try {
-      const ratings = await context.submissionStore.getRatings(req.params.submissionId);
-      res.json({ ratings });
+      const selections = context.annotationDb.getSelectionsBySubmission(req.params.submissionId);
+      
+      // Populate each selection with its tags
+      const selectionsWithData = selections.map(sel => {
+        const tags = context.annotationDb.getTagsForSelection(sel.id);
+        return { ...sel, annotation_tags: tags };
+      });
+      
+      res.json({ selections: selectionsWithData });
     } catch (error) {
-      console.error('Get ratings error:', error);
+      console.error('Get selections error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Delete submission (soft delete - mark as deleted)
+  router.delete('/:submissionId', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      const user = await context.userStore.getUserById(req.userId!);
+      const canDelete = submission.submitter_id === req.userId! ||
+                        user?.roles.includes('admin');
+
+      if (!canDelete) {
+        res.status(403).json({ error: 'Not authorized to delete this submission' });
+        return;
+      }
+
+      // TODO: Implement soft delete or mark as deleted
+      // For now just return success
+      res.status(200).json({ success: true, message: 'Deletion not yet implemented' });
+    } catch (error) {
+      console.error('Delete submission error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   });

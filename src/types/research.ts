@@ -5,6 +5,7 @@ export const TopicSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   description: z.string(),
+  default_ontologies: z.array(z.string().uuid()).default([]),  // Auto-attach to submissions
   created_by: z.string().uuid(),
   created_at: z.date()
 });
@@ -32,7 +33,7 @@ export const UserSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
   name: z.string(),
-  roles: z.array(z.enum(['viewer', 'contributor', 'rater', 'expert', 'researcher', 'agent'])),
+  roles: z.array(z.enum(['viewer', 'contributor', 'rater', 'expert', 'researcher', 'agent', 'admin'])),
   created_at: z.date(),
   updated_at: z.date().optional()
 });
@@ -42,7 +43,8 @@ export type User = z.infer<typeof UserSchema>;
 // API request schemas
 export const CreateTopicRequestSchema = z.object({
   name: z.string(),
-  description: z.string()
+  description: z.string(),
+  default_ontologies: z.array(z.string().uuid()).optional()
 });
 
 export const CreateCriterionRequestSchema = z.object({

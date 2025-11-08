@@ -1,10 +1,11 @@
 // Matches backend types
+export * from './ontology'
 
 export interface User {
   id: string
   email: string
   name: string
-  roles: ('viewer' | 'contributor' | 'rater' | 'expert' | 'researcher' | 'agent')[]
+  roles: ('viewer' | 'contributor' | 'rater' | 'expert' | 'researcher' | 'agent' | 'admin')[]
 }
 
 export interface ContentBlock {
@@ -62,15 +63,14 @@ export interface Selection {
   end_message_id: string
   end_offset?: number
   label?: string
+  annotation_tags: string[]  // Tag IDs
   created_at: string
 }
 
 export interface Comment {
   id: string
-  submission_id: string
+  selection_id: string  // Always on selection
   author_id: string
-  target_id: string
-  target_type: 'submission' | 'selection' | 'comment'
   parent_id?: string
   content: string
   created_at: string
@@ -79,13 +79,10 @@ export interface Comment {
 
 export interface Rating {
   id: string
-  submission_id: string
+  selection_id: string  // Always on selection
   rater_id: string
-  target_id: string
-  target_type: 'submission' | 'selection'
   criterion_id: string
   score: number
-  comment_id?: string
   created_at: string
   updated_at?: string
 }
@@ -94,6 +91,7 @@ export interface Topic {
   id: string
   name: string
   description: string
+  default_ontologies: string[]
   created_by: string
   created_at: string
 }

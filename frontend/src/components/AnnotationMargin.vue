@@ -1,10 +1,5 @@
 <template>
   <div class="annotation-margin relative w-full" :style="{ minHeight: minHeight + 'px' }">
-    <!-- Debug info -->
-    <div class="absolute top-0 left-0 text-xs text-gray-400 bg-white p-2 z-50">
-      {{ layoutPositions.length }} positioned
-    </div>
-    
     <!-- Positioned annotation cards -->
     <div
       v-for="pos in layoutPositions"
@@ -16,42 +11,55 @@
       }"
       :title="`Ideal: ${pos.idealTop}, Actual: ${pos.actualTop}`"
     >
-      <!-- Connection line if displaced from anchor -->
+      <!-- Connection lines showing extent to ideal position -->
       <svg
-        v-if="Math.abs(pos.actualTop - pos.idealTop) > 5"
         class="absolute pointer-events-none"
         :style="{ 
-          left: '-24px',
-          width: '24px',
-          height: Math.abs(pos.actualTop - pos.idealTop) + 50 + 'px',
-          top: pos.idealTop < pos.actualTop ? '10px' : 'auto',
-          bottom: pos.idealTop > pos.actualTop ? '10px' : 'auto'
+          left: '-32px',
+          top: '0',
+          width: '32px',
+          height: Math.max(pos.height, Math.abs(pos.idealTop - pos.actualTop) + pos.height) + 'px'
         }"
       >
+        <!-- Top line: from top-left of card to ideal top position -->
         <path
-          :d="getConnectionPath(pos)"
-          stroke="#CBD5E1" 
+          :d="getTopLinePath(pos)"
+          stroke="#9CA3AF"
+          stroke-width="1.5"
+          stroke-dasharray="4 2"
+          fill="none"
+        />
+        
+        <!-- Bottom line: from bottom-left of card to ideal bottom position -->
+        <path
+          :d="getBottomLinePath(pos)"
+          stroke="#9CA3AF"
           stroke-width="1.5"
           stroke-dasharray="4 2"
           fill="none"
         />
       </svg>
       
-      <!-- Render appropriate card type -->
-      <CommentCard
-        v-if="getAnnotation(pos.annotationId)?.type === 'comment'"
-        :comment="getAnnotation(pos.annotationId).data"
-        :user-name="getUserName(getAnnotation(pos.annotationId).data.author_id)"
+      <!-- Unified SelectionCard -->
+      <SelectionCard
+        v-if="getAnnotation(pos.annotationId)"
+        :selection="getAnnotation(pos.annotationId)!.data.selection"
+        :tags="getAnnotation(pos.annotationId)!.data.tags"
+        :comments="getAnnotation(pos.annotationId)!.data.comments"
+        :ratings="getAnnotation(pos.annotationId)!.data.ratings"
+        :created-by="getUserName(getAnnotation(pos.annotationId)!.data.selection.created_by)"
+        :user-names="userNames"
+        :current-user-id="currentUserId"
+        :can-delete="canModerate || getAnnotation(pos.annotationId)!.data.selection.created_by === currentUserId"
+        :can-delete-comments="canModerate"
+        :can-delete-ratings="canModerate"
         @resize="handleResize(pos.annotationId, $event)"
-        @reply="$emit('reply-comment', getAnnotation(pos.annotationId).data.id)"
-      />
-      
-      <RatingCard
-        v-else-if="getAnnotation(pos.annotationId)?.type === 'rating'"
-        :rating="getAnnotation(pos.annotationId).data"
-        :criterion-name="getCriterionName(getAnnotation(pos.annotationId).data.criterion_id)"
-        :user-name="getUserName(getAnnotation(pos.annotationId).data.rater_id)"
-        @resize="handleResize(pos.annotationId, $event)"
+        @add-tag="$emit('add-tag', getAnnotation(pos.annotationId)!.data.selection.id)"
+        @add-comment="$emit('add-comment', getAnnotation(pos.annotationId)!.data.selection.id)"
+        @add-rating="$emit('add-rating', getAnnotation(pos.annotationId)!.data.selection.id)"
+        @delete="$emit('delete-selection', getAnnotation(pos.annotationId)!.data.selection.id)"
+        @delete-comment="$emit('delete-comment', $event)"
+        @delete-rating="$emit('delete-rating', $event)"
       />
     </div>
   </div>
@@ -62,18 +70,28 @@ import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { AnnotationLayoutManager } from '@/utils/layout-manager'
 import type { MarginAnnotation, LayoutPosition } from '@/utils/layout-manager'
-import CommentCard from './CommentCard.vue'
-import RatingCard from './RatingCard.vue'
+import SelectionCard from './SelectionCard.vue'
 
 interface Props {
   annotations: MarginAnnotation[]
   conversationEl: HTMLElement | null
+  userNames?: Map<string, string>
+  currentUserId?: string
+  canModerate?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  userNames: () => new Map(),
+  canModerate: false
+})
 
 const emit = defineEmits<{
-  'reply-comment': [commentId: string]
+  'add-tag': [selectionId: string]
+  'add-comment': [selectionId: string]
+  'add-rating': [selectionId: string]
+  'delete-selection': [selectionId: string]
+  'delete-comment': [commentId: string]
+  'delete-rating': [ratingId: string]
 }>()
 
 const layoutManager = new AnnotationLayoutManager()
@@ -112,12 +130,8 @@ onUnmounted(() => {
 })
 
 function recalculateLayout() {
-  if (!props.conversationEl) {
-    console.log('No conversation element for layout')
-    return
-  }
+  if (!props.conversationEl) return
   
-  console.log('Recalculating layout for', props.annotations.length, 'annotations')
   layoutManager.updateMessagePositions(props.conversationEl)
   
   // Update annotations with measured heights
@@ -126,9 +140,7 @@ function recalculateLayout() {
     minHeight: annotationHeights.value.get(ann.id) || ann.minHeight
   }))
   
-  const positions = layoutManager.layoutAnnotations(annotationsWithHeights)
-  console.log('Layout positions:', positions)
-  layoutPositions.value = positions
+  layoutPositions.value = layoutManager.layoutAnnotations(annotationsWithHeights)
 }
 
 function handleResize(annotationId: string, height: number) {
@@ -156,22 +168,37 @@ function getCriterionName(criterionId: string) {
   return 'Criterion'
 }
 
-function getConnectionPath(pos: LayoutPosition): string {
-  const displacement = pos.actualTop - pos.idealTop
+function getTopLinePath(pos: LayoutPosition): string {
+  const startX = 32 // Right edge (card side)
+  const startY = 0  // Top of card (actual)
+  const endX = 0    // Left edge (conversation side)
+  const endY = pos.idealTop - pos.actualTop // Ideal top (relative to card position)
   
-  if (Math.abs(displacement) < 5) return ''
-  
-  const startY = pos.height / 2
-  const endY = startY - displacement
-  const dx = 24
-  
-  if (displacement > 0) {
-    // Annotation pushed down, line goes up to anchor
-    return `M 0,${startY} C ${dx/3},${startY} ${dx*2/3},${endY} ${dx},${endY}`
-  } else {
-    // Annotation pushed up, line goes down to anchor
-    return `M 0,${startY} C ${dx/3},${startY} ${dx*2/3},${endY} ${dx},${endY}`
+  // If aligned, straight line
+  if (Math.abs(endY) < 2) {
+    return `M ${startX},${startY} L ${endX},${startY}`
   }
+  
+  // Curved path using cubic bezier
+  return `M ${startX},${startY} C ${startX * 2/3},${startY} ${startX / 3},${endY} ${endX},${endY}`
+}
+
+function getBottomLinePath(pos: LayoutPosition): string {
+  const startX = 32 // Right edge (card side)
+  const startY = pos.height  // Bottom of card (actual)
+  const endX = 0    // Left edge (conversation side)
+  
+  // Calculate where ideal bottom should be (relative to card)
+  const idealMessageBottom = pos.idealBottom - pos.actualTop
+  const endY = idealMessageBottom
+  
+  // If aligned, straight line
+  if (Math.abs(endY - startY) < 2) {
+    return `M ${startX},${startY} L ${endX},${startY}`
+  }
+  
+  // Curved path
+  return `M ${startX},${startY} C ${startX * 2/3},${startY} ${startX / 3},${endY} ${endX},${endY}`
 }
 </script>
 

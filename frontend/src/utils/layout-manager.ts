@@ -1,37 +1,39 @@
 export interface MarginAnnotation {
   id: string
-  type: 'comment' | 'rating' | 'selection-info'
+  type: 'selection'  // Unified type
   anchorMessageId: string
   anchorOffset?: number
   priority: number
   minHeight: number
-  data: any
+  data: {
+    selection: any
+    tags: any[]
+    comments: any[]
+    ratings: any[]
+  }
 }
 
 export interface LayoutPosition {
   annotationId: string
   idealTop: number
+  idealBottom: number    // Where annotation should end
   actualTop: number
   height: number
   priority: number
 }
 
 export class AnnotationLayoutManager {
-  private messagePositions: Map<string, number> = new Map()
+  private messagePositions: Map<string, { top: number, height: number }> = new Map()
   private containerTop: number = 0
 
   updateMessagePositions(containerEl: HTMLElement | null) {
-    if (!containerEl) {
-      console.log('updateMessagePositions: no container')
-      return
-    }
+    if (!containerEl) return
     
     const containerRect = containerEl.getBoundingClientRect()
     this.containerTop = containerRect.top
     this.messagePositions.clear()
     
     const messages = containerEl.querySelectorAll('[data-message-id]')
-    console.log('Found', messages.length, 'messages with data-message-id')
     
     messages.forEach(el => {
       const messageId = el.getAttribute('data-message-id')
@@ -39,8 +41,10 @@ export class AnnotationLayoutManager {
         const rect = el.getBoundingClientRect()
         // Position relative to container's scroll position
         const relativeTop = rect.top - this.containerTop + containerEl.scrollTop
-        this.messagePositions.set(messageId, relativeTop)
-        console.log(`Message ${messageId.substring(0, 8)}: ${relativeTop}px`)
+        this.messagePositions.set(messageId, {
+          top: relativeTop,
+          height: rect.height
+        })
       }
     })
   }
@@ -50,12 +54,16 @@ export class AnnotationLayoutManager {
     
     // Calculate ideal positions
     for (const ann of annotations) {
-      const messageTop = this.messagePositions.get(ann.anchorMessageId) || 0
-      const idealTop = messageTop + (ann.anchorOffset || 0)
+      const messagePos = this.messagePositions.get(ann.anchorMessageId)
+      if (!messagePos) continue
+      
+      const idealTop = messagePos.top + (ann.anchorOffset || 0)
+      const idealBottom = idealTop + messagePos.height
       
       positions.push({
         annotationId: ann.id,
         idealTop,
+        idealBottom,
         actualTop: idealTop,
         height: ann.minHeight,
         priority: ann.priority

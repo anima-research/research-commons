@@ -79,11 +79,6 @@ export const useSubmissionsStore = defineStore('submissions', () => {
   async function createComment(data: Omit<Comment, 'id' | 'author_id' | 'created_at'>) {
     try {
       const response = await annotationsAPI.createComment(data)
-      
-      // Add to cache
-      const existing = comments.value.get(data.submission_id) || []
-      comments.value.set(data.submission_id, [...existing, response.data])
-      
       return response.data
     } catch (err: any) {
       error.value = err.response?.data?.error || 'Failed to create comment'
@@ -94,15 +89,30 @@ export const useSubmissionsStore = defineStore('submissions', () => {
   async function createRating(data: Omit<Rating, 'id' | 'rater_id' | 'created_at'>) {
     try {
       const response = await annotationsAPI.createRating(data)
-      
-      // Add to cache
-      const existing = ratings.value.get(data.submission_id) || []
-      ratings.value.set(data.submission_id, [...existing, response.data])
-      
       return response.data
     } catch (err: any) {
       error.value = err.response?.data?.error || 'Failed to create rating'
       throw err
+    }
+  }
+  
+  async function getCommentsBySelection(selectionId: string) {
+    try {
+      const response = await annotationsAPI.getCommentsBySelection(selectionId)
+      return response.data.comments
+    } catch (err: any) {
+      error.value = err.response?.data?.error || 'Failed to fetch comments'
+      return []
+    }
+  }
+  
+  async function getRatingsBySelection(selectionId: string) {
+    try {
+      const response = await annotationsAPI.getRatingsBySelection(selectionId)
+      return response.data.ratings
+    } catch (err: any) {
+      error.value = err.response?.data?.error || 'Failed to fetch ratings'
+      return []
     }
   }
 
@@ -140,7 +150,9 @@ export const useSubmissionsStore = defineStore('submissions', () => {
     getMessages,
     getSelections,
     getComments,
-    getRatings
+    getRatings,
+    getCommentsBySelection,
+    getRatingsBySelection
   }
 })
 

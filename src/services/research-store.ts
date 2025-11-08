@@ -47,11 +47,12 @@ export class ResearchStore {
   }
 
   // Topic methods
-  async createTopic(name: string, description: string, createdBy: string): Promise<Topic> {
+  async createTopic(name: string, description: string, createdBy: string, defaultOntologies: string[] = []): Promise<Topic> {
     const topic: Topic = {
       id: uuidv4(),
       name,
       description,
+      default_ontologies: defaultOntologies,
       created_by: createdBy,
       created_at: new Date()
     };

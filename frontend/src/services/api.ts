@@ -35,6 +35,9 @@ export const submissionsAPI = {
   get: (id: string) =>
     api.get<Submission>(`/submissions/${id}`),
   
+  update: (id: string, updates: { description?: string; tags?: string[] }) =>
+    api.patch<Submission>(`/submissions/${id}`, updates),
+  
   getMessages: (id: string) =>
     api.get<{ messages: Message[] }>(`/submissions/${id}/messages`),
   
@@ -43,23 +46,52 @@ export const submissionsAPI = {
 }
 
 export const annotationsAPI = {
-  createSelection: (data: Omit<Selection, 'id' | 'created_by' | 'created_at'>) =>
+  createSelection: (data: Omit<Selection, 'id' | 'created_by' | 'created_at' | 'annotation_tags'>) =>
     api.post<Selection>('/annotations/selections', data),
   
   getSelections: (submissionId: string) =>
     api.get<{ selections: Selection[] }>(`/annotations/selections/submission/${submissionId}`),
   
+  deleteSelection: (selectionId: string) =>
+    api.delete<{ success: boolean }>(`/annotations/selections/${selectionId}`),
+  
   createComment: (data: Omit<Comment, 'id' | 'author_id' | 'created_at'>) =>
     api.post<Comment>('/annotations/comments', data),
   
-  getComments: (submissionId: string) =>
-    api.get<{ comments: Comment[] }>(`/annotations/comments/submission/${submissionId}`),
+  getCommentsBySelection: (selectionId: string) =>
+    api.get<{ comments: Comment[] }>(`/annotations/comments/selection/${selectionId}`),
+  
+  deleteComment: (commentId: string) =>
+    api.delete<{ success: boolean }>(`/annotations/comments/${commentId}`),
   
   createRating: (data: Omit<Rating, 'id' | 'rater_id' | 'created_at'>) =>
     api.post<Rating>('/annotations/ratings', data),
   
-  getRatings: (submissionId: string) =>
-    api.get<{ ratings: Rating[] }>(`/annotations/ratings/submission/${submissionId}`)
+  getRatingsBySelection: (selectionId: string) =>
+    api.get<{ ratings: Rating[] }>(`/annotations/ratings/selection/${selectionId}`),
+  
+  deleteRating: (ratingId: string) =>
+    api.delete<{ success: boolean }>(`/annotations/ratings/${ratingId}`)
+}
+
+export const ontologiesAPI = {
+  list: () =>
+    api.get<{ ontologies: any[] }>('/ontologies'),
+  
+  get: (id: string) =>
+    api.get<{ ontology: any; tags: any[] }>(`/ontologies/${id}`),
+  
+  create: (data: any) =>
+    api.post<any>('/ontologies', data),
+  
+  attach: (submissionId: string, ontologyId: string, usagePermissions: string) =>
+    api.post<any>('/ontologies/attach', { submission_id: submissionId, ontology_id: ontologyId, usage_permissions: usagePermissions }),
+  
+  getForSubmission: (submissionId: string) =>
+    api.get<{ ontologies: any[] }>(`/ontologies/submission/${submissionId}`),
+  
+  applyTags: (selectionId: string, tagIds: string[]) =>
+    api.post<{ success: boolean }>('/ontologies/tags/apply', { selection_id: selectionId, tag_ids: tagIds })
 }
 
 export const researchAPI = {
