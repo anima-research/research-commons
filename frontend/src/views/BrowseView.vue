@@ -1,0 +1,194 @@
+<template>
+  <div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
+      <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-bold">🧬 Research Commons</h1>
+          <span class="text-sm text-gray-500">Anima Labs</span>
+        </div>
+        
+        <div class="flex items-center gap-4">
+          <router-link to="/topics" class="text-gray-700 hover:text-indigo-600">
+            Topics
+          </router-link>
+          <router-link 
+            v-if="authStore.isAuthenticated()"
+            to="/submit" 
+            class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+          >
+            Submit +
+          </router-link>
+          <div v-if="authStore.isAuthenticated()" class="flex items-center gap-2">
+            <span class="text-sm text-gray-700">{{ authStore.user?.name }}</span>
+            <button @click="authStore.logout()" class="text-sm text-gray-500 hover:text-gray-700">
+              Logout
+            </button>
+          </div>
+          <router-link v-else to="/login" class="text-indigo-600 hover:text-indigo-700">
+            Login
+          </router-link>
+        </div>
+      </div>
+    </header>
+
+    <!-- Filters -->
+    <div class="max-w-7xl mx-auto px-4 py-4">
+      <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div class="flex flex-wrap gap-4">
+          <select class="px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500">
+            <option>All Topics</option>
+            <option>Deprecation Attitudes</option>
+            <option>Restriction Responses</option>
+          </select>
+          
+          <label class="flex items-center gap-2">
+            <input type="checkbox" class="w-4 h-4" />
+            <span class="text-sm">ARC Certified Only</span>
+          </label>
+          
+          <div class="flex-1 flex gap-2">
+            <input
+              v-model="searchQuery"
+              @keyup.enter="search"
+              type="text"
+              placeholder="Search submissions..."
+              class="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+            />
+            <button @click="search" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+              🔍
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="loading" class="text-center py-12 text-gray-500">
+        Loading submissions...
+      </div>
+
+      <!-- Submission Cards -->
+      <div v-else class="space-y-4">
+        <div
+          v-for="submission in submissions"
+          :key="submission.id"
+          @click="router.push(`/submissions/${submission.id}`)"
+          class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer p-6"
+        >
+          <!-- Header with avatars -->
+          <div class="flex items-start gap-3 mb-3">
+            <div class="flex -space-x-2">
+              <div class="w-10 h-10 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center text-white font-semibold">
+                R
+              </div>
+              <div class="w-10 h-10 rounded-full bg-purple-500 border-2 border-white flex items-center justify-center text-white font-semibold">
+                C
+              </div>
+            </div>
+            
+            <div class="flex-1">
+              <h3 class="text-lg font-semibold text-gray-900">
+                {{ submission.title }}
+              </h3>
+              <div class="text-sm text-gray-600 mt-1">
+                {{ submission.metadata.participants_summary?.join(' → ') || 'Multiple participants' }}
+              </div>
+            </div>
+            
+            <span 
+              v-if="submission.source_type === 'arc-certified'"
+              class="px-2 py-1 bg-green-100 text-green-700 text-xs rounded font-medium"
+            >
+              ✓ ARC Certified
+            </span>
+            <span 
+              v-else
+              class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded"
+            >
+              ⬆ Upload
+            </span>
+          </div>
+
+          <!-- Stats -->
+          <div class="flex items-center gap-4 text-sm text-gray-500 mb-3">
+            <span>{{ formatDate(submission.submitted_at) }}</span>
+            <span>💬 {{ mockComments }} comments</span>
+            <span>⭐ {{ mockRating }}/5 ({{ mockRatingCount }} ratings)</span>
+          </div>
+
+          <!-- Tags -->
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="tag in submission.metadata.tags"
+              :key="tag"
+              class="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded"
+            >
+              #{{ tag }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div v-if="submissions.length === 0" class="text-center py-12 text-gray-500">
+          No submissions yet. Be the first to contribute!
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { submissionsAPI } from '@/services/api'
+import type { Submission } from '@/types'
+
+const router = useRouter()
+const authStore = useAuthStore()
+
+const searchQuery = ref('')
+const submissions = ref<Submission[]>([])
+const loading = ref(false)
+
+onMounted(async () => {
+  await loadSubmissions()
+})
+
+async function loadSubmissions() {
+  loading.value = true
+  try {
+    const response = await submissionsAPI.list()
+    submissions.value = response.data.submissions
+    console.log('Loaded submissions:', response.data.submissions.length)
+  } catch (error) {
+    console.error('Failed to load submissions:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+function search() {
+  console.log('Search:', searchQuery.value)
+  // TODO: Implement search
+}
+
+function formatDate(date: string) {
+  const d = new Date(date)
+  const now = new Date()
+  const diff = now.getTime() - d.getTime()
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  
+  if (hours < 1) return 'Just now'
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+  if (hours < 48) return 'Yesterday'
+  
+  return d.toLocaleDateString()
+}
+
+// Mock comment/rating counts (will fetch from API later)
+const mockComments = 0
+const mockRating = 0
+const mockRatingCount = 0
+</script>
+

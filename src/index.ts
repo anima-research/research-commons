@@ -1,0 +1,84 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { SubmissionStore } from './storage/submission-store.js';
+import { AnnotationDatabase } from './database/db.js';
+import { UserStore } from './services/user-store.js';
+import { ResearchStore } from './services/research-store.js';
+import { createAuthRoutes } from './routes/auth.js';
+import { createSubmissionRoutes } from './routes/submissions.js';
+import { createAnnotationRoutes } from './routes/annotations.js';
+import { createResearchRoutes } from './routes/research.js';
+
+dotenv.config();
+
+const PORT = process.env.PORT || 3020;
+const DATABASE_PATH = process.env.DATABASE_PATH || './data/research.db';
+const SUBMISSIONS_PATH = process.env.SUBMISSIONS_PATH || './data/submissions';
+const DATA_PATH = process.env.DATA_PATH || './data';
+
+export interface AppContext {
+  submissionStore: SubmissionStore;
+  annotationDb: AnnotationDatabase;
+  userStore: UserStore;
+  researchStore: ResearchStore;
+}
+
+async function main() {
+  const app = express();
+
+  // Middleware
+  app.use(cors());
+  app.use(express.json({ limit: '50mb' })); // Large submissions with images
+
+  // Initialize stores
+  console.log('Initializing stores...');
+  
+  const submissionStore = new SubmissionStore(SUBMISSIONS_PATH);
+  const annotationDb = new AnnotationDatabase(DATABASE_PATH);
+  const userStore = new UserStore(DATA_PATH);
+  const researchStore = new ResearchStore(DATA_PATH);
+
+  await submissionStore.init();
+  await userStore.init();
+  await researchStore.init();
+
+  const context: AppContext = {
+    submissionStore,
+    annotationDb,
+    userStore,
+    researchStore
+  };
+
+  // Routes
+  app.use('/api/auth', createAuthRoutes(context));
+  app.use('/api/submissions', createSubmissionRoutes(context));
+  app.use('/api/annotations', createAnnotationRoutes(context));
+  app.use('/api/research', createResearchRoutes(context));
+
+  // Health check
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+  });
+
+  // Start server
+  app.listen(PORT, () => {
+    console.log(`✅ Research Commons API running on port ${PORT}`);
+  });
+
+  // Graceful shutdown
+  process.on('SIGINT', async () => {
+    console.log('\nShutting down...');
+    await submissionStore.close();
+    annotationDb.close();
+    await userStore.close();
+    await researchStore.close();
+    process.exit(0);
+  });
+}
+
+main().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});
+

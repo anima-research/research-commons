@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  /* Discord-style message layout */
+  .message-row {
+    @apply flex gap-4 p-4 hover:bg-gray-100 transition-colors;
+  }
+  
+  .message-avatar {
+    @apply w-10 h-10 rounded-full flex-shrink-0;
+  }
+  
+  .message-content {
+    @apply flex-1 min-w-0;
+  }
+  
+  /* Selection highlight */
+  .text-selection {
+    @apply bg-yellow-200 rounded cursor-pointer;
+  }
+  
+  .text-selection.has-comments {
+    @apply border-l-4 border-blue-500;
+  }
+  
+  .text-selection.has-ratings::after {
+    content: "⭐";
+    @apply ml-1 text-sm;
+  }
+  
+  /* Action buttons */
+  .action-button {
+    @apply px-3 py-1.5 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 transition-colors text-sm;
+  }
+  
+  /* Checkbox column animation */
+  @keyframes slideInLeft {
+    from {
+      transform: translateX(-40px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  .checkbox-column {
+    animation: slideInLeft 0.2s ease;
+  }
+}
+
