@@ -45,15 +45,19 @@
             :selection="annotation.selection"
             :tags="annotation.tags"
             :comments="annotation.comments"
+            :tag-attributions="annotation.tagAttributions || []"
             :created-by="getUserName(annotation.selection.created_by)"
             :user-names="userNames"
             :current-user-id="currentUserId"
             :can-delete="canModerate || annotation.selection.created_by === currentUserId"
             :can-delete-comments="canModerate"
+            :can-remove-tags="canModerate"
             @add-tag="$emit('add-tag', annotation.selection.id)"
+            @add-tag-vote="$emit('add-tag-vote', annotation.selection.id, $event)"
             @add-comment="$emit('add-comment', annotation.selection.id)"
             @delete="$emit('delete-selection', annotation.selection.id)"
             @delete-comment="$emit('delete-comment', $event)"
+            @remove-tag="$emit('remove-tag', annotation.selection.id, $event)"
           />
         </div>
       </template>
@@ -110,9 +114,11 @@ const emit = defineEmits<{
   'start-multi-select': [messageId: string]
   'selection-mode-changed': [active: boolean]
   'add-tag': [selectionId: string]
+  'add-tag-vote': [selectionId: string, tagId: string]
   'add-comment': [selectionId: string]
   'delete-selection': [selectionId: string]
   'delete-comment': [commentId: string]
+  'remove-tag': [selectionId: string, tagId: string]
 }>()
 
 function getUserName(userId: string): string {

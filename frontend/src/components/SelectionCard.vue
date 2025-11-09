@@ -27,22 +27,46 @@
     </div>
 
     <!-- Tags section -->
-    <div v-if="tags.length > 0 || canTag" class="p-3 border-b border-gray-100">
+    <div v-if="groupedTags.length > 0 || canTag" class="p-3 border-b border-gray-100 dark:border-gray-800">
       <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">🏷️ Tags</div>
-      <div class="flex flex-wrap gap-1 mb-2">
-        <span
-          v-for="tag in tags"
-          :key="tag.id"
-          class="px-2 py-1 rounded text-xs font-medium"
-          :style="{ backgroundColor: tag.color + '20', color: tag.color }"
+      <div class="flex flex-wrap gap-2 mb-2">
+        <div
+          v-for="group in groupedTags"
+          :key="group.tag.id"
+          class="group relative"
         >
-          {{ tag.name }}
-        </span>
+          <button
+            @click="toggleMyVote(group.tag.id)"
+            class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-all hover:scale-105"
+            :style="{ 
+              backgroundColor: group.tag.color + (group.hasMyVote ? '30' : '15'),
+              color: group.tag.color,
+              outline: group.hasMyVote ? `2px solid ${group.tag.color}` : 'none',
+              outlineOffset: '-2px'
+            }"
+            :title="getGroupTooltip(group)"
+          >
+            {{ group.tag.name }}
+            <span v-if="group.count > 1" class="text-[10px] font-bold opacity-75 bg-white dark:bg-gray-900 px-1 rounded">
+              ×{{ group.count }}
+            </span>
+            <span class="text-[10px] opacity-60">
+              {{ group.hasMyVote ? '(voted)' : '' }}
+            </span>
+          </button>
+          <!-- Contributors tooltip on hover -->
+          <div class="absolute left-0 top-full mt-1 hidden group-hover:block z-10 bg-gray-900 dark:bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+            {{ getContributorsList(group) }}
+            <div class="text-[10px] opacity-75 mt-0.5">
+              Click to {{ group.hasMyVote ? 'remove' : 'add' }} your vote
+            </div>
+          </div>
+        </div>
       </div>
       <button 
         v-if="canTag"
         @click="$emit('add-tag')"
-        class="text-xs text-indigo-600 hover:text-indigo-700"
+        class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
       >
         + Add tag
       </button>
@@ -106,11 +130,13 @@ interface Props {
   selection: Selection
   tags: AnnotationTag[]
   comments: Comment[]
+  tagAttributions?: Array<{ tag_id: string; tagged_by: string; tagged_at: Date }>
   createdBy?: string
   canTag?: boolean
   canComment?: boolean
   canDelete?: boolean
   canDeleteComments?: boolean
+  canRemoveTags?: boolean
   userNames?: Map<string, string>  // userId -> name mapping
   currentUserId?: string
 }
@@ -120,14 +146,18 @@ const props = withDefaults(defineProps<Props>(), {
   canTag: true,
   canComment: true,
   canDelete: false,
-  canDeleteComments: false
+  canDeleteComments: false,
+  canRemoveTags: false,
+  tagAttributions: () => []
 })
 
 const emit = defineEmits<{
   'add-tag': []
+  'add-tag-vote': [tagId: string]
   'add-comment': []
   'delete': []
   'delete-comment': [commentId: string]
+  'remove-tag': [tagId: string]
   'resize': [height: number]
 }>()
 
@@ -151,11 +181,88 @@ const displayedComments = computed(() => {
   return showAllComments.value ? props.comments : props.comments.slice(0, 2)
 })
 
+// Group tags by tag_id and count votes
+const groupedTags = computed(() => {
+  const groups = new Map<string, { 
+    tag: any; 
+    contributors: Array<{ userId: string; timestamp: Date }>;
+    hasMyVote: boolean;
+  }>()
+  
+  // Group by tag
+  props.tags.forEach(tag => {
+    const attributions = (props.tagAttributions || []).filter(a => a.tag_id === tag.id)
+    
+    if (!groups.has(tag.id)) {
+      groups.set(tag.id, {
+        tag,
+        contributors: attributions.map(a => ({ userId: a.tagged_by, timestamp: a.tagged_at })),
+        hasMyVote: attributions.some(a => a.tagged_by === props.currentUserId)
+      })
+    }
+  })
+  
+  return Array.from(groups.values()).map(g => ({
+    tag: g.tag,
+    count: g.contributors.length,
+    contributors: g.contributors,
+    hasMyVote: g.hasMyVote
+  }))
+})
+
 function getUserName(userId: string) {
   if (props.userNames?.has(userId)) {
     return props.userNames.get(userId)!
   }
   return 'User ' + userId.substring(0, 8)
+}
+
+function getTagAuthor(tagId: string): string {
+  const attribution = props.tagAttributions?.find(a => a.tag_id === tagId)
+  if (!attribution) return '?'
+  return props.userNames?.get(attribution.tagged_by) || 'User'
+}
+
+function getTagAttribution(tagId: string): string {
+  const attribution = props.tagAttributions?.find(a => a.tag_id === tagId)
+  if (!attribution) return 'Tagged by unknown'
+  const author = props.userNames?.get(attribution.tagged_by) || 'User'
+  return `Tagged by ${author}`
+}
+
+function canRemoveTag(tagId: string): boolean {
+  if (props.canRemoveTags) return true // Moderators can remove any
+  const attribution = props.tagAttributions?.find(a => a.tag_id === tagId)
+  return attribution?.tagged_by === props.currentUserId
+}
+
+function getGroupTooltip(group: any): string {
+  if (group.count === 1) {
+    const userName = getUserName(group.contributors[0].userId)
+    return `Tagged by ${userName}`
+  }
+  return `${group.count} votes - click to see details`
+}
+
+function getContributorsList(group: any): string {
+  const names = group.contributors.map((c: any) => getUserName(c.userId))
+  if (names.length <= 3) {
+    return names.join(', ')
+  }
+  return `${names.slice(0, 3).join(', ')} +${names.length - 3} more`
+}
+
+function toggleMyVote(tagId: string) {
+  const group = groupedTags.value.find(g => g.tag.id === tagId)
+  if (!group) return
+  
+  if (group.hasMyVote) {
+    // Remove my vote
+    emit('remove-tag', tagId)
+  } else {
+    // Add my vote - need to emit tag-vote event
+    emit('add-tag-vote', tagId)
+  }
 }
 
 function getCriterionName(criterionId: string) {

@@ -100,6 +100,30 @@ export function createAuthRoutes(context: AppContext): Router {
     }
   });
 
+  // Get user names by IDs (for displaying attributions)
+  router.post('/users/names', async (req, res) => {
+    try {
+      const { user_ids } = req.body;
+      if (!Array.isArray(user_ids)) {
+        res.status(400).json({ error: 'user_ids must be an array' });
+        return;
+      }
+
+      const userNames: Record<string, string> = {};
+      for (const userId of user_ids) {
+        const user = await context.userStore.getUserById(userId);
+        if (user) {
+          userNames[userId] = user.name;
+        }
+      }
+
+      res.json({ user_names: userNames });
+    } catch (error) {
+      console.error('Get user names error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   return router;
 }
 

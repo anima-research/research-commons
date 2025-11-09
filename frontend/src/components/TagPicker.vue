@@ -2,12 +2,13 @@
   <Teleport to="body">
     <div
       v-if="show"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      class="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4"
       @click.self="$emit('cancel')"
     >
-      <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto transition-colors">
         <div class="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-4">
-          <h3 class="text-lg font-semibold">🏷️ Tag Selection</h3>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">🏷️ Tag Selection</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Select tags to apply to this selection</p>
         </div>
 
         <div class="p-4">
@@ -16,7 +17,7 @@
             <div
               v-for="onto in ontologiesWithTags"
               :key="onto.ontology.id"
-              class="border border-gray-200 dark:border-gray-800 rounded-lg p-3"
+              class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-800 transition-colors"
             >
               <div class="font-medium text-sm text-gray-900 dark:text-gray-100 mb-2">
                 {{ onto.ontology.name }}
@@ -29,7 +30,7 @@
                 <label
                   v-for="tag in onto.tags"
                   :key="tag.id"
-                  class="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer"
+                  class="flex items-center gap-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
                 >
                   <input
                     type="checkbox"
@@ -51,9 +52,6 @@
 
           <div v-else class="text-center py-8 text-gray-500 dark:text-gray-400">
             No ontologies attached to this submission.
-            <button class="block mx-auto mt-2 text-indigo-600 hover:text-indigo-700 text-sm">
-              Attach an ontology first
-            </button>
           </div>
         </div>
 
@@ -61,14 +59,14 @@
         <div class="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 flex justify-end gap-2">
           <button
             @click="$emit('cancel')"
-            class="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-800"
+            class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             Cancel
           </button>
           <button
             @click="applyTags"
             :disabled="selectedTagIds.size === 0"
-            class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded disabled:opacity-50 transition-colors"
           >
             Apply {{ selectedTagIds.size }} tag(s)
           </button>

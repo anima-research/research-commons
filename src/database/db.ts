@@ -102,9 +102,10 @@ export class AnnotationDatabase {
     }
   }
   
-  removeTag(selectionId: string, tagId: string): void {
-    this.db.prepare('DELETE FROM selection_tags WHERE selection_id = ? AND tag_id = ?')
-      .run(selectionId, tagId);
+  removeTag(selectionId: string, tagId: string, userId: string): void {
+    // Only remove this specific user's vote, not all votes for the tag
+    this.db.prepare('DELETE FROM selection_tags WHERE selection_id = ? AND tag_id = ? AND tagged_by = ?')
+      .run(selectionId, tagId, userId);
   }
   
   getTagsForSelection(selectionId: string): string[] {
@@ -112,12 +113,62 @@ export class AnnotationDatabase {
       .all(selectionId);
     return rows.map((row: any) => row.tag_id);
   }
+
+  getTagAttributions(selectionId: string): Array<{ tag_id: string; tagged_by: string; tagged_at: Date }> {
+    const rows = this.db.prepare(
+      'SELECT tag_id, tagged_by, tagged_at FROM selection_tags WHERE selection_id = ? ORDER BY tagged_at'
+    ).all(selectionId);
+    
+    return rows.map((row: any) => ({
+      tag_id: row.tag_id,
+      tagged_by: row.tagged_by,
+      tagged_at: new Date(row.tagged_at)
+    }));
+  }
   
   getSelectionWithTags(id: string): Selection | null {
     const selection = this.getSelection(id);
     if (!selection) return null;
     selection.annotation_tags = this.getTagsForSelection(id);
     return selection;
+  }
+  
+  canDeleteSelection(selectionId: string, userId: string): { canDelete: boolean; reason?: string } {
+    const selection = this.getSelection(selectionId);
+    if (!selection) return { canDelete: false, reason: 'Selection not found' };
+    
+    // Creator can always delete their own empty selection
+    if (selection.created_by === userId) {
+      // Check if selection has any content from others
+      const comments = this.getCommentsBySelection(selectionId);
+      const hasOthersComments = comments.some(c => c.author_id !== userId);
+      
+      const tags = this.getTagAttributions(selectionId);
+      const hasOthersTags = tags.some(t => t.tagged_by !== userId);
+      
+      if (hasOthersComments || hasOthersTags) {
+        return { canDelete: false, reason: 'Selection has contributions from other users' };
+      }
+      
+      return { canDelete: true };
+    }
+    
+    // Non-creators can only delete if they're the sole contributor
+    const comments = this.getCommentsBySelection(selectionId);
+    const allCommentsAreTheirs = comments.every(c => c.author_id === userId);
+    
+    const tags = this.getTagAttributions(selectionId);
+    const allTagsAreTheirs = tags.every(t => t.tagged_by === userId);
+    
+    if (comments.length === 0 && tags.length === 0) {
+      return { canDelete: false, reason: 'Cannot delete empty selection created by someone else' };
+    }
+    
+    if (allCommentsAreTheirs && allTagsAreTheirs && (comments.length > 0 || tags.length > 0)) {
+      return { canDelete: true };
+    }
+    
+    return { canDelete: false, reason: 'Selection has contributions from other users or you' };
   }
 
   // Comment methods

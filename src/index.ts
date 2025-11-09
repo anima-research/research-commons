@@ -7,6 +7,7 @@ import { UserStore } from './services/user-store.js';
 import { ResearchStore } from './services/research-store.js';
 import { OntologyStore } from './services/ontology-store.js';
 import { RankingStore } from './services/ranking-store.js';
+import { ModelStore } from './services/model-store.js';
 import { createAuthRoutes } from './routes/auth.js';
 import { createSubmissionRoutes } from './routes/submissions.js';
 import { createSubmissionSystemsRoutes } from './routes/submission-systems.js';
@@ -14,6 +15,7 @@ import { createAnnotationRoutes } from './routes/annotations.js';
 import { createResearchRoutes } from './routes/research.js';
 import { createOntologyRoutes } from './routes/ontologies.js';
 import { createRankingRoutes } from './routes/rankings.js';
+import { createModelRoutes } from './routes/models.js';
 
 dotenv.config();
 
@@ -29,6 +31,7 @@ export interface AppContext {
   researchStore: ResearchStore;
   ontologyStore: OntologyStore;
   rankingStore: RankingStore;
+  modelStore: ModelStore;
 }
 
 async function main() {
@@ -47,12 +50,14 @@ async function main() {
   const researchStore = new ResearchStore(DATA_PATH);
   const ontologyStore = new OntologyStore(DATA_PATH);
   const rankingStore = new RankingStore(DATA_PATH);
+  const modelStore = new ModelStore(DATA_PATH);
 
   await submissionStore.init();
   await userStore.init();
   await researchStore.init();
   await ontologyStore.init();
   await rankingStore.init();
+  await modelStore.init();
 
   const context: AppContext = {
     submissionStore,
@@ -60,7 +65,8 @@ async function main() {
     userStore,
     researchStore,
     ontologyStore,
-    rankingStore
+    rankingStore,
+    modelStore
   };
 
   // Routes
@@ -71,6 +77,7 @@ async function main() {
   app.use('/api/research', createResearchRoutes(context));
   app.use('/api/ontologies', createOntologyRoutes(context));
   app.use('/api/rankings', createRankingRoutes(context));
+  app.use('/api/models', createModelRoutes(context));
 
   // Health check
   app.get('/health', (req, res) => {

@@ -44,6 +44,13 @@
           :active="isActive('/rankings')"
           @click="$emit('navigate', '/rankings')"
         />
+        <NavItem 
+          icon="🤖" 
+          label="AI Models" 
+          route="/models" 
+          :active="isActive('/models')"
+          @click="$emit('navigate', '/models')"
+        />
       </div>
 
       <!-- Actions -->

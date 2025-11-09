@@ -25,7 +25,10 @@ export const authAPI = {
     api.post<{ user: User; token: string }>('/auth/login', { email, password }),
   
   refresh: () =>
-    api.post<{ user: User; token: string }>('/auth/refresh')
+    api.post<{ user: User; token: string }>('/auth/refresh'),
+  
+  getUserNames: (userIds: string[]) =>
+    api.post<{ user_names: Record<string, string> }>('/auth/users/names', { user_ids: userIds })
 }
 
 export const submissionsAPI = {
@@ -60,6 +63,9 @@ export const annotationsAPI = {
   
   deleteSelection: (selectionId: string) =>
     api.delete<{ success: boolean }>(`/annotations/selections/${selectionId}`),
+  
+  removeTag: (selectionId: string, tagId: string) =>
+    api.delete<{ success: boolean }>(`/annotations/selections/${selectionId}/tags/${tagId}`),
   
   createComment: (data: Omit<Comment, 'id' | 'author_id' | 'created_at'>) =>
     api.post<Comment>('/annotations/comments', data),
@@ -140,6 +146,23 @@ export const rankingsAPI = {
   
   detach: (submissionId: string, systemId: string) =>
     api.delete<{ success: boolean }>(`/rankings/submission/${submissionId}/system/${systemId}`)
+}
+
+export const modelsAPI = {
+  list: () =>
+    api.get<{ models: any[] }>('/models'),
+  
+  get: (id: string) =>
+    api.get<{ model: any }>(`/models/${id}`),
+  
+  create: (data: any) =>
+    api.post<any>('/models', data),
+  
+  update: (id: string, data: any) =>
+    api.put<any>(`/models/${id}`, data),
+  
+  delete: (id: string) =>
+    api.delete<{ success: boolean }>(`/models/${id}`)
 }
 
 export default api

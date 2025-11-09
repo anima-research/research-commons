@@ -14,13 +14,13 @@ CREATE TABLE IF NOT EXISTS selections (
 CREATE INDEX IF NOT EXISTS idx_selections_submission ON selections(submission_id);
 CREATE INDEX IF NOT EXISTS idx_selections_creator ON selections(created_by);
 
--- Selection tags: Links selections to annotation tags
+-- Selection tags: Links selections to annotation tags (allows multiple votes per tag)
 CREATE TABLE IF NOT EXISTS selection_tags (
   selection_id TEXT NOT NULL,
   tag_id TEXT NOT NULL,
   tagged_by TEXT NOT NULL,
   tagged_at TEXT NOT NULL,
-  PRIMARY KEY (selection_id, tag_id),
+  PRIMARY KEY (selection_id, tag_id, tagged_by),  -- Allow multiple users to vote same tag
   FOREIGN KEY (selection_id) REFERENCES selections(id) ON DELETE CASCADE
 );
 

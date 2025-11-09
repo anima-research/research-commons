@@ -45,11 +45,18 @@ export function createAnnotationRoutes(context: AppContext): Router {
     }
   });
 
-  // Get selections for submission
+  // Get selections for submission (with tag attributions)
   router.get('/selections/submission/:submissionId', async (req, res) => {
     try {
       const selections = context.annotationDb.getSelectionsBySubmission(req.params.submissionId);
-      res.json({ selections });
+      
+      // Add tag attributions to each selection
+      const selectionsWithAttributions = selections.map(sel => ({
+        ...sel,
+        tag_attributions: context.annotationDb.getTagAttributions(sel.id)
+      }));
+      
+      res.json({ selections: selectionsWithAttributions });
     } catch (error) {
       console.error('Get selections error:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -133,7 +140,7 @@ export function createAnnotationRoutes(context: AppContext): Router {
     }
   });
 
-  // Delete selection (and cascade to comments/ratings)
+  // Delete selection (collaborative deletion rules)
   router.delete('/selections/:selectionId', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const selection = context.annotationDb.getSelection(req.params.selectionId);
@@ -143,12 +150,19 @@ export function createAnnotationRoutes(context: AppContext): Router {
       }
 
       const user = await context.userStore.getUserById(req.userId!);
-      const canDelete = selection.created_by === req.userId! ||
-                        user?.roles.includes('researcher') ||
-                        user?.roles.includes('admin');
+      
+      // Admins and researchers can always delete
+      if (user?.roles.includes('admin') || user?.roles.includes('researcher')) {
+        context.annotationDb.deleteSelection(req.params.selectionId);
+        res.status(200).json({ success: true });
+        return;
+      }
 
+      // Regular users: check collaborative deletion rules
+      const { canDelete, reason } = context.annotationDb.canDeleteSelection(req.params.selectionId, req.userId!);
+      
       if (!canDelete) {
-        res.status(403).json({ error: 'Not authorized to delete this selection' });
+        res.status(403).json({ error: reason || 'Not authorized to delete this selection' });
         return;
       }
 
@@ -156,6 +170,36 @@ export function createAnnotationRoutes(context: AppContext): Router {
       res.status(200).json({ success: true });
     } catch (error) {
       console.error('Delete selection error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Remove tag from selection (removes your vote only)
+  router.delete('/selections/:selectionId/tags/:tagId', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const selection = context.annotationDb.getSelection(req.params.selectionId);
+      if (!selection) {
+        res.status(404).json({ error: 'Selection not found' });
+        return;
+      }
+
+      // Check if user has voted for this tag or is moderator
+      const attributions = context.annotationDb.getTagAttributions(req.params.selectionId);
+      const userVote = attributions.find(a => a.tag_id === req.params.tagId && a.tagged_by === req.userId);
+      
+      const user = await context.userStore.getUserById(req.userId!);
+      const isModerator = user?.roles.includes('researcher') || user?.roles.includes('admin');
+      
+      if (!isModerator && !userVote) {
+        res.status(403).json({ error: 'You have not voted for this tag' });
+        return;
+      }
+
+      // Remove only this user's vote
+      context.annotationDb.removeTag(req.params.selectionId, req.params.tagId, req.userId!);
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Remove tag error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   });

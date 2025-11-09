@@ -221,9 +221,11 @@
             @start-multi-select="handleStartMultiSelect"
             @selection-mode-changed="showSelectionToolbar = $event"
             @add-tag="handleAddTag"
+            @add-tag-vote="handleAddTagVote"
             @add-comment="handleAddCommentToSelection"
             @delete-selection="handleDeleteSelection"
             @delete-comment="handleDeleteComment"
+            @remove-tag="handleRemoveTag"
           />
           <div v-else class="p-8 text-center text-gray-500 dark:text-gray-400">
             <div v-if="loading">Loading conversation...</div>
@@ -240,9 +242,11 @@
             :current-user-id="authStore.user?.id"
             :can-moderate="canModerate"
             @add-tag="handleAddTag"
+            @add-tag-vote="handleAddTagVote"
             @add-comment="handleAddCommentToSelection"
             @delete-selection="handleDeleteSelection"
             @delete-comment="handleDeleteComment"
+            @remove-tag="handleRemoveTag"
           />
         </div>
       </div>
@@ -389,7 +393,7 @@ import TopicSelector from '@/components/TopicSelector.vue'
 import RatingForm from '@/components/RatingForm.vue'
 import type { Message, Selection, Comment, Rating, Topic } from '@/types'
 import type { MarginAnnotation } from '@/utils/layout-manager'
-import { ontologiesAPI, submissionsAPI, annotationsAPI, researchAPI, rankingsAPI } from '@/services/api'
+import { ontologiesAPI, submissionsAPI, annotationsAPI, researchAPI, rankingsAPI, authAPI } from '@/services/api'
 import { renderMarkdown } from '@/utils/markdown'
 
 const route = useRoute()
@@ -508,14 +512,43 @@ async function loadData() {
     const topicsResponse = await researchAPI.getTopics()
     availableTopics.value = topicsResponse.data.topics
     
-    // Build user names map (for now just current user)
+    // Build user names map - collect all user IDs from all sources
     userNames.value.clear()
+    const allUserIds = new Set<string>()
+    
+    // Add submission creator
+    allUserIds.add(submission.value.submitter_id)
+    
+    // Add all selection creators
+    selections.value.forEach(sel => allUserIds.add(sel.created_by))
+    
+    // Add all tag contributors (from tag_attributions)
+    selections.value.forEach(sel => {
+      if (sel.tag_attributions) {
+        sel.tag_attributions.forEach(attr => allUserIds.add(attr.tagged_by))
+      }
+    })
+    
+    // We'll add comment authors after loading comments below
+    
+    // Add current user
     if (authStore.user) {
-      userNames.value.set(authStore.user.id, authStore.user.name)
-      submitterName.value = authStore.user.id === submission.value.submitter_id 
-        ? authStore.user.name 
-        : 'User ' + submission.value.submitter_id.substring(0, 8)
+      allUserIds.add(authStore.user.id)
     }
+    
+    // Fetch all user names from API
+    if (allUserIds.size > 0) {
+      try {
+        const response = await authAPI.getUserNames(Array.from(allUserIds))
+        Object.entries(response.data.user_names).forEach(([userId, name]) => {
+          userNames.value.set(userId, name)
+        })
+      } catch (err) {
+        console.error('Failed to load user names:', err)
+      }
+    }
+    
+    submitterName.value = userNames.value.get(submission.value.submitter_id) || 'User'
     
     // Load ontologies and tags (combines topic-derived + explicit)
     const ontoResponse = await ontologiesAPI.getForSubmission(submissionId)
@@ -534,10 +567,12 @@ async function loadData() {
     const rankingsResponse = await rankingsAPI.getForSubmission(submissionId)
     attachedRankingSystems.value = rankingsResponse.data.ranking_systems
     
-    // Build criteria map
+    // Build criteria map and store system details
     allCriteria.value.clear()
+    rankingSystemDetails.value.clear()
     for (const rankingSystem of attachedRankingSystems.value) {
       const systemDetail = await rankingsAPI.get(rankingSystem.ranking_system_id)
+      rankingSystemDetails.value.set(rankingSystem.ranking_system_id, systemDetail)
       systemDetail.data.criteria.forEach((criterion: any) => {
         allCriteria.value.set(criterion.id, criterion)
       })
@@ -547,9 +582,32 @@ async function loadData() {
     selectionData.value.clear()
     for (const sel of selections.value) {
       const comments = await submissionsStore.getCommentsBySelection(sel.id)
-      const tags = sel.annotation_tags.map(tagId => allTags.value.get(tagId)).filter(t => t)
+      
+      // Add comment authors to user IDs set
+      comments.forEach(c => allUserIds.add(c.author_id))
+      
+      // Use tag_attributions if available (new), fallback to annotation_tags (old)
+      const tagIds = sel.tag_attributions 
+        ? sel.tag_attributions.map(a => a.tag_id)
+        : sel.annotation_tags
+      const tags = tagIds.map(tagId => allTags.value.get(tagId)).filter(t => t)
       
       selectionData.value.set(sel.id, { comments, tags })
+    }
+    
+    // Now fetch user names for comment authors too
+    if (allUserIds.size > userNames.value.size) {
+      try {
+        const newUserIds = Array.from(allUserIds).filter(id => !userNames.value.has(id))
+        if (newUserIds.length > 0) {
+          const response = await authAPI.getUserNames(newUserIds)
+          Object.entries(response.data.user_names).forEach(([userId, name]) => {
+            userNames.value.set(userId, name)
+          })
+        }
+      } catch (err) {
+        console.error('Failed to load additional user names:', err)
+      }
     }
     
     // Load submission-level ratings
@@ -688,12 +746,16 @@ const ontologiesForPicker = computed(() => {
   })
 })
 
+// Ranking systems for rating picker - need to store full system details
+const rankingSystemDetails = ref<Map<string, any>>(new Map())
+
 // Ranking systems for rating picker
 const rankingSystemsForPicker = computed(() => {
   return attachedRankingSystems.value.map(subRanking => {
+    const systemDetail = rankingSystemDetails.value.get(subRanking.ranking_system_id)
     const criteria = Array.from(allCriteria.value.values()).filter(c => c.ranking_system_id === subRanking.ranking_system_id)
     return {
-      system: { name: 'Ranking System', id: subRanking.ranking_system_id } as any,
+      system: systemDetail?.data.ranking_system || { name: 'Ranking System', id: subRanking.ranking_system_id },
       criteria,
       isFromTopic: subRanking.source === 'topic'  // From dynamic lookup
     }
@@ -718,6 +780,7 @@ const marginAnnotations = computed<MarginAnnotation[]>(() => {
         selection: sel,
         tags: data.tags,
         comments: data.comments,
+        tagAttributions: sel.tag_attributions || [], // Include tag attributions
         ratings: [] // Ratings are submission-level now
       }
     })
@@ -742,7 +805,8 @@ const inlineAnnotations = computed(() => {
     annotationsByMessage.get(messageId)!.push({
       selection: sel,
       tags: data.tags,
-      comments: data.comments
+      comments: data.comments,
+      tagAttributions: sel.tag_attributions || []
     })
   }
   
@@ -856,6 +920,54 @@ function handleAddTag(selectionId: string) {
   showTagPicker.value = true
 }
 
+async function handleAddTagVote(selectionId: string, tagId: string) {
+  try {
+    // Add vote by applying just this one tag (will add to existing)
+    await ontologiesAPI.applyTags(selectionId, [tagId])
+    
+    // Refresh selection to get updated attributions
+    const updatedSelections = await annotationsAPI.getSelections(submissionId)
+    const updatedSel = updatedSelections.data.selections.find(s => s.id === selectionId)
+    
+    if (updatedSel) {
+      // Update selection in main list
+      const idx = selections.value.findIndex(s => s.id === selectionId)
+      if (idx !== -1) {
+        selections.value[idx] = updatedSel
+      }
+      
+      // Update selection data
+      const data = selectionData.value.get(selectionId)
+      if (data) {
+        const tagIds = updatedSel.tag_attributions 
+          ? updatedSel.tag_attributions.map(a => a.tag_id)
+          : updatedSel.annotation_tags
+        data.tags = tagIds.map(tagId => allTags.value.get(tagId)).filter(t => t) as any[]
+      }
+      
+      // Update user names for any new contributors
+      if (updatedSel.tag_attributions) {
+        const newUserIds = updatedSel.tag_attributions
+          .map(a => a.tagged_by)
+          .filter(id => !userNames.value.has(id))
+        
+        if (newUserIds.length > 0) {
+          try {
+            const response = await authAPI.getUserNames(newUserIds)
+            Object.entries(response.data.user_names).forEach(([userId, name]) => {
+              userNames.value.set(userId, name)
+            })
+          } catch (err) {
+            console.error('Failed to load user names:', err)
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to add tag vote:', err)
+  }
+}
+
 function handleAddCommentToSelection(selectionId: string) {
   activeSelectionId.value = selectionId
   showCommentForm.value = true
@@ -916,6 +1028,37 @@ async function handleDeleteComment(commentId: string) {
   }
 }
 
+async function handleRemoveTag(selectionId: string, tagId: string) {
+  try {
+    await annotationsAPI.removeTag(selectionId, tagId)
+    
+    // Refresh selection to get updated vote counts
+    const updatedSelections = await annotationsAPI.getSelections(submissionId)
+    const updatedSel = updatedSelections.data.selections.find(s => s.id === selectionId)
+    
+    if (updatedSel) {
+      // Update selection in main list
+      const idx = selections.value.findIndex(s => s.id === selectionId)
+      if (idx !== -1) {
+        selections.value[idx] = updatedSel
+      }
+      
+      // Update selection data using tag_attributions
+      const data = selectionData.value.get(selectionId)
+      if (data) {
+        const tagIds = updatedSel.tag_attributions 
+          ? updatedSel.tag_attributions.map(a => a.tag_id)
+          : updatedSel.annotation_tags
+        // Get unique tag IDs for display
+        const uniqueTagIds = [...new Set(tagIds)]
+        data.tags = uniqueTagIds.map(tagId => allTags.value.get(tagId)).filter(t => t) as any[]
+      }
+    }
+  } catch (err) {
+    console.error('Failed to remove tag:', err)
+  }
+}
+
 async function handleDeleteRating(ratingId: string) {
   if (!confirm('Delete this rating?')) return
   
@@ -955,13 +1098,24 @@ async function applyTags(tagIds: string[]) {
   try {
     await ontologiesAPI.applyTags(activeSelectionId.value, tagIds)
     
-    // Update just this selection's data
-    const sel = selections.value.find(s => s.id === activeSelectionId.value)
-    if (sel) {
-      sel.annotation_tags = tagIds
+    // Refresh the selection to get updated tag attributions from server
+    const updatedSelections = await annotationsAPI.getSelections(submissionId)
+    const updatedSel = updatedSelections.data.selections.find(s => s.id === activeSelectionId.value)
+    
+    if (updatedSel) {
+      // Update selection in main list
+      const idx = selections.value.findIndex(s => s.id === activeSelectionId.value)
+      if (idx !== -1) {
+        selections.value[idx] = updatedSel
+      }
+      
+      // Update selection data using tag_attributions
       const data = selectionData.value.get(activeSelectionId.value!)
       if (data) {
-        data.tags = tagIds.map(tagId => allTags.value.get(tagId)).filter(t => t)
+        const tagIds = updatedSel.tag_attributions 
+          ? updatedSel.tag_attributions.map(a => a.tag_id)
+          : updatedSel.annotation_tags
+        data.tags = tagIds.map(tagId => allTags.value.get(tagId)).filter(t => t) as any[]
       }
     }
     
