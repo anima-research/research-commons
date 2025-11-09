@@ -743,6 +743,29 @@ const marginAnnotations = computed<MarginAnnotation[]>(() => {
   return annotations
 })
 
+// Build inline annotations for mobile (grouped by message)
+const inlineAnnotations = computed(() => {
+  const annotationsByMessage = new Map<string, any[]>()
+  
+  for (const sel of selections.value) {
+    const data = selectionData.value.get(sel.id)
+    if (!data) continue
+    
+    const messageId = sel.start_message_id
+    if (!annotationsByMessage.has(messageId)) {
+      annotationsByMessage.set(messageId, [])
+    }
+    
+    annotationsByMessage.get(messageId)!.push({
+      selection: sel,
+      tags: data.tags,
+      comments: data.comments
+    })
+  }
+  
+  return annotationsByMessage
+})
+
 // Annotations are now created directly, no form needed
 
 async function submitComment(text: string) {
