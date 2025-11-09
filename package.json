@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && tsc create-default-ontologies.ts create-default-rankings.ts create-default-models.ts --outDir dist --moduleResolution bundler --module esnext",
     "build:full": "tsc && cd frontend && npm run build",
     "build:backend": "tsc",
     "build:frontend": "cd frontend && npm run build",
     "start": "node dist/index.js",
-    "deploy:init": "npx tsx create-default-ontologies.ts && npx tsx create-default-rankings.ts && npx tsx create-default-models.ts",
-    "deploy:start": "npm run deploy:init; node dist/index.js",
+    "deploy:init": "node dist/create-default-ontologies.js 2>/dev/null || true; node dist/create-default-rankings.js 2>/dev/null || true; node dist/create-default-models.js 2>/dev/null || true",
+    "deploy:start": "npm run deploy:init && node dist/index.js",
     "migrate": "tsx src/database/migrate.ts"
   },
   "dependencies": {
