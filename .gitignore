@@ -1,7 +1,16 @@
 node_modules/
 dist/
-data/
 *.log
-.env
 .DS_Store
+.env
+.env.local
 
+# Data (keep structure, ignore content)
+data/*.db*
+data/*.jsonl
+data/submissions/*
+!data/.gitkeep
+
+# Frontend build
+frontend/dist/
+frontend/node_modules/

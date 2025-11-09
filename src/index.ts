@@ -79,6 +79,22 @@ async function main() {
   app.use('/api/rankings', createRankingRoutes(context));
   app.use('/api/models', createModelRoutes(context));
 
+  // Serve frontend in production
+  if (process.env.NODE_ENV === 'production') {
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    
+    app.use(express.static(path.join(__dirname, '../frontend/dist')));
+    
+    // SPA fallback - serve index.html for all non-API routes
+    app.get('*', (req, res) => {
+      if (!req.path.startsWith('/api') && !req.path.startsWith('/health')) {
+        res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+      }
+    });
+  }
+
   // Health check
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
@@ -86,7 +102,10 @@ async function main() {
 
   // Start server
   app.listen(PORT, () => {
-    console.log(`✅ Research Commons API running on port ${PORT}`);
+    console.log(`✅ Research Commons running on port ${PORT}`);
+    if (process.env.NODE_ENV === 'production') {
+      console.log(`📦 Serving frontend from /frontend/dist`);
+    }
   });
 
   // Graceful shutdown
