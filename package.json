@@ -10,8 +10,7 @@
     "build:backend": "tsc",
     "build:frontend": "cd frontend && npm run build",
     "start": "node dist/index.js",
-    "deploy:init": "node dist/create-default-ontologies.js 2>/dev/null || true; node dist/create-default-rankings.js 2>/dev/null || true; node dist/create-default-models.js 2>/dev/null || true",
-    "deploy:start": "npm run deploy:init && node dist/index.js",
+    "deploy:start": "node dist/index.js",
     "migrate": "tsx src/database/migrate.ts"
   },
   "dependencies": {
