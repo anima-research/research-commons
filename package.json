@@ -5,12 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc && tsc create-default-ontologies.ts create-default-rankings.ts create-default-models.ts --outDir dist --moduleResolution bundler --module esnext",
+    "build": "tsc",
     "build:full": "tsc && cd frontend && npm run build",
     "build:backend": "tsc",
     "build:frontend": "cd frontend && npm run build",
     "start": "node dist/index.js",
-    "deploy:start": "node dist/index.js",
     "migrate": "tsx src/database/migrate.ts"
   },
   "dependencies": {
