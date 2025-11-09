@@ -101,7 +101,7 @@ export function createAnnotationRoutes(context: AppContext): Router {
 
       const rating: Rating = {
         id: uuidv4(),
-        selection_id: data.selection_id,
+        submission_id: data.submission_id,
         rater_id: req.userId!,
         criterion_id: data.criterion_id,
         score: data.score,
@@ -122,10 +122,10 @@ export function createAnnotationRoutes(context: AppContext): Router {
     }
   });
 
-  // Get ratings for selection
-  router.get('/ratings/selection/:selectionId', async (req, res) => {
+  // Get ratings for submission
+  router.get('/ratings/submission/:submissionId', async (req, res) => {
     try {
-      const ratings = context.annotationDb.getRatingsBySelection(req.params.selectionId);
+      const ratings = context.annotationDb.getRatingsBySubmission(req.params.submissionId);
       res.json({ ratings });
     } catch (error) {
       console.error('Get ratings error:', error);
@@ -187,7 +187,7 @@ export function createAnnotationRoutes(context: AppContext): Router {
     }
   });
 
-  // Delete rating
+  // Delete rating (deletes all ratings by this rater for this criterion)
   router.delete('/ratings/:ratingId', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const rating = context.annotationDb.getRating(req.params.ratingId);

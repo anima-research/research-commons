@@ -6,27 +6,15 @@ export const TopicSchema = z.object({
   name: z.string(),
   description: z.string(),
   default_ontologies: z.array(z.string().uuid()).default([]),  // Auto-attach to submissions
+  default_ranking_systems: z.array(z.string().uuid()).default([]),  // Auto-attach to submissions
   created_by: z.string().uuid(),
   created_at: z.date()
 });
 
 export type Topic = z.infer<typeof TopicSchema>;
 
-// Evaluation criterion
-export const CriterionSchema = z.object({
-  id: z.string().uuid(),
-  topic_id: z.string().uuid().optional(), // Can be general or topic-specific
-  name: z.string(),
-  description: z.string(),
-  scale_type: z.enum(['numeric', 'boolean', 'likert']),
-  scale_min: z.number().optional(),
-  scale_max: z.number().optional(),
-  scale_labels: z.array(z.string()).optional(), // For likert scales
-  created_by: z.string().uuid(),
-  created_at: z.date()
-});
-
-export type Criterion = z.infer<typeof CriterionSchema>;
+// Criterion - moved to ranking.ts
+// Note: Import from ranking.ts directly if needed
 
 // User (for research commons, separate from ARC)
 export const UserSchema = z.object({
@@ -44,7 +32,8 @@ export type User = z.infer<typeof UserSchema>;
 export const CreateTopicRequestSchema = z.object({
   name: z.string(),
   description: z.string(),
-  default_ontologies: z.array(z.string().uuid()).optional()
+  default_ontologies: z.array(z.string().uuid()).optional(),
+  default_ranking_systems: z.array(z.string().uuid()).optional()
 });
 
 export const CreateCriterionRequestSchema = z.object({

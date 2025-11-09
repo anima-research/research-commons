@@ -40,7 +40,8 @@ export function createResearchRoutes(context: AppContext): Router {
         data.name,
         data.description,
         req.userId!,
-        data.default_ontologies || []
+        data.default_ontologies || [],
+        data.default_ranking_systems || []
       );
       res.status(201).json(topic);
     } catch (error: any) {
@@ -101,41 +102,8 @@ export function createResearchRoutes(context: AppContext): Router {
     }
   });
 
-  // Get criteria by topic
-  router.get('/topics/:topicId/criteria', async (req, res) => {
-    try {
-      const criteria = await context.researchStore.getCriteriaByTopic(req.params.topicId);
-      res.json({ criteria });
-    } catch (error) {
-      console.error('Get criteria error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  // Create criterion (requires researcher role)
-  router.post('/criteria', authenticateToken, requireRole('researcher'), async (req: AuthRequest, res) => {
-    try {
-      const data = CreateCriterionRequestSchema.parse(req.body);
-      const criterion = await context.researchStore.createCriterion(
-        data.name,
-        data.description,
-        data.scale_type,
-        req.userId!,
-        data.topic_id,
-        data.scale_min,
-        data.scale_max,
-        data.scale_labels
-      );
-      res.status(201).json(criterion);
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
-        res.status(400).json({ error: 'Invalid request', details: error.errors });
-      } else {
-        console.error('Create criterion error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-      }
-    }
-  });
+  // Criteria routes deprecated - use /api/rankings instead
+  // Kept for backward compatibility
 
   return router;
 }

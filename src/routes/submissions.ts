@@ -46,24 +46,46 @@ export function createSubmissionRoutes(context: AppContext): Router {
         } : undefined
       );
 
-      // Auto-attach all public ontologies
-      const allOntologies = await context.ontologyStore.getAllOntologies();
-      const publicOntologies = allOntologies.filter(o => o.permissions === 'public');
+      // Don't attach anything at creation - will be dynamically looked up from topics
+      // Only public ontologies/ranking systems get attached (for submissions without topics)
+      const topicTags = (data.metadata as any)?.tags || [];
       
-      for (const ontology of publicOntologies) {
-        try {
-          const { v4: uuidv4 } = await import('uuid');
-          context.annotationDb.attachOntology({
-            id: uuidv4(),
-            submission_id: submission.id,
-            ontology_id: ontology.id,
-            attached_by: req.userId!,
-            attached_at: new Date(),
-            usage_permissions: 'anyone',
-            is_default: true
-          });
-        } catch (err) {
-          console.error('Failed to auto-attach ontology:', ontology.name, err);
+      if (topicTags.length === 0) {
+        // No topics - attach all public systems as convenience
+        const allOntologies = await context.ontologyStore.getAllOntologies();
+        for (const ontology of allOntologies.filter(o => o.permissions === 'public')) {
+          try {
+            const { v4: uuidv4 } = await import('uuid');
+            context.annotationDb.attachOntology({
+              id: uuidv4(),
+              submission_id: submission.id,
+              ontology_id: ontology.id,
+              attached_by: req.userId!,
+              attached_at: new Date(),
+              usage_permissions: 'anyone',
+              is_default: false
+            });
+          } catch (err) {
+            console.error('Failed to attach ontology:', ontology.name, err);
+          }
+        }
+
+        const allRankingSystems = await context.rankingStore.getAllRankingSystems();
+        for (const system of allRankingSystems.filter(s => s.permissions === 'public')) {
+          try {
+            const { v4: uuidv4 } = await import('uuid');
+            context.annotationDb.attachRankingSystem({
+              id: uuidv4(),
+              submission_id: submission.id,
+              ranking_system_id: system.id,
+              attached_by: req.userId!,
+              attached_at: new Date(),
+              usage_permissions: 'anyone',
+              is_from_topic: false
+            });
+          } catch (err) {
+            console.error('Failed to attach ranking system:', system.name, err);
+          }
         }
       }
 
@@ -118,6 +140,8 @@ export function createSubmissionRoutes(context: AppContext): Router {
         return;
       }
 
+      const oldTags = submission.metadata.tags || [];
+      
       // Update metadata
       if (req.body.description !== undefined) {
         submission.metadata.description = req.body.description;
@@ -127,6 +151,8 @@ export function createSubmissionRoutes(context: AppContext): Router {
       }
 
       await context.submissionStore.updateSubmission(req.params.submissionId, submission);
+
+      // Don't attach on tag change - will be dynamically looked up from topics
 
       res.json(submission);
     } catch (error) {

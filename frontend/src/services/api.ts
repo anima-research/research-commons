@@ -73,8 +73,8 @@ export const annotationsAPI = {
   createRating: (data: Omit<Rating, 'id' | 'rater_id' | 'created_at'>) =>
     api.post<Rating>('/annotations/ratings', data),
   
-  getRatingsBySelection: (selectionId: string) =>
-    api.get<{ ratings: Rating[] }>(`/annotations/ratings/selection/${selectionId}`),
+  getRatingsBySubmission: (submissionId: string) =>
+    api.get<{ ratings: Rating[] }>(`/annotations/ratings/submission/${submissionId}`),
   
   deleteRating: (ratingId: string) =>
     api.delete<{ success: boolean }>(`/annotations/ratings/${ratingId}`)
@@ -93,8 +93,9 @@ export const ontologiesAPI = {
   attach: (submissionId: string, ontologyId: string, usagePermissions: string) =>
     api.post<any>('/ontologies/attach', { submission_id: submissionId, ontology_id: ontologyId, usage_permissions: usagePermissions }),
   
+  // Use new combined endpoint that includes topic-derived systems
   getForSubmission: (submissionId: string) =>
-    api.get<{ ontologies: any[] }>(`/ontologies/submission/${submissionId}`),
+    api.get<{ ontologies: any[] }>(`/submission-systems/${submissionId}/ontologies`),
   
   applyTags: (selectionId: string, tagIds: string[]) =>
     api.post<{ success: boolean }>('/ontologies/tags/apply', { selection_id: selectionId, tag_ids: tagIds })
@@ -107,20 +108,35 @@ export const researchAPI = {
   getTopic: (id: string) =>
     api.get<Topic>(`/research/topics/${id}`),
   
-  createTopic: (data: { name: string; description: string; default_ontologies?: string[] }) =>
+  createTopic: (data: { name: string; description: string; default_ontologies?: string[]; default_ranking_systems?: string[] }) =>
     api.post<Topic>('/research/topics', data),
   
   updateTopic: (id: string, updates: Partial<Topic>) =>
     api.patch<Topic>(`/research/topics/${id}`, updates),
   
   deleteTopic: (id: string) =>
-    api.delete<{ success: boolean }>(`/research/topics/${id}`),
+    api.delete<{ success: boolean }>(`/research/topics/${id}`)
+}
+
+export const rankingsAPI = {
+  list: () =>
+    api.get<{ ranking_systems: any[] }>('/rankings'),
   
-  getCriteria: () =>
-    api.get<{ criteria: Criterion[] }>('/research/criteria'),
+  get: (id: string) =>
+    api.get<{ ranking_system: any; criteria: any[] }>(`/rankings/${id}`),
   
-  createCriterion: (data: any) =>
-    api.post<Criterion>('/research/criteria', data)
+  create: (data: any) =>
+    api.post<any>('/rankings', data),
+  
+  attach: (submissionId: string, rankingSystemId: string, usagePermissions: string) =>
+    api.post<any>('/rankings/attach', { submission_id: submissionId, ranking_system_id: rankingSystemId, usage_permissions: usagePermissions }),
+  
+  // Use new combined endpoint that includes topic-derived systems
+  getForSubmission: (submissionId: string) =>
+    api.get<{ ranking_systems: any[] }>(`/submission-systems/${submissionId}/ranking-systems`),
+  
+  detach: (submissionId: string, systemId: string) =>
+    api.delete<{ success: boolean }>(`/rankings/submission/${submissionId}/system/${systemId}`)
 }
 
 export default api

@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Selection, Comment, Rating } from '../types/annotation.js';
 import { SubmissionOntology } from '../types/ontology.js';
+import { SubmissionRankingSystem } from '../types/ranking.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -177,14 +178,14 @@ export class AnnotationDatabase {
   // Rating methods
   createRating(rating: Rating): void {
     const stmt = this.db.prepare(`
-      INSERT INTO ratings (
-        id, selection_id, rater_id, criterion_id, score, created_at, updated_at
+      INSERT OR REPLACE INTO ratings (
+        id, submission_id, rater_id, criterion_id, score, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       rating.id,
-      rating.selection_id,
+      rating.submission_id,
       rating.rater_id,
       rating.criterion_id,
       rating.score,
@@ -198,8 +199,8 @@ export class AnnotationDatabase {
     return row ? this.rowToRating(row) : null;
   }
 
-  getRatingsBySelection(selectionId: string): Rating[] {
-    const rows = this.db.prepare('SELECT * FROM ratings WHERE selection_id = ? ORDER BY created_at').all(selectionId);
+  getRatingsBySubmission(submissionId: string): Rating[] {
+    const rows = this.db.prepare('SELECT * FROM ratings WHERE submission_id = ? ORDER BY created_at').all(submissionId);
     return rows.map(row => this.rowToRating(row));
   }
 
@@ -220,7 +221,7 @@ export class AnnotationDatabase {
   private rowToRating(row: any): Rating {
     return {
       id: row.id,
-      selection_id: row.selection_id,
+      submission_id: row.submission_id,
       rater_id: row.rater_id,
       criterion_id: row.criterion_id,
       score: row.score,
@@ -268,8 +269,58 @@ export class AnnotationDatabase {
       .run(submissionId, ontologyId);
   }
 
+  // Submission ranking system methods
+  attachRankingSystem(submissionRankingSystem: SubmissionRankingSystem): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO submission_ranking_systems (
+        id, submission_id, ranking_system_id, attached_by, attached_at,
+        usage_permissions, is_from_topic
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    stmt.run(
+      submissionRankingSystem.id,
+      submissionRankingSystem.submission_id,
+      submissionRankingSystem.ranking_system_id,
+      submissionRankingSystem.attached_by,
+      submissionRankingSystem.attached_at.toISOString(),
+      submissionRankingSystem.usage_permissions,
+      submissionRankingSystem.is_from_topic ? 1 : 0
+    );
+  }
+  
+  getSubmissionRankingSystems(submissionId: string): SubmissionRankingSystem[] {
+    const rows = this.db.prepare('SELECT * FROM submission_ranking_systems WHERE submission_id = ?')
+      .all(submissionId);
+    return rows.map((row: any) => ({
+      id: row.id,
+      submission_id: row.submission_id,
+      ranking_system_id: row.ranking_system_id,
+      attached_by: row.attached_by,
+      attached_at: new Date(row.attached_at),
+      usage_permissions: row.usage_permissions,
+      is_from_topic: row.is_from_topic === 1
+    }));
+  }
+  
+  detachRankingSystem(submissionId: string, rankingSystemId: string): boolean {
+    // Check if it's from topic (cannot be detached)
+    const existing = this.db.prepare(
+      'SELECT is_from_topic FROM submission_ranking_systems WHERE submission_id = ? AND ranking_system_id = ?'
+    ).get(submissionId, rankingSystemId) as any;
+    
+    if (existing?.is_from_topic === 1) {
+      return false; // Cannot detach topic-derived ranking systems
+    }
+    
+    this.db.prepare('DELETE FROM submission_ranking_systems WHERE submission_id = ? AND ranking_system_id = ?')
+      .run(submissionId, rankingSystemId);
+    return true;
+  }
+
   close(): void {
     this.db.close();
   }
 }
+
 

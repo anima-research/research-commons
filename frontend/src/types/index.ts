@@ -1,5 +1,6 @@
 // Matches backend types
 export * from './ontology'
+export * from './ranking'
 
 export interface User {
   id: string
@@ -79,7 +80,7 @@ export interface Comment {
 
 export interface Rating {
   id: string
-  selection_id: string  // Always on selection
+  submission_id: string  // Always on submission
   rater_id: string
   criterion_id: string
   score: number
@@ -92,19 +93,7 @@ export interface Topic {
   name: string
   description: string
   default_ontologies: string[]
-  created_by: string
-  created_at: string
-}
-
-export interface Criterion {
-  id: string
-  topic_id?: string
-  name: string
-  description: string
-  scale_type: 'numeric' | 'boolean' | 'likert'
-  scale_min?: number
-  scale_max?: number
-  scale_labels?: string[]
+  default_ranking_systems: string[]
   created_by: string
   created_at: string
 }

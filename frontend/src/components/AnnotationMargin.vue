@@ -46,20 +46,16 @@
         :selection="getAnnotation(pos.annotationId)!.data.selection"
         :tags="getAnnotation(pos.annotationId)!.data.tags"
         :comments="getAnnotation(pos.annotationId)!.data.comments"
-        :ratings="getAnnotation(pos.annotationId)!.data.ratings"
         :created-by="getUserName(getAnnotation(pos.annotationId)!.data.selection.created_by)"
         :user-names="userNames"
         :current-user-id="currentUserId"
         :can-delete="canModerate || getAnnotation(pos.annotationId)!.data.selection.created_by === currentUserId"
         :can-delete-comments="canModerate"
-        :can-delete-ratings="canModerate"
         @resize="handleResize(pos.annotationId, $event)"
         @add-tag="$emit('add-tag', getAnnotation(pos.annotationId)!.data.selection.id)"
         @add-comment="$emit('add-comment', getAnnotation(pos.annotationId)!.data.selection.id)"
-        @add-rating="$emit('add-rating', getAnnotation(pos.annotationId)!.data.selection.id)"
         @delete="$emit('delete-selection', getAnnotation(pos.annotationId)!.data.selection.id)"
         @delete-comment="$emit('delete-comment', $event)"
-        @delete-rating="$emit('delete-rating', $event)"
       />
     </div>
   </div>
@@ -88,10 +84,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   'add-tag': [selectionId: string]
   'add-comment': [selectionId: string]
-  'add-rating': [selectionId: string]
   'delete-selection': [selectionId: string]
   'delete-comment': [commentId: string]
-  'delete-rating': [ratingId: string]
 }>()
 
 const layoutManager = new AnnotationLayoutManager()

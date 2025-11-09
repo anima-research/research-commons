@@ -6,11 +6,14 @@ import { AnnotationDatabase } from './database/db.js';
 import { UserStore } from './services/user-store.js';
 import { ResearchStore } from './services/research-store.js';
 import { OntologyStore } from './services/ontology-store.js';
+import { RankingStore } from './services/ranking-store.js';
 import { createAuthRoutes } from './routes/auth.js';
 import { createSubmissionRoutes } from './routes/submissions.js';
+import { createSubmissionSystemsRoutes } from './routes/submission-systems.js';
 import { createAnnotationRoutes } from './routes/annotations.js';
 import { createResearchRoutes } from './routes/research.js';
 import { createOntologyRoutes } from './routes/ontologies.js';
+import { createRankingRoutes } from './routes/rankings.js';
 
 dotenv.config();
 
@@ -25,6 +28,7 @@ export interface AppContext {
   userStore: UserStore;
   researchStore: ResearchStore;
   ontologyStore: OntologyStore;
+  rankingStore: RankingStore;
 }
 
 async function main() {
@@ -42,26 +46,31 @@ async function main() {
   const userStore = new UserStore(DATA_PATH);
   const researchStore = new ResearchStore(DATA_PATH);
   const ontologyStore = new OntologyStore(DATA_PATH);
+  const rankingStore = new RankingStore(DATA_PATH);
 
   await submissionStore.init();
   await userStore.init();
   await researchStore.init();
   await ontologyStore.init();
+  await rankingStore.init();
 
   const context: AppContext = {
     submissionStore,
     annotationDb,
     userStore,
     researchStore,
-    ontologyStore
+    ontologyStore,
+    rankingStore
   };
 
   // Routes
   app.use('/api/auth', createAuthRoutes(context));
   app.use('/api/submissions', createSubmissionRoutes(context));
+  app.use('/api/submission-systems', createSubmissionSystemsRoutes(context));
   app.use('/api/annotations', createAnnotationRoutes(context));
   app.use('/api/research', createResearchRoutes(context));
   app.use('/api/ontologies', createOntologyRoutes(context));
+  app.use('/api/rankings', createRankingRoutes(context));
 
   // Health check
   app.get('/health', (req, res) => {
@@ -81,6 +90,7 @@ async function main() {
     await userStore.close();
     await researchStore.close();
     await ontologyStore.close();
+    await rankingStore.close();
     process.exit(0);
   });
 }

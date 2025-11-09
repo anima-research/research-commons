@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { EventStore } from '../storage/event-store.js';
-import { Topic, Criterion } from '../types/research.js';
+import { Topic } from '../types/research.js';
+import { Criterion } from '../types/ranking.js';
 
 /**
  * Manages topics and criteria (event-sourced)
@@ -27,7 +28,10 @@ export class ResearchStore {
       if (event.type === 'topic_created') {
         const topic = {
           ...event.data,
-          created_at: new Date(event.data.created_at)
+          created_at: new Date(event.data.created_at),
+          // Ensure arrays exist for backward compat
+          default_ontologies: event.data.default_ontologies || [],
+          default_ranking_systems: event.data.default_ranking_systems || []
         };
         this.topics.set(topic.id, topic);
       } else if (event.type === 'topic_updated') {
@@ -54,12 +58,19 @@ export class ResearchStore {
   }
 
   // Topic methods
-  async createTopic(name: string, description: string, createdBy: string, defaultOntologies: string[] = []): Promise<Topic> {
+  async createTopic(
+    name: string, 
+    description: string, 
+    createdBy: string, 
+    defaultOntologies: string[] = [],
+    defaultRankingSystems: string[] = []
+  ): Promise<Topic> {
     const topic: Topic = {
       id: uuidv4(),
       name,
       description,
       default_ontologies: defaultOntologies,
+      default_ranking_systems: defaultRankingSystems,
       created_by: createdBy,
       created_at: new Date()
     };
@@ -112,49 +123,8 @@ export class ResearchStore {
     return true;
   }
 
-  // Criterion methods
-  async createCriterion(
-    name: string,
-    description: string,
-    scaleType: Criterion['scale_type'],
-    createdBy: string,
-    topicId?: string,
-    scaleMin?: number,
-    scaleMax?: number,
-    scaleLabels?: string[]
-  ): Promise<Criterion> {
-    const criterion: Criterion = {
-      id: uuidv4(),
-      topic_id: topicId,
-      name,
-      description,
-      scale_type: scaleType,
-      scale_min: scaleMin,
-      scale_max: scaleMax,
-      scale_labels: scaleLabels,
-      created_by: createdBy,
-      created_at: new Date()
-    };
-
-    await this.criteriaFile.appendEvent({
-      timestamp: new Date(),
-      type: 'criterion_created',
-      data: criterion
-    });
-
-    this.criteria.set(criterion.id, criterion);
-    return criterion;
-  }
-
-  async getCriterion(id: string): Promise<Criterion | null> {
-    return this.criteria.get(id) || null;
-  }
-
-  async getCriteriaByTopic(topicId: string): Promise<Criterion[]> {
-    return Array.from(this.criteria.values())
-      .filter(c => c.topic_id === topicId);
-  }
-
+  // Criterion methods - deprecated, moved to RankingStore
+  // Kept for backward compatibility with old API routes
   async getAllCriteria(): Promise<Criterion[]> {
     return Array.from(this.criteria.values());
   }

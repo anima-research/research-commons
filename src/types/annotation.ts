@@ -33,10 +33,10 @@ export const CommentSchema = z.object({
 
 export type Comment = z.infer<typeof CommentSchema>;
 
-// Rating: linked to criterion, always on selection
+// Rating: linked to criterion, always on submission (not selection)
 export const RatingSchema = z.object({
   id: z.string().uuid(),
-  selection_id: z.string().uuid(),  // Always on selection
+  submission_id: z.string().uuid(),  // Always on submission
   rater_id: z.string().uuid(),
   
   criterion_id: z.string().uuid(),
@@ -65,7 +65,7 @@ export const CreateCommentRequestSchema = z.object({
 });
 
 export const CreateRatingRequestSchema = z.object({
-  selection_id: z.string().uuid(),
+  submission_id: z.string().uuid(),
   criterion_id: z.string().uuid(),
   score: z.number()
 });

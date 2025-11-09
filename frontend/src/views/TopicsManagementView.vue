@@ -132,6 +132,32 @@
                 class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
               />
             </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Default Ontologies
+                <span class="text-xs text-gray-500">(auto-attached to submissions)</span>
+              </label>
+              <div class="text-sm text-gray-600">
+                {{ topicForm.default_ontologies?.length || 0 }} ontologies selected
+              </div>
+              <div class="text-xs text-gray-500 mt-1">
+                Ontology selection UI coming soon - for now ontologies auto-attach to all submissions
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Default Ranking Systems
+                <span class="text-xs text-gray-500">(auto-attached, cannot be removed)</span>
+              </label>
+              <div class="text-sm text-gray-600">
+                {{ topicForm.default_ranking_systems?.length || 0 }} ranking systems selected
+              </div>
+              <div class="text-xs text-gray-500 mt-1">
+                Ranking system selection UI coming soon
+              </div>
+            </div>
           </div>
 
           <div class="flex justify-end gap-2 mt-6">
@@ -173,9 +199,16 @@ const isMobile = ref(window.innerWidth < 1024)
 
 const showCreateTopic = ref(false)
 const editingTopic = ref<Topic | null>(null)
-const topicForm = ref({
+const topicForm = ref<{
+  name: string
+  description: string
+  default_ontologies?: string[]
+  default_ranking_systems?: string[]
+}>({
   name: '',
-  description: ''
+  description: '',
+  default_ontologies: [],
+  default_ranking_systems: []
 })
 
 onMounted(async () => {
@@ -207,14 +240,21 @@ function startEditTopic(topic: Topic) {
   editingTopic.value = topic
   topicForm.value = {
     name: topic.name,
-    description: topic.description
+    description: topic.description,
+    default_ontologies: topic.default_ontologies,
+    default_ranking_systems: topic.default_ranking_systems
   }
 }
 
 function closeTopicForm() {
   showCreateTopic.value = false
   editingTopic.value = null
-  topicForm.value = { name: '', description: '' }
+  topicForm.value = { 
+    name: '', 
+    description: '',
+    default_ontologies: [],
+    default_ranking_systems: []
+  }
 }
 
 async function saveTopic() {

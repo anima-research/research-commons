@@ -39,10 +39,10 @@
         />
         <NavItem 
           icon="⭐" 
-          label="Rating Criteria" 
-          route="/criteria" 
-          :active="isActive('/criteria')"
-          @click="$emit('navigate', '/criteria')"
+          label="Ranking Systems" 
+          route="/rankings" 
+          :active="isActive('/rankings')"
+          @click="$emit('navigate', '/rankings')"
         />
       </div>
 

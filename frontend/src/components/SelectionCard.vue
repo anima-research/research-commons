@@ -93,41 +93,6 @@
       </button>
     </div>
 
-    <!-- Ratings section -->
-    <div v-if="ratings.length > 0 || canRate" class="p-3">
-      <div class="text-xs font-medium text-gray-600 mb-2">
-        ⭐ Ratings ({{ ratings.length }})
-      </div>
-      
-      <div v-if="ratings.length > 0" class="space-y-1 mb-2">
-        <div
-          v-for="rating in ratings"
-          :key="rating.id"
-          class="flex items-center justify-between text-xs group"
-        >
-          <span class="text-gray-700">{{ getCriterionName(rating.criterion_id) }}</span>
-          <div class="flex items-center gap-2">
-            <span class="font-medium text-indigo-600">{{ rating.score }}/5</span>
-            <button
-              v-if="canDeleteRatings || rating.rater_id === currentUserId"
-              @click="$emit('delete-rating', rating.id)"
-              class="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100"
-              title="Delete rating"
-            >
-              🗑️
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      <button 
-        v-if="canRate"
-        @click="$emit('add-rating')"
-        class="text-xs text-indigo-600 hover:text-indigo-700"
-      >
-        + Add rating
-      </button>
-    </div>
   </div>
 </template>
 
@@ -141,14 +106,11 @@ interface Props {
   selection: Selection
   tags: AnnotationTag[]
   comments: Comment[]
-  ratings: Rating[]
   createdBy?: string
   canTag?: boolean
   canComment?: boolean
-  canRate?: boolean
   canDelete?: boolean
   canDeleteComments?: boolean
-  canDeleteRatings?: boolean
   userNames?: Map<string, string>  // userId -> name mapping
   currentUserId?: string
 }
@@ -157,19 +119,15 @@ const props = withDefaults(defineProps<Props>(), {
   createdBy: 'User',
   canTag: true,
   canComment: true,
-  canRate: true,
   canDelete: false,
-  canDeleteComments: false,
-  canDeleteRatings: false
+  canDeleteComments: false
 })
 
 const emit = defineEmits<{
   'add-tag': []
   'add-comment': []
-  'add-rating': []
   'delete': []
   'delete-comment': [commentId: string]
-  'delete-rating': [ratingId: string]
   'resize': [height: number]
 }>()
 
@@ -201,7 +159,8 @@ function getUserName(userId: string) {
 }
 
 function getCriterionName(criterionId: string) {
-  return 'Criterion'
+  // TODO: Look up criterion name from store
+  return 'Criterion ' + criterionId.substring(0, 8)
 }
 
 function formatTime(timestamp: string) {

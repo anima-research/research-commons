@@ -1,0 +1,141 @@
+import { v4 as uuidv4 } from 'uuid';
+import { EventStore } from '../storage/event-store.js';
+import { RankingSystem, Criterion } from '../types/ranking.js';
+
+/**
+ * Manages ranking systems and criteria (event-sourced)
+ */
+export class RankingStore {
+  private rankingSystemsFile: EventStore;
+  private criteriaFile: EventStore;
+  
+  private rankingSystems: Map<string, RankingSystem> = new Map();
+  private criteria: Map<string, Criterion> = new Map();
+  private systemCriteria: Map<string, string[]> = new Map(); // systemId -> criteriaIds
+
+  constructor(dataPath: string) {
+    this.rankingSystemsFile = new EventStore(`${dataPath}/ranking-systems.jsonl`);
+    this.criteriaFile = new EventStore(`${dataPath}/ranking-criteria.jsonl`);
+  }
+
+  async init(): Promise<void> {
+    await this.rankingSystemsFile.init();
+    await this.criteriaFile.init();
+
+    // Load ranking systems
+    const systemEvents = await this.rankingSystemsFile.loadEvents();
+    for (const event of systemEvents) {
+      if (event.type === 'ranking_system_created') {
+        const system = {
+          ...event.data,
+          created_at: new Date(event.data.created_at)
+        };
+        this.rankingSystems.set(system.id, system);
+      }
+    }
+
+    // Load criteria
+    const criteriaEvents = await this.criteriaFile.loadEvents();
+    for (const event of criteriaEvents) {
+      if (event.type === 'criterion_created') {
+        const criterion = event.data as Criterion;
+        this.criteria.set(criterion.id, criterion);
+        
+        // Build reverse index
+        const systemCriteriaList = this.systemCriteria.get(criterion.ranking_system_id) || [];
+        systemCriteriaList.push(criterion.id);
+        this.systemCriteria.set(criterion.ranking_system_id, systemCriteriaList);
+      }
+    }
+  }
+
+  // Ranking system methods
+  async createRankingSystem(
+    name: string,
+    description: string,
+    category: RankingSystem['category'],
+    permissions: RankingSystem['permissions'],
+    createdBy: string,
+    criteria: Array<{name: string, description: string, scale_type: Criterion['scale_type'], scale_min?: number, scale_max?: number, scale_labels?: string[]}>
+  ): Promise<RankingSystem> {
+    const system: RankingSystem = {
+      id: uuidv4(),
+      name,
+      description,
+      category,
+      permissions,
+      created_by: createdBy,
+      created_at: new Date()
+    };
+
+    await this.rankingSystemsFile.appendEvent({
+      timestamp: new Date(),
+      type: 'ranking_system_created',
+      data: system
+    });
+
+    this.rankingSystems.set(system.id, system);
+
+    // Create criteria
+    const criterionIds: string[] = [];
+    for (const criterionData of criteria) {
+      const criterion = await this.createCriterion(system.id, criterionData);
+      criterionIds.push(criterion.id);
+    }
+    
+    this.systemCriteria.set(system.id, criterionIds);
+
+    return system;
+  }
+
+  async createCriterion(
+    rankingSystemId: string,
+    data: {name: string, description: string, scale_type: Criterion['scale_type'], scale_min?: number, scale_max?: number, scale_labels?: string[]}
+  ): Promise<Criterion> {
+    const criterion: Criterion = {
+      id: uuidv4(),
+      ranking_system_id: rankingSystemId,
+      name: data.name,
+      description: data.description,
+      scale_type: data.scale_type,
+      scale_min: data.scale_min,
+      scale_max: data.scale_max,
+      scale_labels: data.scale_labels
+    };
+
+    await this.criteriaFile.appendEvent({
+      timestamp: new Date(),
+      type: 'criterion_created',
+      data: criterion
+    });
+
+    this.criteria.set(criterion.id, criterion);
+
+    return criterion;
+  }
+
+  async getRankingSystem(id: string): Promise<RankingSystem | null> {
+    return this.rankingSystems.get(id) || null;
+  }
+
+  async getAllRankingSystems(): Promise<RankingSystem[]> {
+    return Array.from(this.rankingSystems.values());
+  }
+
+  async getCriterion(id: string): Promise<Criterion | null> {
+    return this.criteria.get(id) || null;
+  }
+
+  async getCriteriaForSystem(systemId: string): Promise<Criterion[]> {
+    const criterionIds = this.systemCriteria.get(systemId) || [];
+    return criterionIds
+      .map(id => this.criteria.get(id))
+      .filter((c): c is Criterion => c !== undefined);
+  }
+
+  async close(): Promise<void> {
+    await this.rankingSystemsFile.close();
+    await this.criteriaFile.close();
+  }
+}
+

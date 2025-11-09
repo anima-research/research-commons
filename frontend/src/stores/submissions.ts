@@ -106,9 +106,9 @@ export const useSubmissionsStore = defineStore('submissions', () => {
     }
   }
   
-  async function getRatingsBySelection(selectionId: string) {
+  async function getRatingsBySubmission(submissionId: string) {
     try {
-      const response = await annotationsAPI.getRatingsBySelection(selectionId)
+      const response = await annotationsAPI.getRatingsBySubmission(submissionId)
       return response.data.ratings
     } catch (err: any) {
       error.value = err.response?.data?.error || 'Failed to fetch ratings'
@@ -152,7 +152,7 @@ export const useSubmissionsStore = defineStore('submissions', () => {
     getComments,
     getRatings,
     getCommentsBySelection,
-    getRatingsBySelection
+    getRatingsBySubmission
   }
 })
 

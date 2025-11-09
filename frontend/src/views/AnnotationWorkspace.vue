@@ -99,9 +99,9 @@
           </div>
         </div>
         
-        <!-- Research topic tags (editable) -->
+        <!-- Research topic tags (editable with multiselect) -->
         <div class="relative group">
-          <div v-if="!editingTags" class="flex flex-wrap gap-2 items-center">
+          <div class="flex flex-wrap gap-2 items-center">
             <span v-if="!submission?.metadata.tags || submission.metadata.tags.length === 0" class="text-xs text-gray-400">
               No research topics
             </span>
@@ -115,73 +115,115 @@
             </button>
             <button
               v-if="canEditSubmission"
-              @click="startEditTags"
+              @click="showTopicSelector = true"
               class="px-2 py-1 text-xs text-indigo-600 hover:text-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity"
             >
               ✏️ {{ submission?.metadata.tags?.length ? 'Edit' : 'Add' }} topics
             </button>
           </div>
-          <div v-else class="flex gap-2">
-            <input
-              v-model="tagsEdit"
-              ref="tagsInput"
-              @keyup.enter="saveTags"
-              @keyup.esc="cancelEditTags"
-              type="text"
-              class="flex-1 px-2 py-1 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500"
-              placeholder="research-topic, another-topic"
-            />
-            <button @click="saveTags" class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">
-              Save
-            </button>
-            <button @click="cancelEditTags" class="px-2 py-1 border border-gray-300 text-xs rounded hover:bg-gray-50">
-              Cancel
-            </button>
-          </div>
         </div>
       </div>
 
-      <!-- Submission-level comments (Scrollable area) -->
-      <div class="px-4 pb-3 max-h-32 overflow-y-auto border-b border-gray-200">
-        <div class="text-xs font-medium text-gray-600 mb-2">💬 Submission Comments</div>
-        
-        <div v-if="submissionComments.length === 0" class="text-xs text-gray-500">
-          No general comments yet.
-        </div>
-        
-        <div v-else class="space-y-2">
-          <div
-            v-for="comment in submissionComments"
-            :key="comment.id"
-            class="text-xs bg-gray-50 rounded p-2"
-          >
-            <div class="font-medium text-gray-700">{{ getUserName(comment.author_id) }}</div>
-            <div class="text-gray-600">{{ comment.content }}</div>
+      <!-- Two-column: Stats/Info | Actions -->
+      <div class="px-4 pb-3 border-t border-gray-200">
+        <div class="grid grid-cols-1 lg:grid-cols-[1fr,auto] gap-4 py-3">
+          <!-- Left: Stats (compact) -->
+          <div class="space-y-2">
+            <!-- Rating Stats -->
+            <div v-if="ratingStats.length > 0" class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-medium text-gray-600">⭐ Ratings:</span>
+                <button
+                  @click="showStatsDetail = true"
+                  class="text-xs text-indigo-600 hover:text-indigo-700"
+                >
+                  Details →
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-3 text-xs">
+                <div
+                  v-for="stat in ratingStats.slice(0, 3)"
+                  :key="stat.criterion_id"
+                  class="flex items-center gap-1"
+                >
+                  <span class="text-gray-700">{{ stat.criterion_name }}:</span>
+                  <span class="font-semibold text-indigo-600">{{ stat.avg.toFixed(1) }}/{{ stat.max }}</span>
+                  <span class="text-gray-500">({{ stat.count }})</span>
+                </div>
+                <span v-if="ratingStats.length > 3" class="text-gray-500">
+                  +{{ ratingStats.length - 3 }} more
+                </span>
+              </div>
+            </div>
+
+            <!-- Tag Stats -->
+            <div v-if="tagStats.length > 0" class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-medium text-gray-600">🏷️ Tags:</span>
+                <button
+                  @click="showStatsDetail = true"
+                  class="text-xs text-indigo-600 hover:text-indigo-700"
+                >
+                  Details →
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-2 text-xs">
+                <span
+                  v-for="stat in tagStats.slice(0, 5)"
+                  :key="stat.tag_id"
+                  class="bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                >
+                  {{ stat.tag_name }} <span class="text-gray-500">({{ stat.count }})</span>
+                </span>
+                <span v-if="tagStats.length > 5" class="text-gray-500 px-2 py-1">
+                  +{{ tagStats.length - 5 }} more
+                </span>
+              </div>
+            </div>
+
+            <!-- Empty state -->
+            <div v-if="ratingStats.length === 0 && tagStats.length === 0" class="text-xs text-gray-500 py-1">
+              No ratings or annotations yet. Start annotating! →
+            </div>
+          </div>
+
+          <!-- Right: Actions -->
+          <div class="flex flex-col gap-2 lg:min-w-[180px]">
+            <button 
+              @click="showRatingForm = true"
+              class="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm font-medium whitespace-nowrap"
+            >
+              ⭐ Rate Submission
+            </button>
+            <div v-if="submissionRatings.length > 0" class="text-xs text-gray-500 text-center">
+              {{ submissionRatings.length }} rating(s)
+            </div>
           </div>
         </div>
-        
-        <button 
-          class="text-xs text-indigo-600 hover:text-indigo-700 mt-2"
-          @click="handleAddSubmissionComment"
-        >
-          + Add comment on submission
-        </button>
       </div>
     </div>
 
     <!-- Main Content (below fixed header - dynamic padding) -->
-    <div :style="{ paddingTop: contentPaddingTop }">
-      <!-- Conversation (always visible) -->
-      <div class="flex">
-        <!-- Conversation (left side, 60%) -->
-        <div class="flex-1 max-w-[60%] px-4" ref="conversationContainerEl">
+    <div :style="{ paddingTop: contentPaddingTop }" class="min-h-screen">
+      <!-- Two-column layout for desktop, single column for mobile -->
+      <div class="flex flex-col lg:flex-row">
+        <!-- Conversation (full width mobile, 60% desktop) -->
+        <div class="w-full lg:w-[60%] px-4" ref="conversationContainerEl">
           <MessageList
             v-if="messages.length > 0"
             :messages="messages"
             :annotated-message-ids="annotatedMessageIds"
+            :inline-annotations="isMobile ? inlineAnnotations : []"
+            :user-names="userNames"
+            :current-user-id="authStore.user?.id"
+            :can-moderate="canModerate"
             @annotate-message="handleAnnotateMessage"
             @start-multi-select="handleStartMultiSelect"
             @selection-mode-changed="showSelectionToolbar = $event"
+            @add-tag="handleAddTag"
+            @add-comment="handleAddCommentToSelection"
+            @delete-selection="handleDeleteSelection"
+            @delete-comment="handleDeleteComment"
           />
           <div v-else class="p-8 text-center text-gray-500">
             <div v-if="loading">Loading conversation...</div>
@@ -189,8 +231,8 @@
           </div>
         </div>
 
-        <!-- Annotation Margin (right side, 40%, desktop only) -->
-        <div v-if="!isMobile" class="hidden lg:block w-[40%] relative">
+        <!-- Annotation Margin (hidden on mobile, 40% on desktop) -->
+        <div class="hidden lg:block lg:w-[40%] relative">
           <AnnotationMargin
             :annotations="marginAnnotations"
             :conversation-el="conversationContainerEl"
@@ -199,10 +241,8 @@
             :can-moderate="canModerate"
             @add-tag="handleAddTag"
             @add-comment="handleAddCommentToSelection"
-            @add-rating="handleAddRating"
             @delete-selection="handleDeleteSelection"
             @delete-comment="handleDeleteComment"
-            @delete-rating="handleDeleteRating"
           />
         </div>
       </div>
@@ -217,6 +257,23 @@
       @cancel="showTagPicker = false"
     />
 
+    <!-- Topic Selector Modal -->
+    <TopicSelector
+      :show="showTopicSelector"
+      :topics="availableTopics"
+      :selected-topic-names="submission?.metadata.tags || []"
+      @apply="applyTopics"
+      @cancel="showTopicSelector = false"
+    />
+
+    <!-- Rating Form Modal -->
+    <RatingForm
+      :show="showRatingForm"
+      :ranking-systems-with-criteria="rankingSystemsForPicker"
+      @submit="submitRatings"
+      @cancel="showRatingForm = false"
+    />
+
     <!-- Comment Form Modal -->
     <CommentForm
       :show="showCommentForm"
@@ -224,6 +281,115 @@
       @submit="submitComment"
       @cancel="showCommentForm = false"
     />
+
+    <!-- Tag Picker Modal -->
+    <TagPicker
+      v-if="showTagPicker"
+      :ontologies="availableOntologies"
+      :current-tags="activeSelectionId ? (selectionData.get(activeSelectionId)?.tags || []) : []"
+      @add-tag="handleTagSelected"
+      @close="showTagPicker = false; activeSelectionId = null"
+    />
+
+    <!-- Topic Selector Modal -->
+    <TopicSelector
+      v-if="showTopicSelector"
+      :current-topics="submission?.metadata.tags || []"
+      @update="updateTopics"
+      @close="showTopicSelector = false"
+    />
+
+    <!-- Stats Detail Modal -->
+    <div
+      v-if="showStatsDetail"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      @click.self="showStatsDetail = false"
+    >
+      <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-gray-900">Annotation Statistics</h2>
+          <button
+            @click="showStatsDetail = false"
+            class="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
+          <!-- Rating Stats Detail -->
+          <div v-if="ratingStats.length > 0">
+            <h3 class="text-md font-semibold text-gray-800 mb-3">⭐ Rating Breakdown</h3>
+            <div class="space-y-4">
+              <div
+                v-for="stat in ratingStats"
+                :key="stat.criterion_id"
+                class="bg-gray-50 rounded-lg p-4"
+              >
+                <div class="flex items-baseline justify-between mb-2">
+                  <span class="font-medium text-gray-900">{{ stat.criterion_name }}</span>
+                  <span class="text-lg font-bold text-indigo-600">
+                    {{ stat.avg.toFixed(1) }}/{{ stat.max }}
+                  </span>
+                </div>
+                <div class="text-sm text-gray-600 mb-2">
+                  {{ stat.count }} rating(s) • Range: {{ Math.min(...stat.scores) }}–{{ Math.max(...stat.scores) }}
+                </div>
+                <!-- Simple histogram -->
+                <div class="flex gap-1 h-12 items-end">
+                  <div
+                    v-for="score in Array.from({ length: stat.max + 1 }, (_, i) => i)"
+                    :key="score"
+                    class="flex-1 bg-indigo-200 rounded-t"
+                    :style="{ 
+                      height: (stat.scores.filter(s => s === score).length / stat.count * 100) + '%',
+                      minHeight: stat.scores.filter(s => s === score).length > 0 ? '4px' : '0'
+                    }"
+                    :title="`${score}: ${stat.scores.filter(s => s === score).length} rating(s)`"
+                  ></div>
+                </div>
+                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>0</span>
+                  <span>{{ stat.max }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tag Stats Detail -->
+          <div v-if="tagStats.length > 0">
+            <h3 class="text-md font-semibold text-gray-800 mb-3">🏷️ Tag Usage</h3>
+            <div class="grid grid-cols-2 gap-3">
+              <div
+                v-for="stat in tagStats"
+                :key="stat.tag_id"
+                class="bg-gray-50 rounded-lg p-3 flex items-center justify-between"
+              >
+                <span class="text-sm font-medium text-gray-900">{{ stat.tag_name }}</span>
+                <span class="text-lg font-bold text-gray-600">{{ stat.count }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div v-if="ratingStats.length === 0 && tagStats.length === 0" class="text-center py-8 text-gray-500">
+            No statistics available yet.
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+          <button
+            @click="showStatsDetail = false"
+            class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -236,9 +402,11 @@ import MessageList from '@/components/MessageList.vue'
 import AnnotationMargin from '@/components/AnnotationMargin.vue'
 import CommentForm from '@/components/CommentForm.vue'
 import TagPicker from '@/components/TagPicker.vue'
-import type { Message, Selection, Comment, Rating } from '@/types'
+import TopicSelector from '@/components/TopicSelector.vue'
+import RatingForm from '@/components/RatingForm.vue'
+import type { Message, Selection, Comment, Rating, Topic } from '@/types'
 import type { MarginAnnotation } from '@/utils/layout-manager'
-import { ontologiesAPI, submissionsAPI, annotationsAPI } from '@/services/api'
+import { ontologiesAPI, submissionsAPI, annotationsAPI, researchAPI, rankingsAPI } from '@/services/api'
 import { renderMarkdown } from '@/utils/markdown'
 
 const route = useRoute()
@@ -255,9 +423,9 @@ const messages = ref<Message[]>([])
 const selections = ref<Selection[]>([])
 const selectionData = ref<Map<string, {
   comments: Comment[]
-  ratings: Rating[]
   tags: any[]
 }>>(new Map())
+const submissionRatings = ref<Rating[]>([])
 const attachedOntologies = ref<any[]>([])
 const allTags = ref<Map<string, any>>(new Map())
 const submitterName = ref('User')
@@ -267,9 +435,8 @@ const userNames = ref<Map<string, string>>(new Map())
 const editingDescription = ref(false)
 const descriptionEdit = ref('')
 const descriptionTextarea = ref<HTMLTextAreaElement>()
-const editingTags = ref(false)
-const tagsEdit = ref('')
-const tagsInput = ref<HTMLInputElement>()
+const showTopicSelector = ref(false)
+const availableTopics = ref<Topic[]>([])
 
 const canEditSubmission = computed(() => {
   if (!authStore.user || !submission.value) return false
@@ -318,21 +485,28 @@ onMounted(async () => {
   window.addEventListener('resize', checkMobile)
   await loadData()
   
-  // Measure header height after render
-  setTimeout(() => {
+  // Use ResizeObserver to track header height changes
+  const updateHeaderHeight = () => {
     if (headerEl.value) {
       headerHeight.value = headerEl.value.offsetHeight
     }
-  }, 100)
+  }
   
-  // Also recalculate when description changes
-  watch([editingDescription, editingTags], () => {
-    setTimeout(() => {
-      if (headerEl.value) {
-        headerHeight.value = headerEl.value.offsetHeight
-      }
-    }, 50)
+  // Initial measurement
+  setTimeout(updateHeaderHeight, 100)
+  
+  // Watch for any changes that might affect header height
+  watch([editingDescription], () => {
+    setTimeout(updateHeaderHeight, 50)
   })
+  
+  // Use ResizeObserver for continuous tracking
+  if (headerEl.value) {
+    const resizeObserver = new ResizeObserver(() => {
+      updateHeaderHeight()
+    })
+    resizeObserver.observe(headerEl.value)
+  }
 })
 
 function checkMobile() {
@@ -347,6 +521,10 @@ async function loadData() {
     messages.value = await submissionsStore.fetchMessages(submissionId)
     selections.value = await submissionsStore.fetchSelections(submissionId)
     
+    // Load available topics for selector
+    const topicsResponse = await researchAPI.getTopics()
+    availableTopics.value = topicsResponse.data.topics
+    
     // Build user names map (for now just current user)
     userNames.value.clear()
     if (authStore.user) {
@@ -356,7 +534,7 @@ async function loadData() {
         : 'User ' + submission.value.submitter_id.substring(0, 8)
     }
     
-    // Load ontologies and tags
+    // Load ontologies and tags (combines topic-derived + explicit)
     const ontoResponse = await ontologiesAPI.getForSubmission(submissionId)
     attachedOntologies.value = ontoResponse.data.ontologies
     
@@ -369,15 +547,30 @@ async function loadData() {
       })
     }
     
-    // Load comments and ratings for each selection
+    // Load ranking systems and criteria (combines topic-derived + explicit)
+    const rankingsResponse = await rankingsAPI.getForSubmission(submissionId)
+    attachedRankingSystems.value = rankingsResponse.data.ranking_systems
+    
+    // Build criteria map
+    allCriteria.value.clear()
+    for (const rankingSystem of attachedRankingSystems.value) {
+      const systemDetail = await rankingsAPI.get(rankingSystem.ranking_system_id)
+      systemDetail.data.criteria.forEach((criterion: any) => {
+        allCriteria.value.set(criterion.id, criterion)
+      })
+    }
+    
+    // Load comments and tags for each selection
     selectionData.value.clear()
     for (const sel of selections.value) {
       const comments = await submissionsStore.getCommentsBySelection(sel.id)
-      const ratings = await submissionsStore.getRatingsBySelection(sel.id)
       const tags = sel.annotation_tags.map(tagId => allTags.value.get(tagId)).filter(t => t)
       
-      selectionData.value.set(sel.id, { comments, ratings, tags })
+      selectionData.value.set(sel.id, { comments, tags })
     }
+    
+    // Load submission-level ratings
+    submissionRatings.value = await submissionsStore.getRatingsBySubmission(submissionId)
     
     // TODO: Load submission-level comments
     submissionComments.value = []
@@ -402,7 +595,7 @@ async function handleAnnotateMessage(messageId: string) {
     })
     
     selections.value.push(selection)
-    selectionData.value.set(selection.id, { comments: [], ratings: [], tags: [] })
+    selectionData.value.set(selection.id, { comments: [], tags: [] })
   } catch (err) {
     console.error('Failed to create annotation:', err)
   }
@@ -414,12 +607,16 @@ function handleStartMultiSelect(messageId: string) {
 
 const showCommentForm = ref(false)
 const showTagPicker = ref(false)
+const showRatingForm = ref(false)
+const showStatsDetail = ref(false)
 const activeSelectionId = ref<string | null>(null)
 const commentContext = ref<{ messageId: string; text?: string; selectionId?: string } | null>(null)
 const conversationContainerEl = ref<HTMLElement | null>(null)
 const showSelectionToolbar = ref(false)
 const headerEl = ref<HTMLElement | null>(null)
-const headerHeight = ref(280)
+const headerHeight = ref(0)
+const attachedRankingSystems = ref<any[]>([])
+const allCriteria = ref<Map<string, any>>(new Map())
 
 // Computed helpers
 const totalCommentCount = computed(() => {
@@ -431,11 +628,59 @@ const totalCommentCount = computed(() => {
 })
 
 const totalRatingCount = computed(() => {
-  let count = 0
-  for (const data of selectionData.value.values()) {
-    count += data.ratings.length
+  return submissionRatings.value.length
+})
+
+// Rating statistics
+const ratingStats = computed(() => {
+  const stats = new Map<string, { criterion_id: string; criterion_name: string; scores: number[]; max: number }>()
+  
+  for (const rating of submissionRatings.value) {
+    const criterion = allCriteria.value.get(rating.criterion_id)
+    if (!criterion) continue
+    
+    if (!stats.has(rating.criterion_id)) {
+      stats.set(rating.criterion_id, {
+        criterion_id: rating.criterion_id,
+        criterion_name: criterion.name,
+        scores: [],
+        max: criterion.scale_max
+      })
+    }
+    stats.get(rating.criterion_id)!.scores.push(rating.score)
   }
-  return count
+  
+  return Array.from(stats.values()).map(stat => ({
+    criterion_id: stat.criterion_id,
+    criterion_name: stat.criterion_name,
+    avg: stat.scores.reduce((a, b) => a + b, 0) / stat.scores.length,
+    count: stat.scores.length,
+    max: stat.max,
+    scores: stat.scores
+  })).sort((a, b) => b.count - a.count)
+})
+
+// Tag statistics
+const tagStats = computed(() => {
+  const stats = new Map<string, { tag_id: string; tag_name: string; count: number }>()
+  
+  for (const selection of selections.value) {
+    for (const tagId of selection.annotation_tags) {
+      const tag = allTags.value.get(tagId)
+      if (!tag) continue
+      
+      if (!stats.has(tagId)) {
+        stats.set(tagId, {
+          tag_id: tagId,
+          tag_name: tag.name,
+          count: 0
+        })
+      }
+      stats.get(tagId)!.count++
+    }
+  }
+  
+  return Array.from(stats.values()).sort((a, b) => b.count - a.count)
 })
 
 const selectionsWithComments = computed(() => {
@@ -460,7 +705,19 @@ const ontologiesForPicker = computed(() => {
   })
 })
 
-// Build margin annotations - one unified card per selection
+// Ranking systems for rating picker
+const rankingSystemsForPicker = computed(() => {
+  return attachedRankingSystems.value.map(subRanking => {
+    const criteria = Array.from(allCriteria.value.values()).filter(c => c.ranking_system_id === subRanking.ranking_system_id)
+    return {
+      system: { name: 'Ranking System', id: subRanking.ranking_system_id } as any,
+      criteria,
+      isFromTopic: subRanking.source === 'topic'  // From dynamic lookup
+    }
+  })
+})
+
+// Build margin annotations - one card per selection (no ratings)
 const marginAnnotations = computed<MarginAnnotation[]>(() => {
   const annotations: MarginAnnotation[] = []
   
@@ -478,7 +735,7 @@ const marginAnnotations = computed<MarginAnnotation[]>(() => {
         selection: sel,
         tags: data.tags,
         comments: data.comments,
-        ratings: data.ratings
+        ratings: [] // Ratings are submission-level now
       }
     })
   }
@@ -508,7 +765,7 @@ async function submitComment(text: string) {
       
       targetSelectionId = selection.id
       selections.value.push(selection)
-      selectionData.value.set(selection.id, { comments: [], ratings: [], tags: [] })
+      selectionData.value.set(selection.id, { comments: [], tags: [] })
     } else {
       showCommentForm.value = false
       return
@@ -574,29 +831,18 @@ function cancelEditDescription() {
   descriptionEdit.value = ''
 }
 
-function startEditTags() {
-  tagsEdit.value = submission.value?.metadata.tags?.join(', ') || ''
-  editingTags.value = true
-  setTimeout(() => tagsInput.value?.focus(), 10)
-}
-
-async function saveTags() {
+async function applyTopics(topicNames: string[]) {
   try {
-    const tags = tagsEdit.value.split(',').map(t => t.trim()).filter(t => t)
-    await submissionsAPI.update(submissionId, { tags })
+    await submissionsAPI.update(submissionId, { tags: topicNames })
     
     if (submission.value) {
-      submission.value.metadata.tags = tags
+      submission.value.metadata.tags = topicNames
     }
-    editingTags.value = false
+    showTopicSelector.value = false
   } catch (err) {
-    console.error('Failed to save tags:', err)
+    console.error('Failed to save topics:', err)
+    showTopicSelector.value = false
   }
-}
-
-function cancelEditTags() {
-  editingTags.value = false
-  tagsEdit.value = ''
 }
 
 function handleAddTag(selectionId: string) {
@@ -610,9 +856,29 @@ function handleAddCommentToSelection(selectionId: string) {
 }
 
 function handleAddRating(selectionId: string) {
-  activeSelectionId.value = selectionId
-  console.log('Rate selection:', selectionId)
-  // TODO: Open rating form
+  // Ratings are submission-level now, but can still be triggered from annotation card
+  showRatingForm.value = true
+}
+
+async function submitRatings(ratings: Array<{ criterion_id: string; score: number }>) {
+  try {
+    // Submit all ratings at submission level
+    for (const rating of ratings) {
+      await submissionsStore.createRating({
+        submission_id: submissionId,
+        criterion_id: rating.criterion_id,
+        score: rating.score
+      })
+    }
+    
+    // Refresh submission ratings
+    submissionRatings.value = await submissionsStore.getRatingsBySubmission(submissionId)
+    
+    showRatingForm.value = false
+  } catch (err) {
+    console.error('Failed to submit ratings:', err)
+    showRatingForm.value = false
+  }
 }
 
 async function handleDeleteSelection(selectionId: string) {
@@ -650,10 +916,8 @@ async function handleDeleteRating(ratingId: string) {
   try {
     await annotationsAPI.deleteRating(ratingId)
     
-    // Remove from all selections' ratings
-    for (const data of selectionData.value.values()) {
-      data.ratings = data.ratings.filter(r => r.id !== ratingId)
-    }
+    // Remove from submission ratings
+    submissionRatings.value = submissionRatings.value.filter(r => r.id !== ratingId)
   } catch (err) {
     console.error('Failed to delete rating:', err)
   }
