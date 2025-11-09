@@ -6,6 +6,11 @@ const router = createRouter({
   routes: [
     {
       path: '/',
+      name: 'landing',
+      component: () => import('@/views/LandingPage.vue')
+    },
+    {
+      path: '/browse',
       name: 'browse',
       component: () => import('@/views/BrowseView.vue')
     },
