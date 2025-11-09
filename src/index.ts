@@ -16,6 +16,7 @@ import { createResearchRoutes } from './routes/research.js';
 import { createOntologyRoutes } from './routes/ontologies.js';
 import { createRankingRoutes } from './routes/rankings.js';
 import { createModelRoutes } from './routes/models.js';
+import { createAdminRoutes } from './routes/admin.js';
 
 dotenv.config();
 
@@ -78,6 +79,7 @@ async function main() {
   app.use('/api/ontologies', createOntologyRoutes(context));
   app.use('/api/rankings', createRankingRoutes(context));
   app.use('/api/models', createModelRoutes(context));
+  app.use('/api/admin', createAdminRoutes(context));
 
   // Serve frontend in production
   if (process.env.NODE_ENV === 'production') {

@@ -111,6 +111,22 @@ export class UserStore {
     return updated;
   }
 
+  async addUserRole(userId: string, role: User['roles'][number]): Promise<User | null> {
+    const user = this.users.get(userId);
+    if (!user) return null;
+    
+    if (!user.roles.includes(role)) {
+      const newRoles = [...user.roles, role] as User['roles'];
+      return this.updateUserRoles(userId, newRoles);
+    }
+    
+    return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
   async close(): Promise<void> {
     await this.usersFile.close();
   }
