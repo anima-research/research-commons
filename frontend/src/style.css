@@ -4,14 +4,15 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 }
 
 @layer components {
   /* Discord-style message layout */
   .message-row {
-    @apply flex gap-4 p-4 hover:bg-gray-100 transition-colors;
+    @apply flex gap-4 p-4 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors;
   }
   
   .message-avatar {
@@ -24,7 +25,7 @@
   
   /* Prose styles for markdown */
   .prose {
-    @apply text-gray-800;
+    @apply text-gray-800 dark:text-gray-200;
   }
   
   .prose p {
@@ -32,24 +33,24 @@
   }
   
   .prose code {
-    @apply bg-gray-100 px-1 py-0.5 rounded text-sm;
+    @apply bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm;
   }
   
   .prose pre {
-    @apply bg-gray-100 p-2 rounded overflow-x-auto;
+    @apply bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-x-auto;
   }
   
   .prose a {
-    @apply text-indigo-600 hover:text-indigo-700;
+    @apply text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300;
   }
   
   /* Selection highlight */
   .text-selection {
-    @apply bg-yellow-200 rounded cursor-pointer;
+    @apply bg-yellow-200 dark:bg-yellow-900/30 rounded cursor-pointer;
   }
   
   .text-selection.has-comments {
-    @apply border-l-4 border-blue-500;
+    @apply border-l-4 border-blue-500 dark:border-blue-400;
   }
   
   .text-selection.has-ratings::after {
@@ -59,7 +60,7 @@
   
   /* Action buttons */
   .action-button {
-    @apply px-3 py-1.5 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 transition-colors text-sm;
+    @apply px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm;
   }
   
   /* Checkbox column animation */

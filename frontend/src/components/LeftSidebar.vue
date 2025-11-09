@@ -2,7 +2,7 @@
   <!-- Desktop: Fixed left sidebar -->
   <div 
     v-if="!isMobile"
-    class="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex flex-col z-40"
+    class="fixed left-0 top-0 h-screen w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col z-40 transition-colors"
   >
     <SidebarContent @navigate="$emit('navigate', $event)" />
   </div>
@@ -12,11 +12,11 @@
     <transition name="slide-right">
       <div
         v-if="isMobile && show"
-        class="fixed inset-0 bg-white z-50 flex flex-col"
+        class="fixed inset-0 bg-white dark:bg-gray-900 z-50 flex flex-col"
       >
-        <div class="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 class="text-lg font-semibold">Menu</h2>
-          <button @click="$emit('close')" class="text-gray-600 hover:text-gray-900 text-2xl">
+        <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Menu</h2>
+          <button @click="$emit('close')" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 text-2xl">
             ×
           </button>
         </div>

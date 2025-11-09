@@ -56,8 +56,8 @@
       <div class="message-content flex-1 min-w-0 relative">
         <!-- Header -->
         <div class="flex items-baseline gap-2 mb-1">
-          <span class="font-semibold text-gray-900">{{ message.participant_name }}</span>
-          <span class="text-xs text-gray-500">{{ formatTime(message.timestamp) }}</span>
+          <span class="font-semibold text-gray-900 dark:text-gray-100">{{ message.participant_name }}</span>
+          <span class="text-xs text-gray-500 dark:text-gray-400">{{ formatTime(message.timestamp) }}</span>
           
           <!-- Model badge -->
           <span v-if="message.model_info" class="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
@@ -76,13 +76,13 @@
 
         <!-- Content -->
         <div 
-          class="message-text text-gray-800 prose prose-sm max-w-none"
+          class="message-text text-gray-800 dark:text-gray-200 prose prose-sm max-w-none"
           @mouseup="onTextSelect"
           ref="contentEl"
         >
           <template v-for="(block, idx) in message.content_blocks" :key="idx">
             <div v-if="block.type === 'text'" v-html="renderMarkdown(block.text || '')" />
-            <div v-else-if="block.type === 'thinking'" class="thinking-block bg-gray-100 p-2 rounded my-2 text-sm">
+            <div v-else-if="block.type === 'thinking'" class="thinking-block bg-gray-100 dark:bg-gray-800 p-2 rounded my-2 text-sm">
               <div class="text-gray-500 mb-1">Thinking:</div>
               <div class="text-gray-700" v-html="renderMarkdown(block.thinking?.content || '')" />
             </div>
@@ -90,7 +90,7 @@
         </div>
 
         <!-- Branch navigation (if siblings exist) -->
-        <div v-if="hasBranches" class="flex items-center gap-2 mt-2 text-sm text-gray-500">
+        <div v-if="hasBranches" class="flex items-center gap-2 mt-2 text-sm text-gray-500 dark:text-gray-400">
           <button @click="$emit('prev-branch')" class="hover:text-gray-700">⏮️</button>
           <span>{{ branchIndex + 1 }} / {{ branchCount }}</span>
           <button @click="$emit('next-branch')" class="hover:text-gray-700">⏭️</button>
@@ -100,7 +100,7 @@
         <transition name="fade">
           <div 
             v-if="showActions || actionsExpanded"
-            class="message-actions absolute right-0 bottom-2 flex gap-1 bg-white rounded-lg shadow-lg border border-gray-300 px-2 py-1.5"
+            class="message-actions absolute right-0 bottom-2 flex gap-1 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-300 dark:border-gray-700 px-2 py-1.5"
           >
             <button 
               @click="annotateMessage" 
@@ -112,7 +112,7 @@
             <div class="w-px bg-gray-200" />
             <button 
               @click="startMultiSelect" 
-              class="px-3 py-1 text-xs hover:bg-gray-100 rounded flex items-center gap-1"
+              class="px-3 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex items-center gap-1"
               title="Select multiple messages"
             >
               ☑️ Multi-select

@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors">
     <!-- Left Sidebar -->
     <LeftSidebar 
       :show="showMobileSidebar"
@@ -11,9 +11,9 @@
     <button
       v-if="isMobile"
       @click="showMobileSidebar = true"
-      class="fixed top-4 left-4 z-30 p-2 bg-white rounded-lg shadow-lg border border-gray-200 lg:hidden"
+      class="fixed top-4 left-4 z-30 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 lg:hidden transition-colors"
     >
-      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="w-6 h-6 text-gray-900 dark:text-gray-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
       </svg>
     </button>
@@ -21,13 +21,13 @@
     <!-- Main content area (with left margin on desktop) -->
     <div class="lg:ml-64">
       <!-- Header -->
-      <header class="bg-white border-b border-gray-200 sticky top-0 z-20">
+      <header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 transition-colors">
         <div class="px-4 py-4 flex items-center justify-between">
-          <h1 class="text-xl font-bold">Submissions</h1>
+          <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Submissions</h1>
           <router-link 
             v-if="authStore.isAuthenticated()"
             to="/submit" 
-            class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm transition-colors"
           >
             📤 Submit
           </router-link>
@@ -36,16 +36,16 @@
 
       <!-- Filters -->
       <div class="px-4 py-4">
-        <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-4 mb-6 transition-colors">
           <div class="flex flex-wrap gap-4">
-          <select class="px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500">
+          <select class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 transition-colors">
             <option>All Topics</option>
             <option>Deprecation Attitudes</option>
             <option>Restriction Responses</option>
           </select>
           
-          <label class="flex items-center gap-2">
-            <input type="checkbox" class="w-4 h-4" />
+          <label class="flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <input type="checkbox" class="w-4 h-4 rounded border-gray-300 dark:border-gray-700" />
             <span class="text-sm">ARC Certified Only</span>
           </label>
           
@@ -55,9 +55,9 @@
               @keyup.enter="search"
               type="text"
               placeholder="Search submissions..."
-              class="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+              class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-colors"
             />
-            <button @click="search" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+            <button @click="search" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors">
               🔍
             </button>
           </div>
@@ -65,7 +65,7 @@
       </div>
 
         <!-- Loading State -->
-        <div v-if="loading" class="text-center py-12 text-gray-500">
+        <div v-if="loading" class="text-center py-12 text-gray-500 dark:text-gray-400">
           Loading submissions...
         </div>
 
@@ -75,44 +75,44 @@
             v-for="submission in submissions"
             :key="submission.id"
             @click="router.push(`/submissions/${submission.id}`)"
-            class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer p-6"
+            class="bg-white dark:bg-gray-900 rounded-lg shadow-sm hover:shadow-md dark:hover:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 transition-all cursor-pointer p-6"
           >
           <!-- Header with avatars -->
           <div class="flex items-start gap-3 mb-3">
             <div class="flex -space-x-2">
-              <div class="w-10 h-10 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center text-white font-semibold">
+              <div class="w-10 h-10 rounded-full bg-blue-500 border-2 border-white dark:border-gray-900 flex items-center justify-center text-white font-semibold">
                 R
               </div>
-              <div class="w-10 h-10 rounded-full bg-purple-500 border-2 border-white flex items-center justify-center text-white font-semibold">
+              <div class="w-10 h-10 rounded-full bg-purple-500 border-2 border-white dark:border-gray-900 flex items-center justify-center text-white font-semibold">
                 C
               </div>
             </div>
             
             <div class="flex-1">
-              <h3 class="text-lg font-semibold text-gray-900">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {{ submission.title }}
               </h3>
-              <div class="text-sm text-gray-600 mt-1">
+              <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 {{ submission.metadata.participants_summary?.join(' → ') || 'Multiple participants' }}
               </div>
             </div>
             
             <span 
               v-if="submission.source_type === 'arc-certified'"
-              class="px-2 py-1 bg-green-100 text-green-700 text-xs rounded font-medium"
+              class="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded font-medium"
             >
               ✓ ARC Certified
             </span>
             <span 
               v-else
-              class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded"
+              class="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded"
             >
               ⬆ Upload
             </span>
           </div>
 
           <!-- Stats -->
-          <div class="flex items-center gap-4 text-sm text-gray-500 mb-3">
+          <div class="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-3">
             <span>{{ formatDate(submission.submitted_at) }}</span>
             <span>💬 {{ mockComments }} comments</span>
             <span>⭐ {{ mockRating }}/5 ({{ mockRatingCount }} ratings)</span>
@@ -123,7 +123,7 @@
               <span
                 v-for="tag in submission.metadata.tags"
                 :key="tag"
-                class="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded"
+                class="px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs rounded"
               >
                 #{{ tag }}
               </span>
@@ -131,7 +131,7 @@
           </div>
 
           <!-- Empty state -->
-          <div v-if="submissions.length === 0" class="text-center py-12 text-gray-500">
+          <div v-if="submissions.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
             No submissions yet. Be the first to contribute!
           </div>
         </div>

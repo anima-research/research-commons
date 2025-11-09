@@ -21,13 +21,13 @@
             ref="textareaRef"
             placeholder="Share your thoughts... (Markdown supported)"
             rows="6"
-            class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y"
+            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y"
           />
           <div class="flex justify-between items-center mt-1">
-            <div class="text-xs text-gray-500">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
               Markdown supported: **bold**, *italic*, `code`, [links](url)
             </div>
-            <div class="text-xs text-gray-500">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
               {{ commentText.length }} characters
             </div>
           </div>
@@ -37,7 +37,7 @@
         <div class="flex justify-end gap-2">
           <button
             @click="$emit('cancel')"
-            class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+            class="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Cancel
           </button>

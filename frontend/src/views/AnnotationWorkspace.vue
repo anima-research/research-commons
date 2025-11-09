@@ -1,22 +1,22 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 dark:bg-gray-950 transition-colors">
     <!-- Fixed Top Pane -->
-    <div class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-30" ref="headerEl">
+    <div class="fixed top-0 left-0 right-0 bg-white dark:bg-gray-900 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 dark:border-gray-800 z-30 transition-colors" ref="headerEl">
       <!-- Navigation Bar -->
-      <div class="px-4 py-3 border-b border-gray-100">
+      <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
         <div class="flex items-center justify-between">
-          <button @click="router.push('/')" class="text-gray-600 hover:text-gray-900">
+          <button @click="router.push('/')" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 dark:hover:text-gray-100 transition-colors">
             ← Back to Browse
           </button>
           <div class="flex items-center gap-3">
             <button
               v-if="canDeleteSubmission"
               @click="handleDeleteSubmission"
-              class="text-xs text-red-600 hover:text-red-700 px-2 py-1 border border-red-300 rounded hover:bg-red-50"
+              class="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 px-2 py-1 border border-red-300 dark:border-red-800 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
             >
               🗑️ Delete Submission
             </button>
-            <div v-if="authStore.isAuthenticated()" class="text-sm text-gray-700">
+            <div v-if="authStore.isAuthenticated()" class="text-sm text-gray-700 dark:text-gray-300 dark:text-gray-300">
               {{ authStore.user?.name }}
             </div>
           </div>
@@ -39,7 +39,7 @@
         </div>
         
         <!-- Meta info -->
-        <div class="text-sm text-gray-600">
+        <div class="text-sm text-gray-600 dark:text-gray-400">
           <span>by {{ submitterName }}</span>
           <span class="mx-2">•</span>
           <span>{{ formatDate(submission?.submitted_at) }}</span>
@@ -51,7 +51,7 @@
             <!-- Show description or prominent placeholder -->
             <div 
               v-if="submission?.metadata.description"
-              class="text-sm text-gray-700 bg-gray-50 rounded p-2 group cursor-text prose prose-sm max-w-none"
+              class="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-950 rounded p-2 group cursor-text prose prose-sm max-w-none"
               @click="canEditSubmission && startEditDescription()"
             >
               <div v-html="renderMarkdown(submission.metadata.description)" class="inline"></div>
@@ -66,7 +66,7 @@
             <button
               v-else-if="canEditSubmission"
               @click="startEditDescription"
-              class="text-sm text-gray-400 hover:text-gray-600 bg-gray-50 rounded p-2 w-full text-left border border-dashed border-gray-300"
+              class="text-sm text-gray-400 hover:text-gray-600 bg-gray-50 dark:bg-gray-950 rounded p-2 w-full text-left border border-dashed border-gray-300 dark:border-gray-700"
             >
               + Add description for this submission
             </button>
@@ -86,9 +86,9 @@
               placeholder="Describe what this conversation is about, what makes it interesting or noteworthy..."
             />
             <div class="flex justify-between items-center">
-              <span class="text-xs text-gray-500">Ctrl/⌘ + Enter to save, Esc to cancel</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">Ctrl/⌘ + Enter to save, Esc to cancel</span>
               <div class="flex gap-2">
-                <button @click="cancelEditDescription" class="px-3 py-1.5 border border-gray-300 text-xs rounded hover:bg-gray-50">
+                <button @click="cancelEditDescription" class="px-3 py-1.5 border border-gray-300 dark:border-gray-700 text-xs rounded hover:bg-gray-50 dark:hover:bg-gray-800">
                   Cancel
                 </button>
                 <button @click="saveDescription" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">
@@ -125,14 +125,14 @@
       </div>
 
       <!-- Two-column: Stats/Info | Actions -->
-      <div class="px-4 pb-3 border-t border-gray-200">
+      <div class="px-4 pb-3 border-t border-gray-200 dark:border-gray-800">
         <div class="grid grid-cols-1 lg:grid-cols-[1fr,auto] gap-4 py-3">
           <!-- Left: Stats (compact) -->
           <div class="space-y-2">
             <!-- Rating Stats -->
             <div v-if="ratingStats.length > 0" class="space-y-1">
               <div class="flex items-center gap-2">
-                <span class="text-xs font-medium text-gray-600">⭐ Ratings:</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-gray-400">⭐ Ratings:</span>
                 <button
                   @click="showStatsDetail = true"
                   class="text-xs text-indigo-600 hover:text-indigo-700"
@@ -159,7 +159,7 @@
             <!-- Tag Stats -->
             <div v-if="tagStats.length > 0" class="space-y-1">
               <div class="flex items-center gap-2">
-                <span class="text-xs font-medium text-gray-600">🏷️ Tags:</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-gray-400">🏷️ Tags:</span>
                 <button
                   @click="showStatsDetail = true"
                   class="text-xs text-indigo-600 hover:text-indigo-700"
@@ -171,7 +171,7 @@
                 <span
                   v-for="stat in tagStats.slice(0, 5)"
                   :key="stat.tag_id"
-                  class="bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                  class="bg-gray-100 text-gray-700 dark:text-gray-300 px-2 py-1 rounded"
                 >
                   {{ stat.tag_name }} <span class="text-gray-500">({{ stat.count }})</span>
                 </span>
@@ -182,7 +182,7 @@
             </div>
 
             <!-- Empty state -->
-            <div v-if="ratingStats.length === 0 && tagStats.length === 0" class="text-xs text-gray-500 py-1">
+            <div v-if="ratingStats.length === 0 && tagStats.length === 0" class="text-xs text-gray-500 dark:text-gray-400 py-1">
               No ratings or annotations yet. Start annotating! →
             </div>
           </div>
@@ -195,7 +195,7 @@
             >
               ⭐ Rate Submission
             </button>
-            <div v-if="submissionRatings.length > 0" class="text-xs text-gray-500 text-center">
+            <div v-if="submissionRatings.length > 0" class="text-xs text-gray-500 dark:text-gray-400 text-center">
               {{ submissionRatings.length }} rating(s)
             </div>
           </div>
@@ -225,7 +225,7 @@
             @delete-selection="handleDeleteSelection"
             @delete-comment="handleDeleteComment"
           />
-          <div v-else class="p-8 text-center text-gray-500">
+          <div v-else class="p-8 text-center text-gray-500 dark:text-gray-400">
             <div v-if="loading">Loading conversation...</div>
             <div v-else>No messages found</div>
           </div>
@@ -285,16 +285,16 @@
     <!-- Stats Detail Modal -->
     <div
       v-if="showStatsDetail"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      class="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center p-4 z-50"
       @click.self="showStatsDetail = false"
     >
-      <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col transition-colors">
         <!-- Header -->
-        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-gray-900">Annotation Statistics</h2>
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Annotation Statistics</h2>
           <button
             @click="showStatsDetail = false"
-            class="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none transition-colors"
           >
             ✕
           </button>
@@ -304,20 +304,20 @@
         <div class="flex-1 overflow-y-auto p-6 space-y-6">
           <!-- Rating Stats Detail -->
           <div v-if="ratingStats.length > 0">
-            <h3 class="text-md font-semibold text-gray-800 mb-3">⭐ Rating Breakdown</h3>
+            <h3 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">⭐ Rating Breakdown</h3>
             <div class="space-y-4">
               <div
                 v-for="stat in ratingStats"
                 :key="stat.criterion_id"
-                class="bg-gray-50 rounded-lg p-4"
+                class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 transition-colors"
               >
                 <div class="flex items-baseline justify-between mb-2">
-                  <span class="font-medium text-gray-900">{{ stat.criterion_name }}</span>
-                  <span class="text-lg font-bold text-indigo-600">
+                  <span class="font-medium text-gray-900 dark:text-gray-100">{{ stat.criterion_name }}</span>
+                  <span class="text-lg font-bold text-indigo-600 dark:text-indigo-400">
                     {{ stat.avg.toFixed(1) }}/{{ stat.max }}
                   </span>
                 </div>
-                <div class="text-sm text-gray-600 mb-2">
+                <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
                   {{ stat.count }} rating(s) • Range: {{ Math.min(...stat.scores) }}–{{ Math.max(...stat.scores) }}
                 </div>
                 <!-- Simple histogram -->
@@ -325,7 +325,7 @@
                   <div
                     v-for="score in Array.from({ length: stat.max + 1 }, (_, i) => i)"
                     :key="score"
-                    class="flex-1 bg-indigo-200 rounded-t"
+                    class="flex-1 bg-indigo-200 dark:bg-indigo-700 rounded-t transition-colors"
                     :style="{ 
                       height: (stat.scores.filter(s => s === score).length / stat.count * 100) + '%',
                       minHeight: stat.scores.filter(s => s === score).length > 0 ? '4px' : '0'
@@ -333,7 +333,7 @@
                     :title="`${score}: ${stat.scores.filter(s => s === score).length} rating(s)`"
                   ></div>
                 </div>
-                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                   <span>0</span>
                   <span>{{ stat.max }}</span>
                 </div>
@@ -343,30 +343,30 @@
 
           <!-- Tag Stats Detail -->
           <div v-if="tagStats.length > 0">
-            <h3 class="text-md font-semibold text-gray-800 mb-3">🏷️ Tag Usage</h3>
+            <h3 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">🏷️ Tag Usage</h3>
             <div class="grid grid-cols-2 gap-3">
               <div
                 v-for="stat in tagStats"
                 :key="stat.tag_id"
-                class="bg-gray-50 rounded-lg p-3 flex items-center justify-between"
+                class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 flex items-center justify-between border border-gray-200 dark:border-gray-700 transition-colors"
               >
-                <span class="text-sm font-medium text-gray-900">{{ stat.tag_name }}</span>
-                <span class="text-lg font-bold text-gray-600">{{ stat.count }}</span>
+                <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ stat.tag_name }}</span>
+                <span class="text-lg font-bold text-gray-600 dark:text-gray-400">{{ stat.count }}</span>
               </div>
             </div>
           </div>
 
           <!-- Empty state -->
-          <div v-if="ratingStats.length === 0 && tagStats.length === 0" class="text-center py-8 text-gray-500">
+          <div v-if="ratingStats.length === 0 && tagStats.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
             No statistics available yet.
           </div>
         </div>
 
         <!-- Footer -->
-        <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex justify-end">
           <button
             @click="showStatsDetail = false"
-            class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+            class="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
           >
             Close
           </button>

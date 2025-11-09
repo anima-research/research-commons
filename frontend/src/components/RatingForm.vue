@@ -2,17 +2,17 @@
   <Teleport to="body">
     <div
       v-if="show"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      class="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4"
       @click.self="$emit('cancel')"
     >
-      <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col">
-        <div class="p-4 border-b border-gray-200">
-          <h3 class="text-lg font-semibold">⭐ Rate Selection</h3>
-          <p class="text-sm text-gray-600 mt-1">Rate against available criteria from attached ranking systems</p>
+      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col transition-colors">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-800">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">⭐ Rate Submission</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Evaluate this conversation using the available criteria</p>
         </div>
 
         <div class="flex-1 overflow-y-auto p-4">
-          <div v-if="rankingSystemsWithCriteria.length === 0" class="text-center py-8 text-gray-500">
+          <div v-if="rankingSystemsWithCriteria.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
             No ranking systems attached to this submission.
           </div>
 
@@ -20,19 +20,19 @@
             <div
               v-for="system in rankingSystemsWithCriteria"
               :key="system.system.id"
-              class="border border-gray-200 rounded-lg p-4"
+              class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 transition-colors"
             >
               <div class="flex items-start gap-2 mb-4">
                 <div class="flex-1">
-                  <h4 class="font-semibold text-gray-900">{{ system.system.name }}</h4>
-                  <p class="text-xs text-gray-600 mt-1">{{ system.system.description }}</p>
+                  <h4 class="font-semibold text-gray-900 dark:text-gray-100">{{ system.system.name }}</h4>
+                  <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ system.system.description }}</p>
                 </div>
                 <span
                   v-if="system.isFromTopic"
-                  class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded flex items-center gap-1"
+                  class="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs rounded flex items-center gap-1"
                   title="From research topic (required)"
                 >
-                  🔒
+                  🔒 Topic
                 </span>
               </div>
 
@@ -40,14 +40,14 @@
                 <div
                   v-for="criterion in system.criteria"
                   :key="criterion.id"
-                  class="bg-gray-50 rounded p-3"
+                  class="bg-white dark:bg-gray-900 rounded p-3 border border-gray-200 dark:border-gray-700 transition-colors"
                 >
                   <div class="flex items-start justify-between mb-2">
                     <div class="flex-1">
-                      <div class="font-medium text-sm text-gray-900">{{ criterion.name }}</div>
-                      <div class="text-xs text-gray-600 mt-1">{{ criterion.description }}</div>
+                      <div class="font-medium text-sm text-gray-900 dark:text-gray-100">{{ criterion.name }}</div>
+                      <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ criterion.description }}</div>
                     </div>
-                    <div class="text-sm text-gray-500">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
                       {{ criterion.scale_min }}-{{ criterion.scale_max }}
                     </div>
                   </div>
@@ -60,14 +60,14 @@
                       :min="criterion.scale_min"
                       :max="criterion.scale_max"
                       :step="1"
-                      class="flex-1"
+                      class="flex-1 accent-indigo-600"
                     />
                     <input
                       v-model.number="ratings[criterion.id]"
                       type="number"
                       :min="criterion.scale_min"
                       :max="criterion.scale_max"
-                      class="w-16 px-2 py-1 border border-gray-300 rounded text-center"
+                      class="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-center bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors"
                     />
                   </div>
                 </div>
@@ -76,21 +76,21 @@
           </div>
         </div>
 
-        <div class="p-4 border-t border-gray-200 flex justify-between items-center">
-          <div class="text-sm text-gray-600">
+        <div class="p-4 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center">
+          <div class="text-sm text-gray-600 dark:text-gray-400">
             {{ ratingCount }} rating(s) entered
           </div>
           <div class="flex gap-2">
             <button
               @click="$emit('cancel')"
-              class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               Cancel
             </button>
             <button
               @click="submitRatings"
               :disabled="ratingCount === 0"
-              class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded disabled:opacity-50 transition-colors"
             >
               Submit {{ ratingCount }} Rating(s)
             </button>

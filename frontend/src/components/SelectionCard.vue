@@ -1,6 +1,6 @@
 <template>
   <div 
-    class="selection-card bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+    class="selection-card bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow"
     ref="cardEl"
   >
     <!-- Annotation header -->
@@ -8,10 +8,10 @@
       <div class="flex items-start gap-2">
         <span class="text-base flex-shrink-0">📌</span>
         <div class="flex-1 min-w-0">
-          <div v-if="selection.label" class="text-sm font-medium text-gray-900 mb-1">
+          <div v-if="selection.label" class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
             {{ selection.label }}
           </div>
-          <div class="text-xs text-gray-500">
+          <div class="text-xs text-gray-500 dark:text-gray-400">
             {{ createdBy }} • {{ timeAgo }}
           </div>
         </div>
@@ -28,7 +28,7 @@
 
     <!-- Tags section -->
     <div v-if="tags.length > 0 || canTag" class="p-3 border-b border-gray-100">
-      <div class="text-xs font-medium text-gray-600 mb-2">🏷️ Tags</div>
+      <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">🏷️ Tags</div>
       <div class="flex flex-wrap gap-1 mb-2">
         <span
           v-for="tag in tags"
@@ -50,7 +50,7 @@
 
     <!-- Comments section -->
     <div v-if="comments.length > 0 || canComment" class="p-3 border-b border-gray-100">
-      <div class="text-xs font-medium text-gray-600 mb-2">
+      <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
         💬 Comments ({{ comments.length }})
       </div>
       
@@ -58,10 +58,10 @@
         <div
           v-for="comment in displayedComments"
           :key="comment.id"
-          class="text-sm bg-gray-50 rounded p-2 group relative"
+          class="text-sm bg-gray-50 dark:bg-gray-950 rounded p-2 group relative"
         >
           <div class="flex items-baseline gap-2 mb-1">
-            <span class="font-medium text-gray-700">{{ getUserName(comment.author_id) }}</span>
+            <span class="font-medium text-gray-700 dark:text-gray-300">{{ getUserName(comment.author_id) }}</span>
             <span class="text-xs text-gray-400">{{ formatTime(comment.created_at) }}</span>
             <button
               v-if="canDeleteComments || comment.author_id === currentUserId"

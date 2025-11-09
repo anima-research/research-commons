@@ -6,7 +6,7 @@
       @click.self="$emit('cancel')"
     >
       <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-        <div class="sticky top-0 bg-white border-b border-gray-200 p-4">
+        <div class="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-4">
           <h3 class="text-lg font-semibold">🏷️ Tag Selection</h3>
         </div>
 
@@ -16,12 +16,12 @@
             <div
               v-for="onto in ontologiesWithTags"
               :key="onto.ontology.id"
-              class="border border-gray-200 rounded-lg p-3"
+              class="border border-gray-200 dark:border-gray-800 rounded-lg p-3"
             >
-              <div class="font-medium text-sm text-gray-900 mb-2">
+              <div class="font-medium text-sm text-gray-900 dark:text-gray-100 mb-2">
                 {{ onto.ontology.name }}
               </div>
-              <div class="text-xs text-gray-600 mb-3">
+              <div class="text-xs text-gray-600 dark:text-gray-400 mb-3">
                 {{ onto.ontology.description }}
               </div>
               
@@ -29,7 +29,7 @@
                 <label
                   v-for="tag in onto.tags"
                   :key="tag.id"
-                  class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                  class="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer"
                 >
                   <input
                     type="checkbox"
@@ -43,13 +43,13 @@
                   >
                     {{ tag.name }}
                   </span>
-                  <span class="text-xs text-gray-500">{{ tag.description }}</span>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ tag.description }}</span>
                 </label>
               </div>
             </div>
           </div>
 
-          <div v-else class="text-center py-8 text-gray-500">
+          <div v-else class="text-center py-8 text-gray-500 dark:text-gray-400">
             No ontologies attached to this submission.
             <button class="block mx-auto mt-2 text-indigo-600 hover:text-indigo-700 text-sm">
               Attach an ontology first
@@ -58,10 +58,10 @@
         </div>
 
         <!-- Actions -->
-        <div class="sticky bottom-0 bg-white border-t border-gray-200 p-4 flex justify-end gap-2">
+        <div class="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 flex justify-end gap-2">
           <button
             @click="$emit('cancel')"
-            class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+            class="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Cancel
           </button>
