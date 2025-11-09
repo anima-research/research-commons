@@ -64,6 +64,47 @@ export function createOntologyRoutes(context: AppContext): Router {
     }
   });
 
+  // Update ontology (requires researcher role + ownership or admin)
+  router.put('/:id', authenticateToken, requireRole('researcher'), async (req: AuthRequest, res) => {
+    try {
+      const ontology = await context.ontologyStore.getOntology(req.params.id);
+      if (!ontology) {
+        res.status(404).json({ error: 'Ontology not found' });
+        return;
+      }
+
+      // Check permissions
+      const user = await context.userStore.getUserById(req.userId!);
+      const isOwner = ontology.created_by === req.userId;
+      const isAdmin = user?.roles.includes('admin');
+      
+      if (!isOwner && !isAdmin) {
+        res.status(403).json({ error: 'Not authorized to edit this ontology' });
+        return;
+      }
+
+      const data = CreateOntologyRequestSchema.parse(req.body);
+      
+      const updated = await context.ontologyStore.updateOntology(
+        req.params.id,
+        data.name,
+        data.description,
+        data.category,
+        data.permissions,
+        data.tags
+      );
+      
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Invalid request', details: error.errors });
+      } else {
+        console.error('Update ontology error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    }
+  });
+
   // Attach ontology to submission
   router.post('/attach', authenticateToken, async (req: AuthRequest, res) => {
     try {

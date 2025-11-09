@@ -128,6 +128,9 @@ export const rankingsAPI = {
   create: (data: any) =>
     api.post<any>('/rankings', data),
   
+  update: (id: string, data: any) =>
+    api.put<any>(`/rankings/${id}`, data),
+  
   attach: (submissionId: string, rankingSystemId: string, usagePermissions: string) =>
     api.post<any>('/rankings/attach', { submission_id: submissionId, ranking_system_id: rankingSystemId, usage_permissions: usagePermissions }),
   

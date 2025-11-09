@@ -213,7 +213,7 @@
             v-if="messages.length > 0"
             :messages="messages"
             :annotated-message-ids="annotatedMessageIds"
-            :inline-annotations="isMobile ? inlineAnnotations : []"
+            :inline-annotations="isMobile ? inlineAnnotations : new Map()"
             :user-names="userNames"
             :current-user-id="authStore.user?.id"
             :can-moderate="canModerate"
@@ -280,23 +280,6 @@
       :selected-text="commentContext?.text"
       @submit="submitComment"
       @cancel="showCommentForm = false"
-    />
-
-    <!-- Tag Picker Modal -->
-    <TagPicker
-      v-if="showTagPicker"
-      :ontologies="availableOntologies"
-      :current-tags="activeSelectionId ? (selectionData.get(activeSelectionId)?.tags || []) : []"
-      @add-tag="handleTagSelected"
-      @close="showTagPicker = false; activeSelectionId = null"
-    />
-
-    <!-- Topic Selector Modal -->
-    <TopicSelector
-      v-if="showTopicSelector"
-      :current-topics="submission?.metadata.tags || []"
-      @update="updateTopics"
-      @close="showTopicSelector = false"
     />
 
     <!-- Stats Detail Modal -->

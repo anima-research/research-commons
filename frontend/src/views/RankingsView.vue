@@ -46,6 +46,13 @@
                   Category: {{ system.category }} • {{ system.permissions }}
                 </div>
               </div>
+              <button
+                v-if="canEdit(system)"
+                @click.stop="startEditSystem(system)"
+                class="px-3 py-1 text-sm text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded"
+              >
+                ✏️ Edit
+              </button>
             </div>
 
             <!-- Criteria list -->
@@ -70,15 +77,15 @@
       </div>
     </div>
 
-    <!-- Create Ranking System Modal -->
+    <!-- Create/Edit Ranking System Modal -->
     <Teleport to="body">
       <div
-        v-if="showCreateSystem"
+        v-if="showCreateSystem || showEditSystem"
         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-        @click.self="showCreateSystem = false"
+        @click.self="showEditSystem ? closeEditForm() : (showCreateSystem = false)"
       >
         <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-y-auto p-6">
-          <h3 class="text-lg font-semibold mb-4">Create Ranking System</h3>
+          <h3 class="text-lg font-semibold mb-4">{{ showEditSystem ? 'Edit' : 'Create' }} Ranking System</h3>
 
           <div class="space-y-4 mb-6">
             <div>
@@ -172,12 +179,21 @@
 
           <div class="flex justify-end gap-2">
             <button
-              @click="closeCreateForm"
+              @click="showEditSystem ? closeEditForm() : closeCreateForm()"
               class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
+              v-if="showEditSystem"
+              @click="updateSystem"
+              :disabled="!canCreate"
+              class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+            >
+              Update System
+            </button>
+            <button
+              v-else
               @click="createSystem"
               :disabled="!canCreate"
               class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
@@ -206,6 +222,8 @@ const systemCriteria = ref<Record<string, any[]>>({})
 const loading = ref(false)
 const showMobileSidebar = ref(false)
 const showCreateSystem = ref(false)
+const showEditSystem = ref(false)
+const editingSystemId = ref<string | null>(null)
 
 const systemForm = ref({
   name: '',
@@ -282,6 +300,54 @@ async function createSystem() {
     closeCreateForm()
   } catch (err) {
     console.error('Failed to create ranking system:', err)
+  }
+}
+
+function canEdit(system: any): boolean {
+  if (!authStore.isAuthenticated()) return false
+  if (authStore.hasRole('admin')) return true
+  return system.created_by === authStore.user?.id
+}
+
+function startEditSystem(system: any) {
+  editingSystemId.value = system.id
+  systemForm.value = {
+    name: system.name,
+    description: system.description,
+    category: system.category,
+    permissions: system.permissions,
+    criteria: systemCriteria.value[system.id]?.map(c => ({
+      name: c.name,
+      description: c.description,
+      scale_type: c.scale_type,
+      scale_min: c.scale_min,
+      scale_max: c.scale_max
+    })) || []
+  }
+  showEditSystem.value = true
+}
+
+function closeEditForm() {
+  showEditSystem.value = false
+  editingSystemId.value = null
+  systemForm.value = {
+    name: '',
+    description: '',
+    category: 'model-behavior',
+    permissions: 'public',
+    criteria: []
+  }
+}
+
+async function updateSystem() {
+  if (!editingSystemId.value) return
+  
+  try {
+    await rankingsAPI.update(editingSystemId.value, systemForm.value)
+    await loadRankingSystems()
+    closeEditForm()
+  } catch (err) {
+    console.error('Failed to update ranking system:', err)
   }
 }
 </script>

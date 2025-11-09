@@ -63,6 +63,47 @@ export function createRankingRoutes(context: AppContext): Router {
     }
   });
 
+  // Update ranking system (requires researcher role + ownership or admin)
+  router.put('/:id', authenticateToken, requireRole('researcher'), async (req: AuthRequest, res) => {
+    try {
+      const system = await context.rankingStore.getRankingSystem(req.params.id);
+      if (!system) {
+        res.status(404).json({ error: 'Ranking system not found' });
+        return;
+      }
+
+      // Check permissions
+      const user = await context.userStore.getUserById(req.userId!);
+      const isOwner = system.created_by === req.userId;
+      const isAdmin = user?.roles.includes('admin');
+      
+      if (!isOwner && !isAdmin) {
+        res.status(403).json({ error: 'Not authorized to edit this ranking system' });
+        return;
+      }
+
+      const data = CreateRankingSystemRequestSchema.parse(req.body);
+      
+      const updated = await context.rankingStore.updateRankingSystem(
+        req.params.id,
+        data.name,
+        data.description,
+        data.category,
+        data.permissions,
+        data.criteria
+      );
+      
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Invalid request', details: error.errors });
+      } else {
+        console.error('Update ranking system error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    }
+  });
+
   // Attach ranking system to submission
   router.post('/attach', authenticateToken, async (req: AuthRequest, res) => {
     try {

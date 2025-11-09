@@ -31,6 +31,14 @@ export class RankingStore {
           created_at: new Date(event.data.created_at)
         };
         this.rankingSystems.set(system.id, system);
+      } else if (event.type === 'ranking_system_updated') {
+        const existing = this.rankingSystems.get(event.data.id);
+        if (existing) {
+          this.rankingSystems.set(event.data.id, {
+            ...existing,
+            ...event.data.updates
+          });
+        }
       }
     }
 
@@ -45,6 +53,18 @@ export class RankingStore {
         const systemCriteriaList = this.systemCriteria.get(criterion.ranking_system_id) || [];
         systemCriteriaList.push(criterion.id);
         this.systemCriteria.set(criterion.ranking_system_id, systemCriteriaList);
+      } else if (event.type === 'criterion_deleted') {
+        const criterionId = event.data.id;
+        const criterion = this.criteria.get(criterionId);
+        if (criterion) {
+          // Remove from reverse index
+          const systemCriteriaList = this.systemCriteria.get(criterion.ranking_system_id) || [];
+          this.systemCriteria.set(
+            criterion.ranking_system_id,
+            systemCriteriaList.filter(id => id !== criterionId)
+          );
+          this.criteria.delete(criterionId);
+        }
       }
     }
   }
@@ -131,6 +151,73 @@ export class RankingStore {
     return criterionIds
       .map(id => this.criteria.get(id))
       .filter((c): c is Criterion => c !== undefined);
+  }
+
+  async updateRankingSystem(
+    id: string,
+    name: string,
+    description: string,
+    category: RankingSystem['category'],
+    permissions: RankingSystem['permissions'],
+    criteria: Array<{name: string, description: string, scale_type: Criterion['scale_type'], scale_min?: number, scale_max?: number, scale_labels?: string[]}>
+  ): Promise<RankingSystem> {
+    const system = this.rankingSystems.get(id);
+    if (!system) {
+      throw new Error('Ranking system not found');
+    }
+
+    // Update system metadata
+    const updates = {
+      name,
+      description,
+      category,
+      permissions
+    };
+
+    await this.rankingSystemsFile.appendEvent({
+      timestamp: new Date(),
+      type: 'ranking_system_updated',
+      data: { id, updates }
+    });
+
+    const updatedSystem = { ...system, ...updates };
+    this.rankingSystems.set(id, updatedSystem);
+
+    // Replace all criteria (delete old, create new)
+    const oldCriteria = await this.getCriteriaForSystem(id);
+    for (const criterion of oldCriteria) {
+      await this.deleteCriterion(criterion.id);
+    }
+
+    const newCriterionIds: string[] = [];
+    for (const criterionData of criteria) {
+      const criterion = await this.createCriterion(id, criterionData);
+      newCriterionIds.push(criterion.id);
+    }
+    
+    this.systemCriteria.set(id, newCriterionIds);
+
+    return updatedSystem;
+  }
+
+  async deleteCriterion(id: string): Promise<void> {
+    const criterion = this.criteria.get(id);
+    if (!criterion) return;
+
+    await this.criteriaFile.appendEvent({
+      timestamp: new Date(),
+      type: 'criterion_deleted',
+      data: { id }
+    });
+
+    // Remove from reverse index
+    const systemCriteriaList = this.systemCriteria.get(criterion.ranking_system_id) || [];
+    this.systemCriteria.set(
+      criterion.ranking_system_id,
+      systemCriteriaList.filter(cid => cid !== id)
+    );
+
+    this.criteria.delete(id);
   }
 
   async close(): Promise<void> {

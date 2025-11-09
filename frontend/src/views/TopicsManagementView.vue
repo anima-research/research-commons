@@ -136,26 +136,56 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 Default Ontologies
-                <span class="text-xs text-gray-500">(auto-attached to submissions)</span>
+                <span class="text-xs text-gray-500">(available for submissions)</span>
               </label>
-              <div class="text-sm text-gray-600">
-                {{ topicForm.default_ontologies?.length || 0 }} ontologies selected
-              </div>
-              <div class="text-xs text-gray-500 mt-1">
-                Ontology selection UI coming soon - for now ontologies auto-attach to all submissions
+              <div class="space-y-2">
+                <label
+                  v-for="ontology in availableOntologies"
+                  :key="ontology.id"
+                  class="flex items-center gap-2 p-2 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="topicForm.default_ontologies?.includes(ontology.id)"
+                    @change="toggleOntology(ontology.id)"
+                    class="w-4 h-4"
+                  />
+                  <div class="flex-1">
+                    <div class="text-sm font-medium text-gray-900">{{ ontology.name }}</div>
+                    <div class="text-xs text-gray-500">{{ ontology.description }}</div>
+                  </div>
+                </label>
+                <div v-if="availableOntologies.length === 0" class="text-xs text-gray-500 italic">
+                  No ontologies available. Create some first.
+                </div>
               </div>
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 Default Ranking Systems
-                <span class="text-xs text-gray-500">(auto-attached, cannot be removed)</span>
+                <span class="text-xs text-gray-500">(available for submissions)</span>
               </label>
-              <div class="text-sm text-gray-600">
-                {{ topicForm.default_ranking_systems?.length || 0 }} ranking systems selected
-              </div>
-              <div class="text-xs text-gray-500 mt-1">
-                Ranking system selection UI coming soon
+              <div class="space-y-2">
+                <label
+                  v-for="system in availableRankingSystems"
+                  :key="system.id"
+                  class="flex items-center gap-2 p-2 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="topicForm.default_ranking_systems?.includes(system.id)"
+                    @change="toggleRankingSystem(system.id)"
+                    class="w-4 h-4"
+                  />
+                  <div class="flex-1">
+                    <div class="text-sm font-medium text-gray-900">{{ system.name }}</div>
+                    <div class="text-xs text-gray-500">{{ system.description }}</div>
+                  </div>
+                </label>
+                <div v-if="availableRankingSystems.length === 0" class="text-xs text-gray-500 italic">
+                  No ranking systems available. Create some first.
+                </div>
               </div>
             </div>
           </div>
@@ -185,7 +215,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { researchAPI } from '@/services/api'
+import { researchAPI, ontologiesAPI, rankingsAPI } from '@/services/api'
 import type { Topic } from '@/types'
 import LeftSidebar from '@/components/LeftSidebar.vue'
 
@@ -193,6 +223,8 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const topics = ref<Topic[]>([])
+const availableOntologies = ref<any[]>([])
+const availableRankingSystems = ref<any[]>([])
 const loading = ref(false)
 const showMobileSidebar = ref(false)
 const isMobile = ref(window.innerWidth < 1024)
@@ -213,7 +245,11 @@ const topicForm = ref<{
 
 onMounted(async () => {
   window.addEventListener('resize', checkMobile)
-  await loadTopics()
+  await Promise.all([
+    loadTopics(),
+    loadOntologies(),
+    loadRankingSystems()
+  ])
 })
 
 function checkMobile() {
@@ -233,6 +269,24 @@ async function loadTopics() {
     console.error('Failed to load topics:', err)
   } finally {
     loading.value = false
+  }
+}
+
+async function loadOntologies() {
+  try {
+    const response = await ontologiesAPI.list()
+    availableOntologies.value = response.data.ontologies
+  } catch (err) {
+    console.error('Failed to load ontologies:', err)
+  }
+}
+
+async function loadRankingSystems() {
+  try {
+    const response = await rankingsAPI.list()
+    availableRankingSystems.value = response.data.ranking_systems
+  } catch (err) {
+    console.error('Failed to load ranking systems:', err)
   }
 }
 
@@ -271,6 +325,30 @@ async function saveTopic() {
     closeTopicForm()
   } catch (err) {
     console.error('Failed to save topic:', err)
+  }
+}
+
+function toggleOntology(ontologyId: string) {
+  if (!topicForm.value.default_ontologies) {
+    topicForm.value.default_ontologies = []
+  }
+  const index = topicForm.value.default_ontologies.indexOf(ontologyId)
+  if (index > -1) {
+    topicForm.value.default_ontologies.splice(index, 1)
+  } else {
+    topicForm.value.default_ontologies.push(ontologyId)
+  }
+}
+
+function toggleRankingSystem(systemId: string) {
+  if (!topicForm.value.default_ranking_systems) {
+    topicForm.value.default_ranking_systems = []
+  }
+  const index = topicForm.value.default_ranking_systems.indexOf(systemId)
+  if (index > -1) {
+    topicForm.value.default_ranking_systems.splice(index, 1)
+  } else {
+    topicForm.value.default_ranking_systems.push(systemId)
   }
 }
 

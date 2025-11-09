@@ -31,6 +31,14 @@ export class OntologyStore {
           created_at: new Date(event.data.created_at)
         };
         this.ontologies.set(ontology.id, ontology);
+      } else if (event.type === 'ontology_updated') {
+        const existing = this.ontologies.get(event.data.id);
+        if (existing) {
+          this.ontologies.set(event.data.id, {
+            ...existing,
+            ...event.data.updates
+          });
+        }
       }
     }
 
@@ -45,6 +53,18 @@ export class OntologyStore {
         const ontologyTagList = this.ontologyTags.get(tag.ontology_id) || [];
         ontologyTagList.push(tag.id);
         this.ontologyTags.set(tag.ontology_id, ontologyTagList);
+      } else if (event.type === 'tag_deleted') {
+        const tagId = event.data.id;
+        const tag = this.tags.get(tagId);
+        if (tag) {
+          // Remove from reverse index
+          const ontologyTagList = this.ontologyTags.get(tag.ontology_id) || [];
+          this.ontologyTags.set(
+            tag.ontology_id,
+            ontologyTagList.filter(id => id !== tagId)
+          );
+          this.tags.delete(tagId);
+        }
       }
     }
   }
@@ -129,6 +149,73 @@ export class OntologyStore {
     return tagIds
       .map(id => this.tags.get(id))
       .filter((tag): tag is AnnotationTag => tag !== undefined);
+  }
+
+  async updateOntology(
+    id: string,
+    name: string,
+    description: string,
+    category: AnnotationOntology['category'],
+    permissions: AnnotationOntology['permissions'],
+    tags: Array<{name: string, description: string, color: string, examples?: string[]}>
+  ): Promise<AnnotationOntology> {
+    const ontology = this.ontologies.get(id);
+    if (!ontology) {
+      throw new Error('Ontology not found');
+    }
+
+    // Update ontology metadata
+    const updates = {
+      name,
+      description,
+      category,
+      permissions
+    };
+
+    await this.ontologiesFile.appendEvent({
+      timestamp: new Date(),
+      type: 'ontology_updated',
+      data: { id, updates }
+    });
+
+    const updatedOntology = { ...ontology, ...updates };
+    this.ontologies.set(id, updatedOntology);
+
+    // Replace all tags (delete old, create new)
+    const oldTags = await this.getTagsForOntology(id);
+    for (const tag of oldTags) {
+      await this.deleteTag(tag.id);
+    }
+
+    const newTagIds: string[] = [];
+    for (const tagData of tags) {
+      const tag = await this.createTag(id, tagData);
+      newTagIds.push(tag.id);
+    }
+    
+    this.ontologyTags.set(id, newTagIds);
+
+    return updatedOntology;
+  }
+
+  async deleteTag(id: string): Promise<void> {
+    const tag = this.tags.get(id);
+    if (!tag) return;
+
+    await this.tagsFile.appendEvent({
+      timestamp: new Date(),
+      type: 'tag_deleted',
+      data: { id }
+    });
+
+    // Remove from reverse index
+    const ontologyTagList = this.ontologyTags.get(tag.ontology_id) || [];
+    this.ontologyTags.set(
+      tag.ontology_id,
+      ontologyTagList.filter(tid => tid !== id)
+    );
+
+    this.tags.delete(id);
   }
 
   async close(): Promise<void> {
