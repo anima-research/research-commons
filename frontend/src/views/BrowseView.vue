@@ -34,33 +34,23 @@
         </div>
       </header>
 
-      <!-- Filters -->
+      <!-- Search bar -->
       <div class="px-4 py-4">
-        <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-4 mb-6 transition-colors">
-          <div class="flex flex-wrap gap-4">
-          <select class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 transition-colors">
-            <option>All Topics</option>
-            <option>Deprecation Attitudes</option>
-            <option>Restriction Responses</option>
-          </select>
-          
-          <label class="flex items-center gap-2 text-gray-900 dark:text-gray-100">
-            <input type="checkbox" class="w-4 h-4 rounded border-gray-300 dark:border-gray-700" />
-            <span class="text-sm">ARC Certified Only</span>
-          </label>
-          
-          <div class="flex-1 flex gap-2">
-            <input
-              v-model="searchQuery"
-              @keyup.enter="search"
-              type="text"
-              placeholder="Search conversations..."
-              class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-colors"
-            />
-            <button @click="search" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors">
-              🔍
-            </button>
-          </div>
+        <div class="flex gap-3">
+          <input
+            v-model="searchQuery"
+            @input="filterConversations"
+            type="text"
+            placeholder="Search conversations by title, description, or tags..."
+            class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-colors"
+          />
+          <button 
+            v-if="searchQuery"
+            @click="clearSearch"
+            class="px-4 py-3 border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            Clear
+          </button>
         </div>
       </div>
 
@@ -167,6 +157,7 @@ function handleNavigate(route: string) {
 
 const searchQuery = ref('')
 const submissions = ref<Submission[]>([])
+const allSubmissions = ref<Submission[]>([])
 const loading = ref(false)
 
 onMounted(async () => {
@@ -177,18 +168,40 @@ async function loadSubmissions() {
   loading.value = true
   try {
     const response = await submissionsAPI.list()
+    allSubmissions.value = response.data.submissions
     submissions.value = response.data.submissions
-    console.log('Loaded submissions:', response.data.submissions.length)
+    console.log('Loaded conversations:', response.data.submissions.length)
   } catch (error) {
-    console.error('Failed to load submissions:', error)
+    console.error('Failed to load conversations:', error)
   } finally {
     loading.value = false
   }
 }
 
-function search() {
-  console.log('Search:', searchQuery.value)
-  // TODO: Implement search
+function filterConversations() {
+  if (!searchQuery.value.trim()) {
+    submissions.value = allSubmissions.value
+    return
+  }
+  
+  const query = searchQuery.value.toLowerCase()
+  submissions.value = allSubmissions.value.filter(sub => {
+    // Search in title
+    if (sub.title.toLowerCase().includes(query)) return true
+    
+    // Search in description
+    if (sub.metadata.description?.toLowerCase().includes(query)) return true
+    
+    // Search in tags
+    if (sub.metadata.tags?.some(tag => tag.toLowerCase().includes(query))) return true
+    
+    return false
+  })
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+  submissions.value = allSubmissions.value
 }
 
 function formatDate(date: string) {
