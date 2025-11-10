@@ -23,11 +23,11 @@
       <div class="mb-6">
         <div class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2">Explore</div>
         <NavItem 
-          icon="📚" 
-          label="Submissions" 
-          route="/" 
-          :active="isActive('/')"
-          @click="$emit('navigate', '/')"
+          icon="💬" 
+          label="Conversations" 
+          route="/browse" 
+          :active="isActive('/browse')"
+          @click="$emit('navigate', '/browse')"
         />
         <NavItem 
           icon="🔬" 
@@ -68,8 +68,8 @@
       <div>
         <div class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2">Actions</div>
         <NavItem 
-          icon="📤" 
-          label="Submit Conversation" 
+          icon="✨" 
+          label="New Conversation" 
           route="/submit" 
           :active="isActive('/submit')"
           highlight

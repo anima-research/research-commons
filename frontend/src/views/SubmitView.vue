@@ -15,7 +15,7 @@
 
     <div class="lg:ml-64">
       <header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-4 transition-colors">
-        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">📤 Submit Conversation</h1>
+        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">✨ New Conversation</h1>
       </header>
 
       <div class="max-w-4xl mx-auto p-8">
@@ -223,7 +223,7 @@
               :disabled="!title || !allParticipantsMapped || submitting"
               class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {{ submitting ? 'Submitting...' : 'Submit Conversation' }}
+              {{ submitting ? 'Uploading...' : 'Upload Conversation' }}
             </button>
           </div>
         </div>

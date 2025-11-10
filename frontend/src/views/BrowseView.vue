@@ -23,13 +23,13 @@
       <!-- Header -->
       <header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 transition-colors">
         <div class="px-4 py-4 flex items-center justify-between">
-          <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Submissions</h1>
+          <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">💬 Conversations</h1>
           <router-link 
             v-if="authStore.isAuthenticated()"
             to="/submit" 
-            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm transition-colors"
+            class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-semibold text-sm shadow-md transition-all hover:scale-105"
           >
-            📤 Submit
+            ✨ New Conversation
           </router-link>
         </div>
       </header>
@@ -54,7 +54,7 @@
               v-model="searchQuery"
               @keyup.enter="search"
               type="text"
-              placeholder="Search submissions..."
+              placeholder="Search conversations..."
               class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-colors"
             />
             <button @click="search" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors">
@@ -66,10 +66,10 @@
 
         <!-- Loading State -->
         <div v-if="loading" class="text-center py-12 text-gray-500 dark:text-gray-400">
-          Loading submissions...
+          Loading conversations...
         </div>
 
-        <!-- Submission Cards -->
+        <!-- Conversation Cards -->
         <div v-else class="space-y-4">
           <div
             v-for="submission in submissions"
@@ -132,7 +132,7 @@
 
           <!-- Empty state -->
           <div v-if="submissions.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
-            No submissions yet. Be the first to contribute!
+            No conversations yet. Be the first to contribute!
           </div>
         </div>
       </div>

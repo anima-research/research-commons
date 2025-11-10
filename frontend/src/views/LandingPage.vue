@@ -25,13 +25,13 @@
             @click="router.push('/browse')"
             class="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105"
           >
-            Browse Submissions
+            Browse Conversations
           </button>
           <button
             @click="router.push(authStore.isAuthenticated() ? '/submit' : '/login')"
             class="px-8 py-4 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-gray-100 border-2 border-gray-200 dark:border-gray-700 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105"
           >
-            {{ authStore.isAuthenticated() ? 'Submit Conversation' : 'Get Started' }}
+            {{ authStore.isAuthenticated() ? 'New Conversation' : 'Get Started' }}
           </button>
         </div>
 
