@@ -5,8 +5,8 @@
       <!-- Navigation Bar -->
       <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
         <div class="flex items-center justify-between">
-          <button @click="router.push('/')" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 dark:hover:text-gray-100 transition-colors">
-            ← Back to Browse
+          <button @click="router.push('/browse')" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            ← Back to Conversations
           </button>
           <div class="flex items-center gap-3">
             <button
@@ -1085,7 +1085,7 @@ async function handleDeleteSubmission() {
   try {
     await submissionsAPI.delete(submissionId)
     // Navigate back to browse
-    router.push('/')
+    router.push('/browse')
   } catch (err: any) {
     console.error('Failed to delete submission:', err)
     alert('Failed to delete submission: ' + (err.response?.data?.error || err.message))

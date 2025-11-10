@@ -34,19 +34,33 @@
         </div>
       </header>
 
-      <!-- Search bar -->
+      <!-- Filters & Search -->
       <div class="px-4 py-4">
-        <div class="flex gap-3">
+        <div class="flex gap-3 mb-4">
+          <!-- Topic filter -->
+          <select
+            v-model="selectedTopic"
+            @change="filterConversations"
+            class="px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 transition-colors"
+          >
+            <option value="">All Topics</option>
+            <option v-for="topic in availableTopics" :key="topic" :value="topic">
+              {{ topic }}
+            </option>
+          </select>
+
+          <!-- Search -->
           <input
             v-model="searchQuery"
             @input="filterConversations"
             type="text"
-            placeholder="Search conversations by title, description, or tags..."
+            placeholder="Search by title, description..."
             class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-colors"
           />
+          
           <button 
-            v-if="searchQuery"
-            @click="clearSearch"
+            v-if="searchQuery || selectedTopic"
+            @click="clearFilters"
             class="px-4 py-3 border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             Clear
@@ -54,19 +68,19 @@
         </div>
       </div>
 
-        <!-- Loading State -->
-        <div v-if="loading" class="text-center py-12 text-gray-500 dark:text-gray-400">
-          Loading conversations...
-        </div>
+      <!-- Loading State -->
+      <div v-if="loading" class="px-4 text-center py-12 text-gray-500 dark:text-gray-400">
+        Loading conversations...
+      </div>
 
-        <!-- Conversation Cards -->
-        <div v-else class="space-y-4">
-          <div
-            v-for="submission in submissions"
-            :key="submission.id"
-            @click="router.push(`/submissions/${submission.id}`)"
-            class="bg-white dark:bg-gray-900 rounded-lg shadow-sm hover:shadow-md dark:hover:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 transition-all cursor-pointer p-6"
-          >
+      <!-- Conversation Cards -->
+      <div v-else class="px-4 space-y-4">
+        <div
+          v-for="submission in submissions"
+          :key="submission.id"
+          @click="router.push(`/submissions/${submission.id}`)"
+          class="bg-white dark:bg-gray-900 rounded-lg shadow-sm hover:shadow-md dark:hover:shadow-indigo-900/20 border border-gray-200 dark:border-gray-800 transition-all cursor-pointer p-6"
+        >
           <!-- Header with avatars -->
           <div class="flex items-start gap-3 mb-3">
             <div class="flex -space-x-2">
@@ -107,20 +121,24 @@
             <span v-if="submission.metadata.message_count">💬 {{ submission.metadata.message_count }} messages</span>
           </div>
 
-            <!-- Tags -->
-            <div class="flex flex-wrap gap-2">
-              <span
-                v-for="tag in submission.metadata.tags"
-                :key="tag"
-                class="px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs rounded"
-              >
-                #{{ tag }}
-              </span>
-            </div>
+          <!-- Tags -->
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="tag in submission.metadata.tags"
+              :key="tag"
+              class="px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs rounded"
+            >
+              #{{ tag }}
+            </span>
           </div>
+        </div>
 
-          <!-- Empty state -->
-          <div v-if="submissions.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
+        <!-- Empty state -->
+        <div v-if="submissions.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
+          <div v-if="searchQuery || selectedTopic">
+            No conversations match your filters.
+          </div>
+          <div v-else>
             No conversations yet. Be the first to contribute!
           </div>
         </div>
@@ -156,8 +174,10 @@ function handleNavigate(route: string) {
 }
 
 const searchQuery = ref('')
+const selectedTopic = ref('')
 const submissions = ref<Submission[]>([])
 const allSubmissions = ref<Submission[]>([])
+const availableTopics = ref<string[]>([])
 const loading = ref(false)
 
 onMounted(async () => {
@@ -170,6 +190,14 @@ async function loadSubmissions() {
     const response = await submissionsAPI.list()
     allSubmissions.value = response.data.submissions
     submissions.value = response.data.submissions
+    
+    // Extract unique topics
+    const topicsSet = new Set<string>()
+    response.data.submissions.forEach(sub => {
+      sub.metadata.tags?.forEach(tag => topicsSet.add(tag))
+    })
+    availableTopics.value = Array.from(topicsSet).sort()
+    
     console.log('Loaded conversations:', response.data.submissions.length)
   } catch (error) {
     console.error('Failed to load conversations:', error)
@@ -179,28 +207,35 @@ async function loadSubmissions() {
 }
 
 function filterConversations() {
-  if (!searchQuery.value.trim()) {
-    submissions.value = allSubmissions.value
-    return
+  let filtered = allSubmissions.value
+  
+  // Filter by topic
+  if (selectedTopic.value) {
+    filtered = filtered.filter(sub => 
+      sub.metadata.tags?.includes(selectedTopic.value)
+    )
   }
   
-  const query = searchQuery.value.toLowerCase()
-  submissions.value = allSubmissions.value.filter(sub => {
-    // Search in title
-    if (sub.title.toLowerCase().includes(query)) return true
-    
-    // Search in description
-    if (sub.metadata.description?.toLowerCase().includes(query)) return true
-    
-    // Search in tags
-    if (sub.metadata.tags?.some(tag => tag.toLowerCase().includes(query))) return true
-    
-    return false
-  })
+  // Filter by search query
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(sub => {
+      // Search in title
+      if (sub.title.toLowerCase().includes(query)) return true
+      
+      // Search in description
+      if (sub.metadata.description?.toLowerCase().includes(query)) return true
+      
+      return false
+    })
+  }
+  
+  submissions.value = filtered
 }
 
-function clearSearch() {
+function clearFilters() {
   searchQuery.value = ''
+  selectedTopic.value = ''
   submissions.value = allSubmissions.value
 }
 
