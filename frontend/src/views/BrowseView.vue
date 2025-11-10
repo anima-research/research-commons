@@ -114,8 +114,7 @@
           <!-- Stats -->
           <div class="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-3">
             <span>{{ formatDate(submission.submitted_at) }}</span>
-            <span>💬 {{ mockComments }} comments</span>
-            <span>⭐ {{ mockRating }}/5 ({{ mockRatingCount }} ratings)</span>
+            <span v-if="submission.metadata.message_count">💬 {{ submission.metadata.message_count }} messages</span>
           </div>
 
             <!-- Tags -->
