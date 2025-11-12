@@ -9,14 +9,26 @@
       highlight && !active ? 'border border-indigo-200 dark:border-indigo-800' : ''
     ]"
   >
-    <span class="text-lg">{{ icon }}</span>
+    <svg 
+      class="w-4 h-4 shrink-0" 
+      fill="none" 
+      stroke="currentColor" 
+      viewBox="0 0 24 24"
+      stroke-width="2"
+    >
+      <path 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        :d="iconPath" 
+      />
+    </svg>
     <span class="text-sm">{{ label }}</span>
   </button>
 </template>
 
 <script setup lang="ts">
 interface Props {
-  icon: string
+  iconPath: string
   label: string
   route: string
   active?: boolean
@@ -32,4 +44,3 @@ defineEmits<{
   'click': []
 }>()
 </script>
-

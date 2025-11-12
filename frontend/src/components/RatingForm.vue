@@ -1,73 +1,94 @@
 <template>
   <Teleport to="body">
-    <div
-      v-if="show"
-      class="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4"
-      @click.self="$emit('cancel')"
-    >
-      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col transition-colors">
-        <div class="p-4 border-b border-gray-200 dark:border-gray-800">
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">⭐ Rate Submission</h3>
-          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Evaluate this conversation using the available criteria</p>
+    <!-- Backdrop -->
+    <transition name="fade">
+      <div
+        v-if="show"
+        class="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
+        @click="$emit('cancel')"
+      />
+    </transition>
+    
+    <!-- Side panel -->
+    <transition name="slide-left">
+      <div
+        v-if="show"
+        class="fixed right-0 top-0 bottom-0 w-[480px] bg-gray-900/95 backdrop-blur-xl border-l border-gray-700/50 shadow-2xl z-50 flex flex-col"
+        @click.stop
+      >
+        <!-- Compact header -->
+        <div class="px-4 py-3 border-b border-gray-700/50 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+            <h3 class="text-sm font-semibold text-gray-100">Rate Conversation</h3>
+            <span class="text-xs text-gray-500">Auto-saved</span>
+          </div>
+          <button
+            @click="$emit('cancel')"
+            class="text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-4">
-          <div v-if="rankingSystemsWithCriteria.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
-            No ranking systems attached to this submission.
+        <!-- Content -->
+        <div class="flex-1 overflow-y-auto p-3 space-y-3">
+          <div v-if="rankingSystemsWithCriteria.length === 0" class="text-center py-12 text-gray-500">
+            <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+            <p class="text-sm">No rating systems available</p>
           </div>
 
-          <div v-else class="space-y-6">
+          <!-- Ranking systems -->
+          <div v-else class="space-y-3">
             <div
               v-for="system in rankingSystemsWithCriteria"
               :key="system.system.id"
-              class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 transition-colors"
+              class="rounded-lg bg-gray-800/50 border border-gray-700/50 overflow-hidden"
             >
-              <div class="flex items-start gap-2 mb-4">
-                <div class="flex-1">
-                  <h4 class="font-semibold text-gray-900 dark:text-gray-100">{{ system.system.name }}</h4>
-                  <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ system.system.description }}</p>
+              <!-- System header -->
+              <div class="px-3 py-2 bg-gray-800/80 border-b border-gray-700/50 flex items-center justify-between">
+                <div class="flex-1 min-w-0">
+                  <h4 class="text-sm font-semibold text-gray-100 truncate">{{ system.system.name }}</h4>
+                  <p class="text-xs text-gray-400 mt-0.5 line-clamp-1">{{ system.system.description }}</p>
                 </div>
                 <span
                   v-if="system.isFromTopic"
-                  class="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs rounded flex items-center gap-1"
+                  class="ml-2 px-1.5 py-0.5 bg-indigo-500/20 text-indigo-400 text-[10px] font-medium rounded flex items-center gap-1 shrink-0"
                   title="From research topic (required)"
                 >
-                  🔒 Topic
+                  <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
+                  </svg>
+                  Topic
                 </span>
               </div>
 
-              <div class="space-y-3">
+              <!-- Criteria -->
+              <div class="p-2 space-y-2">
                 <div
                   v-for="criterion in system.criteria"
                   :key="criterion.id"
-                  class="bg-white dark:bg-gray-900 rounded p-3 border border-gray-200 dark:border-gray-700 transition-colors"
+                  class="flex items-stretch gap-2"
                 >
-                  <div class="flex items-start justify-between mb-2">
-                    <div class="flex-1">
-                      <div class="font-medium text-sm text-gray-900 dark:text-gray-100">{{ criterion.name }}</div>
-                      <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ criterion.description }}</div>
-                    </div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400">
-                      {{ criterion.scale_min }}-{{ criterion.scale_max }}
-                    </div>
+                  <!-- Criterion info -->
+                  <div class="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+                    <div class="text-xs font-medium text-gray-200">{{ criterion.name }}</div>
+                    <div class="text-[11px] text-gray-500 leading-tight">{{ criterion.description }}</div>
                   </div>
-
-                  <!-- Rating input -->
-                  <div class="flex items-center gap-2 mt-3">
-                    <input
-                      v-model.number="ratings[criterion.id]"
-                      type="range"
-                      :min="criterion.scale_min"
-                      :max="criterion.scale_max"
-                      :step="1"
-                      class="flex-1 accent-indigo-600"
-                    />
-                    <input
-                      v-model.number="ratings[criterion.id]"
-                      type="number"
-                      :min="criterion.scale_min"
-                      :max="criterion.scale_max"
-                      class="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-center bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors"
+                  
+                  <!-- Discrete rating bar (full height) -->
+                  <div class="w-32 shrink-0">
+                    <RatingBar
+                      v-model="ratings[criterion.id]"
+                      :min="criterion.scale_min!"
+                      :max="criterion.scale_max!"
+                      @update:model-value="autoSaveRating(criterion.id)"
                     />
                   </div>
                 </div>
@@ -75,35 +96,15 @@
             </div>
           </div>
         </div>
-
-        <div class="p-4 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center">
-          <div class="text-sm text-gray-600 dark:text-gray-400">
-            {{ ratingCount }} rating(s) entered
-          </div>
-          <div class="flex gap-2">
-            <button
-              @click="$emit('cancel')"
-              class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              @click="submitRatings"
-              :disabled="ratingCount === 0"
-              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded disabled:opacity-50 transition-colors"
-            >
-              Submit {{ ratingCount }} Rating(s)
-            </button>
-          </div>
-        </div>
       </div>
-    </div>
+    </transition>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import type { Criterion, RankingSystem, SubmissionRankingSystem } from '@/types/ranking'
+import { ref, watch } from 'vue'
+import type { Criterion, RankingSystem } from '@/types/ranking'
+import RatingBar from './RatingBar.vue'
 
 interface Props {
   show: boolean
@@ -111,6 +112,10 @@ interface Props {
     system: RankingSystem
     criteria: Criterion[]
     isFromTopic: boolean
+  }>
+  existingRatings?: Array<{
+    criterion_id: string
+    score: number
   }>
 }
 
@@ -121,33 +126,61 @@ const emit = defineEmits<{
   'cancel': []
 }>()
 
-const ratings = ref<Record<string, number>>({})
+const ratings = ref<Record<string, number | null>>({})
 
 watch(() => props.show, (show) => {
   if (show) {
-    // Initialize with default mid-range values
+    // Initialize with existing ratings or null
     ratings.value = {}
+    
+    // First set all to null
     for (const system of props.rankingSystemsWithCriteria) {
       for (const criterion of system.criteria) {
-        const mid = Math.floor((criterion.scale_min! + criterion.scale_max!) / 2)
-        ratings.value[criterion.id] = mid
+        ratings.value[criterion.id] = null
+      }
+    }
+    
+    // Then load existing ratings
+    if (props.existingRatings) {
+      for (const rating of props.existingRatings) {
+        ratings.value[rating.criterion_id] = rating.score
       }
     }
   }
 })
 
-const ratingCount = computed(() => {
-  return Object.keys(ratings.value).length
-})
-
-function submitRatings() {
-  const ratingsList = Object.entries(ratings.value).map(([criterion_id, score]) => ({
-    criterion_id,
-    score
-  }))
-  
-  emit('submit', ratingsList)
-  ratings.value = {}
+// Auto-save individual rating on change
+function autoSaveRating(criterionId: string) {
+  const score = ratings.value[criterionId]
+  if (score !== null && score !== undefined) {
+    emit('submit', [{ criterion_id: criterionId, score }])
+  }
 }
 </script>
 
+<style scoped>
+/* Slide from right */
+.slide-left-enter-active,
+.slide-left-leave-active {
+  transition: transform 0.3s ease-out;
+}
+
+.slide-left-enter-from {
+  transform: translateX(100%);
+}
+
+.slide-left-leave-to {
+  transform: translateX(100%);
+}
+
+/* Fade */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

@@ -11,7 +11,53 @@ export function createSubmissionRoutes(context: AppContext): Router {
   router.get('/', async (req, res) => {
     try {
       const submissions = await context.submissionStore.listSubmissions();
-      res.json({ submissions });
+      
+      // Enhance each submission with stats and submitter name
+      const submissionsWithStats = await Promise.all(submissions.map(async sub => {
+        try {
+          // Get selections (annotations/tags)
+          const selections = context.annotationDb.getSelectionsBySubmission(sub.id);
+          const tagCount = new Set(
+            selections.flatMap(s => s.annotation_tags || [])
+          ).size;
+          
+          // Get comments
+          const allComments = selections.flatMap(s => 
+            context.annotationDb.getCommentsBySelection(s.id)
+          );
+          const commentCount = allComments.length;
+          
+          // Get ratings
+          const ratings = context.annotationDb.getRatingsBySubmission(sub.id);
+          
+          // Get submitter name
+          const submitter = await context.userStore.getUserById(sub.submitter_id);
+          const submitterName = submitter?.name || 'Unknown';
+          
+          return {
+            ...sub,
+            submitter_name: submitterName,
+            stats: {
+              tag_count: tagCount,
+              comment_count: commentCount,
+              rating_count: ratings.length
+            }
+          };
+        } catch (err) {
+          console.error('Error enhancing submission:', sub.id, err);
+          return {
+            ...sub,
+            submitter_name: 'Unknown',
+            stats: {
+              tag_count: 0,
+              comment_count: 0,
+              rating_count: 0
+            }
+          };
+        }
+      }));
+      
+      res.json({ submissions: submissionsWithStats });
     } catch (error) {
       console.error('List submissions error:', error);
       res.status(500).json({ error: 'Internal server error' });

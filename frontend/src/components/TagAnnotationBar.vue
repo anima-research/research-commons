@@ -1,14 +1,25 @@
 <template>
   <div 
     ref="rootEl"
-    class="tag-annotation-bar rounded-full px-3 py-1.5 flex items-center gap-2 transition-all"
+    class="tag-annotation-bar rounded-full px-3 py-1.5 flex items-center gap-2 transition-all relative group"
     :style="{ 
       backgroundColor: tagColor + '20',
       borderColor: tagColor + '40',
       borderWidth: '1px',
       borderStyle: 'solid'
     }"
+    @mouseenter="showTooltip = true"
+    @mouseleave="showTooltip = false"
   >
+    <!-- Tooltip -->
+    <div
+      v-if="showTooltip && voteCount > 0"
+      class="absolute top-full mt-1 left-0 z-50 pointer-events-none whitespace-nowrap"
+    >
+      <div class="bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg">
+        {{ voteTooltip }}
+      </div>
+    </div>
     <!-- Tag name -->
     <span class="text-sm font-medium" :style="{ color: tagColor }">
       {{ tag.name }}
@@ -19,7 +30,6 @@
       v-if="voteCount > 1" 
       class="text-xs font-mono opacity-70"
       :style="{ color: tagColor }"
-      :title="voteTooltip"
     >
       ×{{ voteCount }}
     </span>
@@ -88,6 +98,7 @@ const emit = defineEmits<{
 }>()
 
 const rootEl = ref<HTMLElement>()
+const showTooltip = ref(false)
 
 // Tag color (use tag color or generate from name)
 const tagColor = computed(() => {
@@ -121,7 +132,10 @@ const voteTooltip = computed(() => {
   const voters = props.tagAttributions
     .filter(a => a.tag_id === props.tag.id)
     .map(a => props.userNames.get(a.tagged_by) || 'Unknown')
-  return voters.join(', ')
+  
+  if (voters.length === 0) return 'No votes'
+  if (voters.length === 1) return `Tagged by: ${voters[0]}`
+  return `Tagged by: ${voters.join(', ')}`
 })
 
 // Report height changes

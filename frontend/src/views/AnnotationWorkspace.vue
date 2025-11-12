@@ -36,11 +36,18 @@
           
           <!-- Stats pills -->
           <div class="flex items-center gap-2">
-            <div v-if="ratingStats.length > 0" class="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-full font-mono flex items-center gap-1">
+            <!-- Per-system rating averages -->
+            <div
+              v-for="sysRating in systemRatingAverages"
+              :key="sysRating.system_id"
+              class="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-full font-mono flex items-center gap-1"
+              :title="`${sysRating.system_name}: ${sysRating.avg.toFixed(1)}/${sysRating.max} (${sysRating.count} ratings)`"
+            >
               <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
               </svg>
-              {{ averageRating.toFixed(1) }}
+              <span class="uppercase">{{ abbreviate(sysRating.system_name) }}</span>
+              <span class="font-semibold">{{ sysRating.avg.toFixed(1) }}</span>
             </div>
             <div v-if="tagStats.length > 0" class="px-2 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs rounded-full font-mono flex items-center gap-1">
               <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -191,6 +198,7 @@
     <RatingForm
       :show="showRatingForm"
       :ranking-systems-with-criteria="rankingSystemsForPicker"
+      :existing-ratings="submissionRatings"
       @submit="submitRatings"
       @cancel="showRatingForm = false"
     />
@@ -472,6 +480,14 @@ function checkMobile() {
   isMobile.value = window.innerWidth < 1024
 }
 
+// Abbreviate ranking system names to first letters
+function abbreviate(name: string): string {
+  return name
+    .split(' ')
+    .map(word => word[0])
+    .join('')
+}
+
 async function loadData() {
   loading.value = true
   try {
@@ -487,6 +503,12 @@ async function loadData() {
     // Build user names map - collect all user IDs from all sources
     userNames.value.clear()
     const allUserIds = new Set<string>()
+    
+    // Add current user first
+    if (authStore.user) {
+      userNames.value.set(authStore.user.id, authStore.user.name)
+      allUserIds.add(authStore.user.id)
+    }
     
     // Add submission creator
     allUserIds.add(submission.value.submitter_id)
@@ -1023,10 +1045,34 @@ const totalCommentCount = computed(() => {
   return count
 })
 
-const averageRating = computed(() => {
-  if (ratingStats.value.length === 0) return 0
-  const sum = ratingStats.value.reduce((acc, stat) => acc + stat.avg, 0)
-  return sum / ratingStats.value.length
+// Per-system rating averages
+const systemRatingAverages = computed(() => {
+  const systemStats = new Map<string, { system_id: string; system_name: string; scores: number[]; max: number }>()
+  
+  for (const rating of submissionRatings.value) {
+    const criterion = allCriteria.value.get(rating.criterion_id)
+    if (!criterion) continue
+    
+    const systemId = criterion.ranking_system_id
+    if (!systemStats.has(systemId)) {
+      const systemDetail = rankingSystemDetails.value.get(systemId)
+      systemStats.set(systemId, {
+        system_id: systemId,
+        system_name: systemDetail?.data.ranking_system?.name || 'System',
+        scores: [],
+        max: criterion.scale_max || 5
+      })
+    }
+    systemStats.get(systemId)!.scores.push(rating.score)
+  }
+  
+  return Array.from(systemStats.values()).map(stat => ({
+    system_id: stat.system_id,
+    system_name: stat.system_name,
+    avg: stat.scores.reduce((a, b) => a + b, 0) / stat.scores.length,
+    count: stat.scores.length,
+    max: stat.max
+  }))
 })
 
 // Rating statistics
@@ -1084,17 +1130,19 @@ const tagStats = computed(() => {
 
 // Ontologies for tag picker
 const ontologiesForPicker = computed(() => {
-  return attachedOntologies.value.map(subOnto => {
-    const ontologyDetail = allOntologies.value.get(subOnto.ontology_id)
-    if (!ontologyDetail) return null
-    
-    const tags = Array.from(allTags.value.values()).filter(t => t.ontology_id === subOnto.ontology_id)
-    
-    return {
-      ontology: ontologyDetail,
-      tags
-    }
-  }).filter(Boolean)
+  return attachedOntologies.value
+    .map(subOnto => {
+      const ontologyDetail = allOntologies.value.get(subOnto.ontology_id)
+      if (!ontologyDetail) return null
+      
+      const tags = Array.from(allTags.value.values()).filter(t => t.ontology_id === subOnto.ontology_id)
+      
+      return {
+        ontology: ontologyDetail,
+        tags
+      }
+    })
+    .filter((item): item is { ontology: any; tags: any[] } => item !== null)
 })
 
 // Ranking systems for rating picker - need to store full system details
@@ -1353,6 +1401,11 @@ async function handleAddTagVote(selectionId: string, tagId: string) {
       
       // Update user names for any new contributors
       if (updatedSel.tag_attributions) {
+        // Ensure current user's name is in the map
+        if (authStore.user && !userNames.value.has(authStore.user.id)) {
+          userNames.value.set(authStore.user.id, authStore.user.name)
+        }
+        
         const newUserIds = updatedSel.tag_attributions
           .map(a => a.tagged_by)
           .filter(id => !userNames.value.has(id))
@@ -1390,13 +1443,10 @@ async function submitRatings(ratings: Array<{ criterion_id: string; score: numbe
       })
     }
     
-    // Refresh submission ratings
+    // Refresh submission ratings (but keep form open for auto-save workflow)
     submissionRatings.value = await submissionsStore.getRatingsBySubmission(submissionId)
-    
-    showRatingForm.value = false
   } catch (err) {
     console.error('Failed to submit ratings:', err)
-    showRatingForm.value = false
   }
 }
 
