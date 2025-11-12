@@ -1,128 +1,94 @@
 <template>
   <div 
-    class="comment-card bg-white rounded-lg shadow-sm border border-gray-200 p-3 hover:shadow-md transition-shadow"
-    ref="cardEl"
+    ref="rootEl"
+    class="comment-card bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-lg p-3 transition-all"
   >
-    <div class="flex items-start gap-2 mb-2">
-      <div 
-        class="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
-        :style="{ backgroundColor: avatarColor }"
-      >
-        {{ initial }}
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-2">
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
+        </svg>
+        <span class="text-xs text-gray-400">{{ createdBy }}</span>
       </div>
-      <div class="flex-1 min-w-0">
-        <div class="text-sm font-medium text-gray-900">{{ userName }}</div>
-        <div class="text-xs text-gray-500">{{ timeAgo }}</div>
-      </div>
-      <span class="text-base">💬</span>
-    </div>
-    
-    <div class="text-sm text-gray-800 leading-relaxed">
-      {{ comment.content }}
-    </div>
-    
-    <div v-if="comment.target_type === 'selection'" class="text-xs text-gray-500 mt-2">
-      on selection
-    </div>
-    
-    <div class="flex gap-3 mt-2">
-      <button 
-        @click="$emit('reply')"
-        class="text-xs text-indigo-600 hover:text-indigo-700"
+      
+      <button
+        v-if="canDelete"
+        @click="$emit('delete')"
+        class="text-xs text-red-400/70 hover:text-red-400 transition-colors"
       >
-        Reply
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
       </button>
+    </div>
+    
+    <!-- Comment content -->
+    <div class="text-sm text-gray-300 leading-relaxed" v-html="renderMarkdown(comment.content)" />
+    
+    <!-- Timestamp -->
+    <div class="text-xs text-gray-500 mt-2">
+      {{ formatDate(comment.created_at) }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import type { Comment } from '@/types'
+import { ref, onMounted, watch, nextTick } from 'vue'
+import { renderMarkdown } from '@/utils/markdown'
 
 interface Props {
-  comment: Comment
-  userName?: string
+  comment: {
+    id: string
+    content: string
+    author_id: string
+    created_at: string
+  }
+  selection?: any
+  createdBy: string
+  canDelete?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  userName: 'User'
+  canDelete: false
 })
 
 const emit = defineEmits<{
-  'reply': []
+  'delete': []
   'resize': [height: number]
 }>()
 
-const cardEl = ref<HTMLElement>()
+const rootEl = ref<HTMLElement>()
 
-// Get actual user name from author_id
-const actualUserName = computed(() => {
-  if (props.userName && props.userName !== 'User') {
-    return props.userName
+const reportHeight = () => {
+  if (rootEl.value) {
+    emit('resize', rootEl.value.offsetHeight)
   }
-  // Fallback to ID
-  return 'User ' + props.comment.author_id.substring(0, 8)
-})
-
-const initial = computed(() => 
-  actualUserName.value.charAt(0).toUpperCase()
-)
-
-const userName = computed(() => actualUserName.value)
-
-const avatarColor = computed(() => {
-  // Generate color from user ID
-  let hash = 0
-  const id = props.comment.author_id
-  for (let i = 0; i < id.length; i++) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  const hue = hash % 360
-  return `hsl(${hue}, 60%, 50%)`
-})
-
-const timeAgo = computed(() => {
-  const date = new Date(props.comment.created_at)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / (1000 * 60))
-  
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${diffHours}h ago`
-  return date.toLocaleDateString()
-})
-
-// Measure and emit height changes
-watch(() => cardEl.value?.offsetHeight, (height) => {
-  if (height) {
-    emit('resize', height)
-  }
-})
+}
 
 onMounted(() => {
-  if (cardEl.value) {
-    emit('resize', cardEl.value.offsetHeight)
-  }
+  nextTick(reportHeight)
 })
+
+watch(() => props.comment, () => {
+  nextTick(reportHeight)
+}, { deep: true })
+
+function formatDate(date: string) {
+  const d = new Date(date)
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+  
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 7) return `${diffDays}d ago`
+  
+  return d.toLocaleDateString()
+}
 </script>
-
-<style scoped>
-.comment-card {
-  animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateX(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-</style>
-

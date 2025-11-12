@@ -1,16 +1,20 @@
 export interface MarginAnnotation {
   id: string
-  type: 'selection'  // Unified type
+  type: 'tag-label' | 'comment-card'
   anchorMessageId: string
   anchorOffset?: number
   priority: number
   minHeight: number
-  data: {
-    selection: any
-    tags: any[]
-    comments: any[]
-    ratings: any[]
-  }
+  data: any  // Flexible data based on type
+}
+
+export interface VerticalBar {
+  id: string
+  selectionId: string
+  startMessageId: string
+  endMessageId: string
+  color: string
+  tags: any[]  // All tags for this selection
 }
 
 export interface LayoutPosition {
@@ -22,8 +26,16 @@ export interface LayoutPosition {
   priority: number
 }
 
+export interface VerticalBarPosition {
+  barId: string
+  top: number
+  height: number
+  color: string
+}
+
 export class AnnotationLayoutManager {
   private messagePositions: Map<string, { top: number, height: number }> = new Map()
+  private messageOrder: string[] = []  // Track message order
   private containerTop: number = 0
 
   updateMessagePositions(containerEl: HTMLElement | null) {
@@ -32,6 +44,7 @@ export class AnnotationLayoutManager {
     const containerRect = containerEl.getBoundingClientRect()
     this.containerTop = containerRect.top
     this.messagePositions.clear()
+    this.messageOrder = []
     
     const messages = containerEl.querySelectorAll('[data-message-id]')
     
@@ -45,8 +58,34 @@ export class AnnotationLayoutManager {
           top: relativeTop,
           height: rect.height
         })
+        this.messageOrder.push(messageId)
       }
     })
+  }
+
+  layoutVerticalBars(bars: VerticalBar[]): VerticalBarPosition[] {
+    const positions: VerticalBarPosition[] = []
+    
+    for (const bar of bars) {
+      const startPos = this.messagePositions.get(bar.startMessageId)
+      const endPos = this.messagePositions.get(bar.endMessageId)
+      
+      if (!startPos || !endPos) continue
+      
+      // Calculate the extent of the selection
+      const top = startPos.top
+      const bottom = endPos.top + endPos.height
+      const height = bottom - top
+      
+      positions.push({
+        barId: bar.id,
+        top,
+        height,
+        color: bar.color
+      })
+    }
+    
+    return positions
   }
 
   layoutAnnotations(annotations: MarginAnnotation[]): LayoutPosition[] {

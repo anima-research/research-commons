@@ -1,66 +1,79 @@
 <template>
-  <div class="annotation-margin relative w-full" :style="{ minHeight: minHeight + 'px' }">
-    <!-- Positioned annotation cards -->
-    <div
-      v-for="pos in layoutPositions"
-      :key="pos.annotationId"
-      class="absolute left-4 right-4 transition-all duration-300 ease-out"
-      :style="{ 
-        top: pos.actualTop + 'px',
-        zIndex: 10 + pos.priority 
-      }"
-      :title="`Ideal: ${pos.idealTop}, Actual: ${pos.actualTop}`"
-    >
-      <!-- Connection lines showing extent to ideal position -->
-      <svg
-        class="absolute pointer-events-none"
+  <div class="annotation-margin-container flex relative" :style="{ minHeight: minHeight + 'px' }">
+    <!-- Vertical bars column (narrow, left side) -->
+    <div class="vertical-bars-column relative" style="width: 24px; flex-shrink: 0;">
+      <div
+        v-for="barPos in verticalBarPositions"
+        :key="barPos.barId"
+        class="absolute left-1/2 -translate-x-1/2 rounded-full transition-all duration-300"
+        :style="{
+          top: barPos.top + 'px',
+          height: barPos.height + 'px',
+          width: '4px',
+          backgroundColor: barPos.color,
+          opacity: 0.6
+        }"
+      />
+    </div>
+
+    <!-- Annotations column (labels and cards) -->
+    <div class="annotations-column relative flex-1 pl-2">
+      <!-- Positioned annotation elements -->
+      <div
+        v-for="pos in layoutPositions"
+        :key="pos.annotationId"
+        class="absolute left-4 right-4 transition-all duration-300 ease-out"
         :style="{ 
-          left: '-32px',
-          top: getSvgTop(pos) + 'px',
-          width: '32px',
-          height: getSvgHeight(pos) + 'px'
+          top: pos.actualTop + 'px',
+          zIndex: 10 + pos.priority 
         }"
       >
-        <!-- Top line: from top-left of card to ideal top position -->
-        <path
-          :d="getTopLinePath(pos)"
-          stroke="#9CA3AF"
-          stroke-width="1.5"
-          stroke-dasharray="4 2"
-          fill="none"
+        <!-- Connector line (only for displaced tag labels) -->
+        <svg
+          v-if="shouldShowConnector(pos)"
+          class="absolute pointer-events-none"
+          :style="{ 
+            left: '-28px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: getConnectorWidth(pos) + 'px',
+            height: '2px'
+          }"
+        >
+          <line
+            x1="0"
+            :x2="getConnectorWidth(pos)"
+            y1="1"
+            y2="1"
+            stroke="#6B7280"
+            stroke-width="1"
+            stroke-dasharray="2 2"
+          />
+        </svg>
+
+        <!-- Tag label -->
+        <TagAnnotationBar
+          v-if="getAnnotation(pos.annotationId)?.type === 'tag-label'"
+          :tag="getAnnotation(pos.annotationId)!.data.tag"
+          :tag-attributions="getAnnotation(pos.annotationId)!.data.tagAttributions"
+          :user-names="userNames"
+          :current-user-id="currentUserId"
+          @resize="handleResize(pos.annotationId, $event)"
+          @add-vote="$emit('add-tag-vote', getAnnotation(pos.annotationId)!.data.selectionId, getAnnotation(pos.annotationId)!.data.tag.id)"
+          @remove-vote="$emit('remove-tag', getAnnotation(pos.annotationId)!.data.selectionId, getAnnotation(pos.annotationId)!.data.tag.id)"
         />
-        
-        <!-- Bottom line: from bottom-left of card to ideal bottom position -->
-        <path
-          :d="getBottomLinePath(pos)"
-          stroke="#9CA3AF"
-          stroke-width="1.5"
-          stroke-dasharray="4 2"
-          fill="none"
+
+        <!-- Comment card -->
+        <CommentCard
+          v-else-if="getAnnotation(pos.annotationId)?.type === 'comment-card'"
+          :comment="getAnnotation(pos.annotationId)!.data.comment"
+          :selection="getAnnotation(pos.annotationId)!.data.selection"
+          :created-by="getUserName(getAnnotation(pos.annotationId)!.data.comment.author_id)"
+          :can-delete="canModerate || getAnnotation(pos.annotationId)!.data.comment.author_id === currentUserId"
+          @resize="handleResize(pos.annotationId, $event)"
+          @delete="$emit('delete-comment', getAnnotation(pos.annotationId)!.data.comment.id)"
         />
-      </svg>
-      
-      <!-- Unified SelectionCard -->
-      <SelectionCard
-        v-if="getAnnotation(pos.annotationId)"
-        :selection="getAnnotation(pos.annotationId)!.data.selection"
-        :tags="getAnnotation(pos.annotationId)!.data.tags"
-        :comments="getAnnotation(pos.annotationId)!.data.comments"
-        :tag-attributions="getAnnotation(pos.annotationId)!.data.tagAttributions || []"
-        :created-by="getUserName(getAnnotation(pos.annotationId)!.data.selection.created_by)"
-        :user-names="userNames"
-        :current-user-id="currentUserId"
-        :can-delete="canModerate || getAnnotation(pos.annotationId)!.data.selection.created_by === currentUserId"
-        :can-delete-comments="canModerate"
-        :can-remove-tags="canModerate"
-        @resize="handleResize(pos.annotationId, $event)"
-        @add-tag="$emit('add-tag', getAnnotation(pos.annotationId)!.data.selection.id)"
-        @add-tag-vote="$emit('add-tag-vote', getAnnotation(pos.annotationId)!.data.selection.id, $event)"
-        @add-comment="$emit('add-comment', getAnnotation(pos.annotationId)!.data.selection.id)"
-        @delete="$emit('delete-selection', getAnnotation(pos.annotationId)!.data.selection.id)"
-        @delete-comment="$emit('delete-comment', $event)"
-        @remove-tag="$emit('remove-tag', getAnnotation(pos.annotationId)!.data.selection.id, $event)"
-      />
+      </div>
     </div>
   </div>
 </template>
@@ -69,11 +82,13 @@
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { AnnotationLayoutManager } from '@/utils/layout-manager'
-import type { MarginAnnotation, LayoutPosition } from '@/utils/layout-manager'
-import SelectionCard from './SelectionCard.vue'
+import type { MarginAnnotation, LayoutPosition, VerticalBar, VerticalBarPosition } from '@/utils/layout-manager'
+import TagAnnotationBar from './TagAnnotationBar.vue'
+import CommentCard from './CommentCard.vue'
 
 interface Props {
   annotations: MarginAnnotation[]
+  verticalBars: VerticalBar[]
   conversationEl: HTMLElement | null
   userNames?: Map<string, string>
   currentUserId?: string
@@ -82,30 +97,40 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   userNames: () => new Map(),
-  canModerate: false
+  canModerate: false,
+  verticalBars: () => []
 })
 
 const emit = defineEmits<{
-  'add-tag': [selectionId: string]
   'add-tag-vote': [selectionId: string, tagId: string]
-  'add-comment': [selectionId: string]
-  'delete-selection': [selectionId: string]
-  'delete-comment': [commentId: string]
   'remove-tag': [selectionId: string, tagId: string]
+  'delete-comment': [commentId: string]
 }>()
 
 const layoutManager = new AnnotationLayoutManager()
 const layoutPositions = ref<LayoutPosition[]>([])
+const verticalBarPositions = ref<VerticalBarPosition[]>([])
 const annotationHeights = ref<Map<string, number>>(new Map())
 
-// Calculate minimum height needed for all annotations
+// Calculate minimum height needed for all content
 const minHeight = computed(() => {
-  if (layoutPositions.value.length === 0) return 0
-  const last = layoutPositions.value[layoutPositions.value.length - 1]
-  return last.actualTop + last.height + 20
+  let maxBottom = 0
+  
+  // Check annotation positions
+  if (layoutPositions.value.length > 0) {
+    const last = layoutPositions.value[layoutPositions.value.length - 1]
+    maxBottom = Math.max(maxBottom, last.actualTop + last.height + 20)
+  }
+  
+  // Check vertical bar positions
+  for (const barPos of verticalBarPositions.value) {
+    maxBottom = Math.max(maxBottom, barPos.top + barPos.height + 20)
+  }
+  
+  return maxBottom
 })
 
-watch(() => props.annotations, () => {
+watch(() => [props.annotations, props.verticalBars], () => {
   nextTick(() => recalculateLayout())
 }, { deep: true })
 
@@ -134,6 +159,9 @@ function recalculateLayout() {
   
   layoutManager.updateMessagePositions(props.conversationEl)
   
+  // Layout vertical bars
+  verticalBarPositions.value = layoutManager.layoutVerticalBars(props.verticalBars)
+  
   // Update annotations with measured heights
   const annotationsWithHeights = props.annotations.map(ann => ({
     ...ann,
@@ -154,83 +182,30 @@ function getAnnotation(id: string) {
 }
 
 function getUserName(userId: string) {
-  // Look up from auth store first
   const authStore = useAuthStore()
   if (authStore.user?.id === userId) {
     return authStore.user.name
   }
-  // TODO: Look up other users from API
-  return 'User ' + userId.substring(0, 8)
+  return props.userNames.get(userId) || 'User ' + userId.substring(0, 8)
 }
 
-function getCriterionName(criterionId: string) {
-  // TODO: Look up from criteria store
-  return 'Criterion'
+function shouldShowConnector(pos: LayoutPosition): boolean {
+  const ann = getAnnotation(pos.annotationId)
+  if (ann?.type !== 'tag-label') return false
+  
+  // Show connector if label is displaced from ideal position
+  const displacement = Math.abs(pos.actualTop - pos.idealTop)
+  return displacement > 10  // Show if displaced by more than 10px
 }
 
-function getSvgTop(pos: LayoutPosition): number {
-  // SVG should start at the topmost point we need to draw
-  const displacement = pos.actualTop - pos.idealTop
-  return displacement > 0 ? -displacement : 0
-}
-
-function getSvgHeight(pos: LayoutPosition): number {
-  // SVG needs to contain:
-  // - The full card height
-  // - Any displacement upward (idealTop above actualTop)
-  // - Any ideal message extent beyond card bottom
-  const displacement = pos.actualTop - pos.idealTop
-  const idealMessageHeight = pos.idealBottom - pos.idealTop
-  
-  // When pushed down, need: displacement + card height + any ideal message extent beyond
-  // When aligned, need: max of card height or message height
-  const needed = Math.max(
-    pos.height + Math.abs(displacement),  // Card + displacement
-    idealMessageHeight + Math.abs(displacement) // Or full extent
-  )
-  
-  return needed + 20 // Add padding for curves
-}
-
-function getTopLinePath(pos: LayoutPosition): string {
-  const displacement = pos.actualTop - pos.idealTop
-  
-  const startX = 32 // Right edge (card side)
-  // startY is relative to SVG top (which may be offset)
-  const startY = displacement > 0 ? displacement : 0  // Top of card in SVG space
-  const endX = 0    // Left edge (conversation side)
-  const endY = 0    // Ideal top is always at SVG top
-  
-  // If aligned, straight line
-  if (Math.abs(startY - endY) < 2) {
-    return `M ${startX},${startY} L ${endX},${startY}`
-  }
-  
-  // Curved path using cubic bezier
-  return `M ${startX},${startY} C ${startX * 2/3},${startY} ${startX / 3},${endY} ${endX},${endY}`
-}
-
-function getBottomLinePath(pos: LayoutPosition): string {
-  const displacement = pos.actualTop - pos.idealTop
-  
-  const startX = 32 // Right edge (card side)
-  const startY = (displacement > 0 ? displacement : 0) + pos.height  // Bottom of card in SVG space
-  const endX = 0    // Left edge (conversation side)
-  const endY = pos.idealBottom - pos.idealTop  // Ideal bottom relative to ideal top (which is at SVG y=0)
-  
-  // If aligned, straight line
-  if (Math.abs(startY - endY) < 2) {
-    return `M ${startX},${startY} L ${endX},${startY}`
-  }
-  
-  // Curved path
-  return `M ${startX},${startY} C ${startX * 2/3},${startY} ${startX / 3},${endY} ${endX},${endY}`
+function getConnectorWidth(pos: LayoutPosition): number {
+  // Connector spans the gap between vertical bar and label
+  return 24  // Width of vertical bar column minus some padding
 }
 </script>
 
 <style scoped>
-.annotation-margin {
+.annotation-margin-container {
   position: relative;
 }
 </style>
-

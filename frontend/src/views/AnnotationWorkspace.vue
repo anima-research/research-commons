@@ -1,203 +1,121 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 dark:bg-gray-950 transition-colors">
-    <!-- Fixed Top Pane -->
-    <div class="fixed top-0 left-0 right-0 bg-white dark:bg-gray-900 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 dark:border-gray-800 z-30 transition-colors" ref="headerEl">
-      <!-- Navigation Bar -->
-      <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-        <div class="flex items-center justify-between">
-          <button @click="router.push('/browse')" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
-            ← Back to Conversations
-          </button>
-          <div class="flex items-center gap-3">
-            <button
-              v-if="canDeleteSubmission"
-              @click="handleDeleteSubmission"
-              class="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 px-2 py-1 border border-red-300 dark:border-red-800 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-            >
-              🗑️ Delete Submission
-            </button>
-            <div v-if="authStore.isAuthenticated()" class="text-sm text-gray-700 dark:text-gray-300 dark:text-gray-300">
-              {{ authStore.user?.name }}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Submission Header (Unscrollable) -->
-      <div class="px-4 py-4 space-y-3">
-        <!-- Title and badges -->
-        <div class="flex items-start gap-3">
-          <h1 class="text-xl font-bold flex-1">
-            {{ submission?.title || 'Loading...' }}
-          </h1>
-          <span 
-            v-if="submission?.source_type === 'arc-certified'"
-            class="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-full font-medium"
+  <div class="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 transition-colors">
+    <!-- Compact Header -->
+    <div class="fixed top-0 left-0 right-0 bg-gray-900/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-700/50 dark:border-gray-800/50 z-30 transition-all" ref="headerEl">
+      <div class="px-6 py-3">
+        <div class="flex items-center gap-4">
+          <!-- Back button -->
+          <button 
+            @click="router.push('/browse')" 
+            class="text-gray-400 hover:text-white transition-colors text-sm opacity-70 hover:opacity-100"
           >
-            ✓ ARC Certified
-          </span>
-        </div>
-        
-        <!-- Meta info -->
-        <div class="text-sm text-gray-600 dark:text-gray-400">
-          <span>by {{ submitterName }}</span>
-          <span class="mx-2">•</span>
-          <span>{{ formatDate(submission?.submitted_at) }}</span>
-        </div>
-        
-        <!-- Description (editable) -->
-        <div class="relative">
-          <div v-if="!editingDescription">
-            <!-- Show description or prominent placeholder -->
-            <div 
-              v-if="submission?.metadata.description"
-              class="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-950 rounded p-2 group cursor-text prose prose-sm max-w-none"
-              @click="canEditSubmission && startEditDescription()"
-            >
-              <div v-html="renderMarkdown(submission.metadata.description)" class="inline"></div>
-              <button
-                v-if="canEditSubmission"
-                @click.stop="startEditDescription"
-                class="ml-2 text-xs text-indigo-600 hover:text-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                ✏️ Edit
-              </button>
-            </div>
-            <button
-              v-else-if="canEditSubmission"
-              @click="startEditDescription"
-              class="text-sm text-gray-400 hover:text-gray-600 bg-gray-50 dark:bg-gray-950 rounded p-2 w-full text-left border border-dashed border-gray-300 dark:border-gray-700"
-            >
-              + Add description for this submission
-            </button>
-            <div v-else class="text-sm text-gray-400 italic">
-              No description
-            </div>
+            ← Back
+          </button>
+          
+          <!-- Title + metadata inline -->
+          <div class="flex-1 flex items-baseline gap-3 min-w-0">
+            <h1 class="text-lg font-medium text-white truncate">
+              {{ submission?.title || 'Loading...' }}
+            </h1>
+            <span class="text-xs text-gray-400 opacity-60">by {{ submitterName }}</span>
+            <span class="text-xs text-gray-500 opacity-50">•</span>
+            <span class="text-xs text-gray-400 opacity-60">{{ formatDate(submission?.submitted_at) }}</span>
           </div>
-          <div v-else class="space-y-2">
-            <textarea
-              v-model="descriptionEdit"
-              ref="descriptionTextarea"
-              @keyup.ctrl.enter="saveDescription"
-              @keyup.meta.enter="saveDescription"
-              @keyup.esc="cancelEditDescription"
-              rows="3"
-              class="w-full px-3 py-2 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 resize-none"
-              placeholder="Describe what this conversation is about, what makes it interesting or noteworthy..."
-            />
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-gray-500 dark:text-gray-400">Ctrl/⌘ + Enter to save, Esc to cancel</span>
-              <div class="flex gap-2">
-                <button @click="cancelEditDescription" class="px-3 py-1.5 border border-gray-300 dark:border-gray-700 text-xs rounded hover:bg-gray-50 dark:hover:bg-gray-800">
-                  Cancel
-                </button>
-                <button @click="saveDescription" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">
-                  Save
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Research topic tags (editable with multiselect) -->
-        <div class="relative group">
-          <div class="flex flex-wrap gap-2 items-center">
-            <span v-if="!submission?.metadata.tags || submission.metadata.tags.length === 0" class="text-xs text-gray-400">
-              No research topics
-            </span>
+          
+          <!-- Topic tags inline -->
+          <div class="flex gap-1.5" v-if="submission?.metadata.tags?.length > 0">
             <button
-              v-for="tag in submission?.metadata.tags || []"
+              v-for="tag in submission?.metadata.tags"
               :key="tag"
               @click="router.push(`/topics?tag=${tag}`)"
-              class="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded hover:bg-indigo-100"
+              class="px-2 py-0.5 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 text-xs rounded transition-all"
             >
               #{{ tag }}
             </button>
-            <button
-              v-if="canEditSubmission"
-              @click="showTopicSelector = true"
-              class="px-2 py-1 text-xs text-indigo-600 hover:text-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              ✏️ {{ submission?.metadata.tags?.length ? 'Edit' : 'Add' }} topics
-            </button>
           </div>
+          
+          <!-- Stats pills -->
+          <div class="flex items-center gap-2">
+            <div v-if="ratingStats.length > 0" class="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-full font-mono flex items-center gap-1">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              {{ averageRating.toFixed(1) }}
+            </div>
+            <div v-if="tagStats.length > 0" class="px-2 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs rounded-full font-mono flex items-center gap-1">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+              </svg>
+              {{ tagStats.length }}
+            </div>
+            <div v-if="totalCommentCount > 0" class="px-2 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs rounded-full font-mono flex items-center gap-1">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
+              </svg>
+              {{ totalCommentCount }}
+            </div>
+          </div>
+          
+          <!-- Actions -->
+          <button
+            @click="showRatingForm = true"
+            class="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 text-xs rounded font-medium transition-all"
+          >
+            Rate
+          </button>
+          
+          <button
+            v-if="canDeleteSubmission"
+            @click="handleDeleteSubmission"
+            class="px-2 py-1 text-red-400/70 hover:text-red-400 text-xs transition-colors"
+          >
+            🗑️
+          </button>
         </div>
       </div>
 
-      <!-- Two-column: Stats/Info | Actions -->
-      <div class="px-4 pb-3 border-t border-gray-200 dark:border-gray-800">
-        <div class="grid grid-cols-1 lg:grid-cols-[1fr,auto] gap-4 py-3">
-          <!-- Left: Stats (compact) -->
-          <div class="space-y-2">
-            <!-- Rating Stats -->
-            <div v-if="ratingStats.length > 0" class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-medium text-gray-600 dark:text-gray-400">⭐ Ratings:</span>
-                <button
-                  @click="showStatsDetail = true"
-                  class="text-xs text-indigo-600 hover:text-indigo-700"
-                >
-                  Details →
-                </button>
-              </div>
-              <div class="flex flex-wrap gap-3 text-xs">
-                <div
-                  v-for="stat in ratingStats.slice(0, 3)"
-                  :key="stat.criterion_id"
-                  class="flex items-center gap-1"
-                >
-                  <span class="text-gray-700">{{ stat.criterion_name }}:</span>
-                  <span class="font-semibold text-indigo-600">{{ stat.avg.toFixed(1) }}/{{ stat.max }}</span>
-                  <span class="text-gray-500">({{ stat.count }})</span>
-                </div>
-                <span v-if="ratingStats.length > 3" class="text-gray-500">
-                  +{{ ratingStats.length - 3 }} more
-                </span>
-              </div>
-            </div>
-
-            <!-- Tag Stats -->
-            <div v-if="tagStats.length > 0" class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-medium text-gray-600 dark:text-gray-400">🏷️ Tags:</span>
-                <button
-                  @click="showStatsDetail = true"
-                  class="text-xs text-indigo-600 hover:text-indigo-700"
-                >
-                  Details →
-                </button>
-              </div>
-              <div class="flex flex-wrap gap-2 text-xs">
-                <span
-                  v-for="stat in tagStats.slice(0, 5)"
-                  :key="stat.tag_id"
-                  class="bg-gray-100 text-gray-700 dark:text-gray-300 px-2 py-1 rounded"
-                >
-                  {{ stat.tag_name }} <span class="text-gray-500">({{ stat.count }})</span>
-                </span>
-                <span v-if="tagStats.length > 5" class="text-gray-500 px-2 py-1">
-                  +{{ tagStats.length - 5 }} more
-                </span>
-              </div>
-            </div>
-
-            <!-- Empty state -->
-            <div v-if="ratingStats.length === 0 && tagStats.length === 0" class="text-xs text-gray-500 dark:text-gray-400 py-1">
-              No ratings or annotations yet. Start annotating! →
-            </div>
-          </div>
-
-          <!-- Right: Actions -->
-          <div class="flex flex-col gap-2 lg:min-w-[180px]">
-            <button 
-              @click="showRatingForm = true"
-              class="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm font-medium whitespace-nowrap"
+      <!-- Description row (expandable) -->
+      <div class="px-6 py-2 border-t border-gray-700/30">
+        <div v-if="!editingDescription" class="group">
+          <div class="flex items-start gap-3">
+            <span class="text-xs text-gray-500 uppercase tracking-wider pt-1">Context</span>
+            <div 
+              v-if="submission?.metadata.description"
+              class="flex-1 text-sm text-gray-400 cursor-pointer hover:text-gray-300 transition-colors leading-relaxed"
+              @click="canEditSubmission && startEditDescription()"
+              v-html="renderMarkdown(submission.metadata.description)"
+            ></div>
+            <button
+              v-else-if="canEditSubmission"
+              @click="startEditDescription"
+              class="flex-1 text-sm text-gray-500 hover:text-gray-400 italic text-left transition-colors"
             >
-              ⭐ Rate Submission
+              + Add context...
             </button>
-            <div v-if="submissionRatings.length > 0" class="text-xs text-gray-500 dark:text-gray-400 text-center">
-              {{ submissionRatings.length }} rating(s)
-            </div>
+            <span v-else class="flex-1 text-sm text-gray-600 italic">No context provided</span>
+            <button
+              v-if="canEditSubmission && submission?.metadata.description"
+              @click.stop="startEditDescription"
+              class="text-xs text-gray-500 hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              ✏️
+            </button>
+          </div>
+        </div>
+        <div v-else class="flex flex-col gap-2">
+          <textarea
+            v-model="descriptionEdit"
+            ref="descriptionTextarea"
+            @keyup.ctrl.enter="saveDescription"
+            @keyup.meta.enter="saveDescription"
+            @keyup.esc="cancelEditDescription"
+            rows="3"
+            class="w-full px-3 py-2 text-sm bg-gray-800/50 border border-gray-700/50 text-gray-300 rounded focus:ring-1 focus:ring-indigo-500/50 placeholder-gray-600 resize-y"
+            placeholder="Describe the research context: methodology, interesting aspects, what to look for..."
+          />
+          <div class="flex justify-end gap-2">
+            <button @click="cancelEditDescription" class="px-3 py-1 text-xs text-gray-500 hover:text-gray-400 transition-colors">Cancel</button>
+            <button @click="saveDescription" class="px-3 py-1 text-xs bg-indigo-500/30 hover:bg-indigo-500/40 text-indigo-300 rounded transition-colors">Save</button>
           </div>
         </div>
       </div>
@@ -208,7 +126,7 @@
       <!-- Two-column layout for desktop, single column for mobile -->
       <div class="flex flex-col lg:flex-row">
         <!-- Conversation (full width mobile, 60% desktop) -->
-        <div class="w-full lg:w-[60%] px-4" ref="conversationContainerEl">
+        <div class="w-full lg:w-[60%] px-6 py-8" ref="conversationContainerEl">
           <MessageList
             v-if="messages.length > 0"
             :messages="messages"
@@ -217,9 +135,10 @@
             :user-names="userNames"
             :current-user-id="authStore.user?.id"
             :can-moderate="canModerate"
-            @annotate-message="handleAnnotateMessage"
-            @start-multi-select="handleStartMultiSelect"
-            @selection-mode-changed="showSelectionToolbar = $event"
+            @add-tag-to-message="handleAddTagToMessage"
+            @add-comment-to-message="handleAddCommentToMessage"
+            @copy-message="handleCopyMessage"
+            @text-selected="handleTextSelected"
             @add-tag="handleAddTag"
             @add-tag-vote="handleAddTagVote"
             @add-comment="handleAddCommentToSelection"
@@ -237,14 +156,12 @@
         <div class="hidden lg:block lg:w-[40%] relative">
           <AnnotationMargin
             :annotations="marginAnnotations"
+            :vertical-bars="verticalBars"
             :conversation-el="conversationContainerEl"
             :user-names="userNames"
             :current-user-id="authStore.user?.id"
             :can-moderate="canModerate"
-            @add-tag="handleAddTag"
             @add-tag-vote="handleAddTagVote"
-            @add-comment="handleAddCommentToSelection"
-            @delete-selection="handleDeleteSelection"
             @delete-comment="handleDeleteComment"
             @remove-tag="handleRemoveTag"
           />
@@ -377,11 +294,56 @@
         </div>
       </div>
     </div>
+
+    <!-- Tag Popover (inline tag selection) -->
+    <TagPopover
+      :show="showTagPopover"
+      :position="tagPopoverPosition"
+      :ontologies="ontologiesForPicker"
+      :existing-tag-ids="currentPopoverTagIds"
+      @tag-toggled="handleTagToggled"
+      @cancel="closeTagPopover"
+    />
+
+    <!-- Comment Input (inline comment form) -->
+    <CommentInput
+      :show="showCommentInput"
+      :position="commentInputPosition"
+      @submit="submitCommentToMessage"
+      @cancel="showCommentInput = false"
+    />
+
+    <!-- Text Selection Context Menu -->
+    <div
+      v-if="showTextSelectionMenu"
+      class="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 transition-colors"
+      :style="{ left: textSelectionMenuPosition.x + 'px', top: textSelectionMenuPosition.y + 'px' }"
+      @click.stop
+    >
+      <button
+        @click="handleAddTagToSelection"
+        class="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors rounded-t-lg"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+        </svg>
+        Add Tag
+      </button>
+      <button
+        @click="handleAddCommentToTextSelection"
+        class="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors rounded-b-lg"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+        </svg>
+        Add Comment
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSubmissionsStore } from '@/stores/submissions'
@@ -389,10 +351,12 @@ import MessageList from '@/components/MessageList.vue'
 import AnnotationMargin from '@/components/AnnotationMargin.vue'
 import CommentForm from '@/components/CommentForm.vue'
 import TagPicker from '@/components/TagPicker.vue'
+import TagPopover from '@/components/TagPopover.vue'
+import CommentInput from '@/components/CommentInput.vue'
 import TopicSelector from '@/components/TopicSelector.vue'
 import RatingForm from '@/components/RatingForm.vue'
 import type { Message, Selection, Comment, Rating, Topic } from '@/types'
-import type { MarginAnnotation } from '@/utils/layout-manager'
+import type { MarginAnnotation, VerticalBar } from '@/utils/layout-manager'
 import { ontologiesAPI, submissionsAPI, annotationsAPI, researchAPI, rankingsAPI, authAPI } from '@/services/api'
 import { renderMarkdown } from '@/utils/markdown'
 
@@ -411,9 +375,11 @@ const selections = ref<Selection[]>([])
 const selectionData = ref<Map<string, {
   comments: Comment[]
   tags: any[]
+  tagAttributions: Array<{ tag_id: string; tagged_by: string; tagged_at: Date }>
 }>>(new Map())
 const submissionRatings = ref<Rating[]>([])
 const attachedOntologies = ref<any[]>([])
+const allOntologies = ref<Map<string, any>>(new Map())
 const allTags = ref<Map<string, any>>(new Map())
 const submitterName = ref('User')
 const submissionComments = ref<Comment[]>([])
@@ -470,6 +436,7 @@ const annotatedMessageIds = computed(() => {
 
 onMounted(async () => {
   window.addEventListener('resize', checkMobile)
+  document.addEventListener('click', handleDocumentClick)
   await loadData()
   
   // Use ResizeObserver to track header height changes
@@ -494,6 +461,11 @@ onMounted(async () => {
     })
     resizeObserver.observe(headerEl.value)
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+  document.removeEventListener('click', handleDocumentClick)
 })
 
 function checkMobile() {
@@ -548,16 +520,41 @@ async function loadData() {
       }
     }
     
-    submitterName.value = userNames.value.get(submission.value.submitter_id) || 'User'
+    // Set submitter name
+    if (submission.value.submitter_id) {
+      // If it's the current user, use their name
+      if (authStore.user && submission.value.submitter_id === authStore.user.id) {
+        submitterName.value = authStore.user.name
+      } else {
+        submitterName.value = userNames.value.get(submission.value.submitter_id) || 'Loading...'
+        
+        // If not in cache, fetch it
+        if (!userNames.value.has(submission.value.submitter_id)) {
+          try {
+            const response = await authAPI.getUserNames([submission.value.submitter_id])
+            Object.entries(response.data.user_names).forEach(([userId, name]) => {
+              userNames.value.set(userId, name)
+            })
+            submitterName.value = userNames.value.get(submission.value.submitter_id) || 'Unknown User'
+          } catch (err) {
+            console.error('Failed to load submitter name:', err)
+            submitterName.value = 'Unknown User'
+          }
+        }
+      }
+    }
     
     // Load ontologies and tags (combines topic-derived + explicit)
     const ontoResponse = await ontologiesAPI.getForSubmission(submissionId)
     attachedOntologies.value = ontoResponse.data.ontologies
     
-    // Build tag map
+    // Build ontology and tag maps
+    allOntologies.value.clear()
     allTags.value.clear()
     for (const onto of attachedOntologies.value) {
       const ontoDetail = await ontologiesAPI.get(onto.ontology_id)
+      // Store the actual ontology object, not the API response wrapper
+      allOntologies.value.set(onto.ontology_id, ontoDetail.data.ontology)
       ontoDetail.data.tags.forEach((tag: any) => {
         allTags.value.set(tag.id, tag)
       })
@@ -592,7 +589,7 @@ async function loadData() {
         : sel.annotation_tags
       const tags = tagIds.map(tagId => allTags.value.get(tagId)).filter(t => t)
       
-      selectionData.value.set(sel.id, { comments, tags })
+      selectionData.value.set(sel.id, { comments, tags, tagAttributions: sel.tag_attributions || [] })
     }
     
     // Now fetch user names for comment authors too
@@ -623,27 +620,372 @@ async function loadData() {
   }
 }
 
-async function handleAnnotateMessage(messageId: string) {
-  // Create selection immediately for this message
+function handleAddTagToMessage(messageId: string) {
+  const messageEl = document.querySelector(`[data-message-id="${messageId}"]`) as HTMLElement | null
+  if (!messageEl) return
+
+  const actionsBar = messageEl.querySelector('[data-message-actions]') as HTMLElement | null
+  const fallbackRect = messageEl.getBoundingClientRect()
+  let posX = fallbackRect.left
+  let posY = fallbackRect.bottom + 6
+
+  if (actionsBar) {
+    const rect = actionsBar.getBoundingClientRect()
+    posX = rect.left
+    posY = rect.bottom + 4
+  }
+
+  const viewportWidth = window.innerWidth
+  if (posX + TAG_POPOVER_WIDTH + 8 > viewportWidth) {
+    posX = viewportWidth - TAG_POPOVER_WIDTH - 8
+  }
+  if (posX < 8) {
+    posX = 8
+  }
+
+  tagPopoverPosition.value = { x: posX, y: posY }
+
+  const existingSelection = selections.value.find(
+    s =>
+      s.start_message_id === messageId &&
+      s.end_message_id === messageId &&
+      s.start_offset == null &&
+      s.end_offset == null
+  )
+
+  currentPopoverSelectionId.value = existingSelection?.id || null
+
+  if (existingSelection?.id) {
+    const currentUserId = authStore.user?.id
+    const existingData = selectionData.value.get(existingSelection.id)
+    
+    // Only show tags that the current user has voted for
+    if (currentUserId) {
+      const myTagAttributions = (existingData?.tagAttributions || existingSelection.tag_attributions || [])
+        .filter((attr: any) => attr.tagged_by === currentUserId)
+      currentPopoverTagIds.value = myTagAttributions.map((attr: any) => attr.tag_id)
+    } else {
+      currentPopoverTagIds.value = []
+    }
+  } else {
+    currentPopoverTagIds.value = []
+  }
+
+  activeMessageId.value = messageId
+  showTagPopover.value = true
+}
+
+function closeTagPopover() {
+  showTagPopover.value = false
+  activeMessageId.value = null
+  currentPopoverSelectionId.value = null
+  currentPopoverTagIds.value = []
+}
+
+function handleAddCommentToMessage(messageId: string) {
+  // Get message position to anchor input
+  const messageEl = document.querySelector(`[data-message-id="${messageId}"]`)
+  if (!messageEl) return
+  
+  const rect = messageEl.getBoundingClientRect()
+  commentInputPosition.value = {
+    x: rect.right + 10,
+    y: rect.top
+  }
+  
+  activeMessageId.value = messageId
+  showCommentInput.value = true
+}
+
+function handleCopyMessage(messageId: string) {
+  const message = messages.value.find(m => m.id === messageId)
+  if (!message) return
+  
+  // Extract text from content blocks
+  const text = message.content_blocks
+    .filter(block => block.type === 'text')
+    .map(block => block.text || '')
+    .join('\n')
+  
+  navigator.clipboard.writeText(text)
+    .then(() => {
+      console.log('Message copied to clipboard')
+      // TODO: Show toast notification
+    })
+    .catch(err => {
+      console.error('Failed to copy message:', err)
+    })
+}
+
+function handleTextSelected(messageId: string, text: string, start: number, end: number) {
+  // Store the selection data
+  pendingTextSelection.value = { messageId, text, start, end }
+  
+  // Get cursor position from current selection
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return
+  
+  const range = selection.getRangeAt(0)
+  const rect = range.getBoundingClientRect()
+  
+  // Position menu near the end of selection
+  textSelectionMenuPosition.value = {
+    x: rect.right + 10,
+    y: rect.top
+  }
+  
+  showTextSelectionMenu.value = true
+}
+
+async function handleAddTagToSelection() {
+  if (!pendingTextSelection.value) return
+  
+  // Create a selection for the text
   try {
     const selection = await submissionsStore.createSelection({
       submission_id: submissionId,
-      start_message_id: messageId,
-      end_message_id: messageId,
-      start_offset: undefined,
-      end_offset: undefined,
-      label: undefined
+      start_message_id: pendingTextSelection.value.messageId,
+      end_message_id: pendingTextSelection.value.messageId,
+      start_offset: pendingTextSelection.value.start,
+      end_offset: pendingTextSelection.value.end,
+      label: pendingTextSelection.value.text.substring(0, 50),
+      annotation_tags: []
     })
     
     selections.value.push(selection)
-    selectionData.value.set(selection.id, { comments: [], tags: [] })
+    selectionData.value.set(selection.id, { comments: [], tags: [], tagAttributions: [] })
+    
+    // Open tag picker for this new selection
+    activeSelectionId.value = selection.id
+    showTextSelectionMenu.value = false
+    showTagPicker.value = true
+    
+    pendingTextSelection.value = null
   } catch (err) {
-    console.error('Failed to create annotation:', err)
+    console.error('Failed to create selection:', err)
   }
 }
 
-function handleStartMultiSelect(messageId: string) {
-  // Just enters multi-select mode - handled by MessageList
+async function handleAddCommentToTextSelection() {
+  if (!pendingTextSelection.value) return
+  
+  // Create a selection for the text
+  try {
+    const selection = await submissionsStore.createSelection({
+      submission_id: submissionId,
+      start_message_id: pendingTextSelection.value.messageId,
+      end_message_id: pendingTextSelection.value.messageId,
+      start_offset: pendingTextSelection.value.start,
+      end_offset: pendingTextSelection.value.end,
+      label: pendingTextSelection.value.text.substring(0, 50),
+      annotation_tags: []
+    })
+    
+    selections.value.push(selection)
+    selectionData.value.set(selection.id, { comments: [], tags: [], tagAttributions: [] })
+    
+    // Open comment form for this new selection
+    activeSelectionId.value = selection.id
+    commentContext.value = {
+      messageId: pendingTextSelection.value.messageId,
+      text: pendingTextSelection.value.text,
+      selectionId: selection.id
+    }
+    showTextSelectionMenu.value = false
+    showCommentForm.value = true
+    
+    pendingTextSelection.value = null
+  } catch (err) {
+    console.error('Failed to create selection:', err)
+  }
+}
+
+async function handleTagToggled(tagId: string, shouldSelect: boolean) {
+  if (!activeMessageId.value) return
+  const currentUserId = authStore.user?.id
+  let previousTagIdsSnapshot: Set<string> | null = null
+  let previousRecordSnapshot: { comments: Comment[]; tags: any[]; tagAttributions: Array<{ tag_id: string; tagged_by: string; tagged_at: Date }> } | null = null
+  let targetSelectionId: string | null = null
+
+  try {
+    let selection: Selection | undefined
+
+    if (currentPopoverSelectionId.value) {
+      selection = selections.value.find(s => s.id === currentPopoverSelectionId.value)
+    }
+
+    if (!selection) {
+      selection = await submissionsStore.createSelection({
+        submission_id: submissionId,
+        start_message_id: activeMessageId.value,
+        end_message_id: activeMessageId.value,
+        start_offset: undefined,
+        end_offset: undefined,
+        label: undefined,
+        annotation_tags: []
+      })
+
+      selections.value.push(selection)
+      selectionData.value.set(selection.id, { comments: [], tags: [], tagAttributions: [] })
+      currentPopoverSelectionId.value = selection.id
+    }
+
+    targetSelectionId = selection.id
+
+    previousTagIdsSnapshot = new Set(currentPopoverTagIds.value)
+    const selectionRecord = selectionData.value.get(selection.id) || { comments: [], tags: [], tagAttributions: [] }
+    previousRecordSnapshot = {
+      comments: selectionRecord.comments ? [...selectionRecord.comments] : [],
+      tags: selectionRecord.tags ? [...selectionRecord.tags] : [],
+      tagAttributions: selectionRecord.tagAttributions ? [...selectionRecord.tagAttributions] : []
+    }
+
+    const tagSet = new Set(previousTagIdsSnapshot)
+
+    if (shouldSelect) {
+      tagSet.add(tagId)
+    } else {
+      const hasMyVote = previousRecordSnapshot.tagAttributions.some(a => a.tag_id === tagId && a.tagged_by === currentUserId)
+      if (!hasMyVote) {
+        console.warn('Cannot remove tag vote you do not own.')
+        return
+      }
+      tagSet.delete(tagId)
+    }
+
+    currentPopoverTagIds.value = Array.from(tagSet)
+
+    if (shouldSelect) {
+      await ontologiesAPI.applyTags(selection.id, [tagId])
+    } else {
+      await annotationsAPI.removeTag(selection.id, tagId)
+    }
+
+    const response = await annotationsAPI.getSelections(submissionId)
+    const updatedSelection = response.data.selections.find(s => s.id === selection!.id)
+
+    let selTags: string[]
+    let selAttributions: Array<{ tag_id: string; tagged_by: string; tagged_at: Date }>
+
+    if (updatedSelection) {
+      selTags = updatedSelection.annotation_tags || []
+      selAttributions = (updatedSelection.tag_attributions || []).map(attr => ({
+        tag_id: attr.tag_id,
+        tagged_by: attr.tagged_by,
+        tagged_at: new Date(attr.tagged_at)
+      }))
+    } else {
+      selTags = Array.from(tagSet)
+      const existingAttrs = previousRecordSnapshot.tagAttributions ? [...previousRecordSnapshot.tagAttributions] : []
+      if (currentUserId) {
+        if (shouldSelect) {
+          existingAttrs.push({
+            tag_id: tagId,
+            tagged_by: currentUserId,
+            tagged_at: new Date()
+          })
+        } else {
+          const idx = existingAttrs.findIndex(a => a.tag_id === tagId && a.tagged_by === currentUserId)
+          if (idx !== -1) {
+            existingAttrs.splice(idx, 1)
+          }
+        }
+      }
+      selAttributions = existingAttrs
+    }
+
+    // Only show tags that the current user has voted for in the popover
+    if (currentUserId) {
+      const myTagIds = selAttributions
+        .filter(attr => attr.tagged_by === currentUserId)
+        .map(attr => attr.tag_id)
+      currentPopoverTagIds.value = myTagIds
+    } else {
+      currentPopoverTagIds.value = []
+    }
+
+    const existing = selectionData.value.get(selection!.id) || { comments: [], tags: [], tagAttributions: [] }
+    const tagObjs = selTags
+      .map((id: string) => allTags.value.get(id))
+      .filter((t: any) => t)
+
+    selectionData.value.set(selection!.id, {
+      comments: existing.comments || [],
+      tags: tagObjs,
+      tagAttributions: selAttributions
+    })
+
+    const selectionIndex = selections.value.findIndex(s => s.id === selection!.id)
+    if (selectionIndex !== -1) {
+      selections.value[selectionIndex] = {
+        ...selections.value[selectionIndex],
+        annotation_tags: selTags,
+        tag_attributions: selAttributions
+      }
+    }
+  } catch (err) {
+    console.error('Failed to toggle tag:', err)
+    if (targetSelectionId) {
+      if (previousTagIdsSnapshot) {
+        currentPopoverTagIds.value = Array.from(previousTagIdsSnapshot)
+      }
+      if (previousRecordSnapshot) {
+        selectionData.value.set(targetSelectionId, {
+          comments: previousRecordSnapshot.comments,
+          tags: previousRecordSnapshot.tags,
+          tagAttributions: previousRecordSnapshot.tagAttributions
+        })
+      }
+    }
+  }
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  const target = event.target as HTMLElement
+
+  if (
+    showTagPopover.value &&
+    !target.closest('.tag-popover') &&
+    !target.closest('[data-message-actions]')
+  ) {
+    closeTagPopover()
+  }
+}
+
+async function submitCommentToMessage(text: string) {
+  if (!activeMessageId.value) return
+  
+  // Create a selection for the message
+  try {
+    const selection = await submissionsStore.createSelection({
+      submission_id: submissionId,
+      start_message_id: activeMessageId.value,
+      end_message_id: activeMessageId.value,
+      start_offset: undefined,
+      end_offset: undefined,
+      label: undefined,
+      annotation_tags: []
+    })
+    
+    selections.value.push(selection)
+    selectionData.value.set(selection.id, { comments: [], tags: [], tagAttributions: [] })
+    
+    // Add comment to the selection
+    const commentResponse = await annotationsAPI.createComment({
+      selection_id: selection.id,
+      content: text
+    })
+    const comment = commentResponse.data
+    const data = selectionData.value.get(selection.id)
+    if (data) {
+      data.comments.push(comment)
+    }
+    
+    showCommentInput.value = false
+    activeMessageId.value = null
+  } catch (err) {
+    console.error('Failed to submit comment:', err)
+  }
 }
 
 const showCommentForm = ref(false)
@@ -654,9 +996,22 @@ const activeSelectionId = ref<string | null>(null)
 const commentContext = ref<{ messageId: string; text?: string; selectionId?: string } | null>(null)
 const conversationContainerEl = ref<HTMLElement | null>(null)
 const showSelectionToolbar = ref(false)
+
+// New inline popover state
+const showTagPopover = ref(false)
+const tagPopoverPosition = ref({ x: 0, y: 0 })
+const activeMessageId = ref<string | null>(null)
+const currentPopoverSelectionId = ref<string | null>(null)
+const currentPopoverTagIds = ref<string[]>([])
+const showCommentInput = ref(false)
+const commentInputPosition = ref({ x: 0, y: 0 })
+const showTextSelectionMenu = ref(false)
+const textSelectionMenuPosition = ref({ x: 0, y: 0 })
+const pendingTextSelection = ref<{ messageId: string; text: string; start: number; end: number } | null>(null)
 const headerEl = ref<HTMLElement | null>(null)
 const headerHeight = ref(0)
 const attachedRankingSystems = ref<any[]>([])
+const TAG_POPOVER_WIDTH = 224
 const allCriteria = ref<Map<string, any>>(new Map())
 
 // Computed helpers
@@ -668,8 +1023,10 @@ const totalCommentCount = computed(() => {
   return count
 })
 
-const totalRatingCount = computed(() => {
-  return submissionRatings.value.length
+const averageRating = computed(() => {
+  if (ratingStats.value.length === 0) return 0
+  const sum = ratingStats.value.reduce((acc, stat) => acc + stat.avg, 0)
+  return sum / ratingStats.value.length
 })
 
 // Rating statistics
@@ -724,26 +1081,20 @@ const tagStats = computed(() => {
   return Array.from(stats.values()).sort((a, b) => b.count - a.count)
 })
 
-const selectionsWithComments = computed(() => {
-  return selections.value.filter(sel => {
-    const data = selectionData.value.get(sel.id)
-    return data && data.comments.length > 0
-  })
-})
-
-function getCommentsForSelection(selectionId: string) {
-  return selectionData.value.get(selectionId)?.comments || []
-}
 
 // Ontologies for tag picker
 const ontologiesForPicker = computed(() => {
   return attachedOntologies.value.map(subOnto => {
+    const ontologyDetail = allOntologies.value.get(subOnto.ontology_id)
+    if (!ontologyDetail) return null
+    
     const tags = Array.from(allTags.value.values()).filter(t => t.ontology_id === subOnto.ontology_id)
+    
     return {
-      ontology: { name: 'Ontology', id: subOnto.ontology_id } as any,
+      ontology: ontologyDetail,
       tags
     }
-  })
+  }).filter(Boolean)
 })
 
 // Ranking systems for rating picker - need to store full system details
@@ -762,7 +1113,42 @@ const rankingSystemsForPicker = computed(() => {
   })
 })
 
-// Build margin annotations - one card per selection (no ratings)
+// Build vertical bars - one per selection
+const verticalBars = computed<VerticalBar[]>(() => {
+  const bars: VerticalBar[] = []
+  
+  for (const sel of selections.value) {
+    const data = selectionData.value.get(sel.id)
+    if (!data) continue
+    
+    // Determine color: use first tag's color, or generate from selection ID
+    let color = '#6B7280' // Default gray
+    if (data.tags.length > 0 && data.tags[0].color) {
+      color = data.tags[0].color
+    } else if (data.tags.length > 0) {
+      // Generate from tag name
+      let hash = 0
+      for (let i = 0; i < data.tags[0].name.length; i++) {
+        hash = data.tags[0].name.charCodeAt(i) + ((hash << 5) - hash)
+      }
+      const hue = hash % 360
+      color = `hsl(${hue}, 70%, 60%)`
+    }
+    
+    bars.push({
+      id: sel.id,
+      selectionId: sel.id,
+      startMessageId: sel.start_message_id,
+      endMessageId: sel.end_message_id,
+      color,
+      tags: data.tags
+    })
+  }
+  
+  return bars
+})
+
+// Build margin annotations - separate annotations for tags and comments
 const marginAnnotations = computed<MarginAnnotation[]>(() => {
   const annotations: MarginAnnotation[] = []
   
@@ -770,20 +1156,51 @@ const marginAnnotations = computed<MarginAnnotation[]>(() => {
     const data = selectionData.value.get(sel.id)
     if (!data) continue
     
-    annotations.push({
-      id: sel.id,
-      type: 'selection',
-      anchorMessageId: sel.start_message_id,
-      priority: 5,
-      minHeight: 100,
-      data: {
-        selection: sel,
-        tags: data.tags,
-        comments: data.comments,
-        tagAttributions: sel.tag_attributions || [], // Include tag attributions
-        ratings: [] // Ratings are submission-level now
+    // Group tag attributions by tag_id
+    const tagGroups = new Map<string, typeof sel.tag_attributions>()
+    if (sel.tag_attributions) {
+      for (const attr of sel.tag_attributions) {
+        if (!tagGroups.has(attr.tag_id)) {
+          tagGroups.set(attr.tag_id, [])
+        }
+        tagGroups.get(attr.tag_id)!.push(attr)
       }
-    })
+    }
+    
+    // Create one annotation per unique tag
+    for (const [tagId, attributions] of tagGroups) {
+      const tag = allTags.value.get(tagId)
+      if (!tag) continue
+      
+      annotations.push({
+        id: `tag-${sel.id}-${tagId}`,
+        type: 'tag-label',
+        anchorMessageId: sel.start_message_id,
+        priority: 5,
+        minHeight: 32,
+        data: {
+          selectionId: sel.id,
+          tag,
+          tagAttributions: attributions
+        }
+      })
+    }
+    
+    // Create one annotation per comment
+    for (const comment of data.comments) {
+      annotations.push({
+        id: `comment-${comment.id}`,
+        type: 'comment-card',
+        anchorMessageId: sel.start_message_id,
+        priority: 4,
+        minHeight: 80,
+        data: {
+          selectionId: sel.id,
+          selection: sel,
+          comment
+        }
+      })
+    }
   }
   
   return annotations
@@ -830,12 +1247,13 @@ async function submitComment(text: string) {
         end_message_id: commentContext.value.messageId,
         start_offset: undefined,
         end_offset: undefined,
-        label: undefined
+        label: undefined,
+        annotation_tags: []
       })
       
       targetSelectionId = selection.id
       selections.value.push(selection)
-      selectionData.value.set(selection.id, { comments: [], tags: [] })
+      selectionData.value.set(selection.id, { comments: [], tags: [], tagAttributions: [] })
     } else {
       showCommentForm.value = false
       return
@@ -864,18 +1282,6 @@ async function submitComment(text: string) {
   }
 }
 
-function getUserName(userId: string) {
-  if (userId === authStore.user?.id) {
-    return authStore.user.name
-  }
-  // TODO: Look up from user cache/API
-  return 'User ' + userId.substring(0, 8)
-}
-
-function handleAddSubmissionComment() {
-  console.log('Add submission comment')
-  // TODO: Implement submission-level comments
-}
 
 function startEditDescription() {
   descriptionEdit.value = submission.value?.metadata.description || ''
@@ -973,11 +1379,6 @@ function handleAddCommentToSelection(selectionId: string) {
   showCommentForm.value = true
 }
 
-function handleAddRating(selectionId: string) {
-  // Ratings are submission-level now, but can still be triggered from annotation card
-  showRatingForm.value = true
-}
-
 async function submitRatings(ratings: Array<{ criterion_id: string; score: number }>) {
   try {
     // Submit all ratings at submission level
@@ -1059,18 +1460,6 @@ async function handleRemoveTag(selectionId: string, tagId: string) {
   }
 }
 
-async function handleDeleteRating(ratingId: string) {
-  if (!confirm('Delete this rating?')) return
-  
-  try {
-    await annotationsAPI.deleteRating(ratingId)
-    
-    // Remove from submission ratings
-    submissionRatings.value = submissionRatings.value.filter(r => r.id !== ratingId)
-  } catch (err) {
-    console.error('Failed to delete rating:', err)
-  }
-}
 
 async function handleDeleteSubmission() {
   const confirmed = confirm(

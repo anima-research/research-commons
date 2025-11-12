@@ -65,6 +65,11 @@ export interface Selection {
   end_offset?: number
   label?: string
   annotation_tags: string[]  // Tag IDs
+  tag_attributions?: Array<{
+    tag_id: string
+    tagged_by: string
+    tagged_at: Date
+  }>
   created_at: string
 }
 

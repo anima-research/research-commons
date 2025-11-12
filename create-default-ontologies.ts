@@ -8,6 +8,16 @@ async function main() {
 
   console.log('Creating default ontologies...');
 
+  // Check if ontologies already exist
+  const existing = await store.getAllOntologies();
+  const existingNames = new Set(existing.map(o => o.name));
+  
+  if (existingNames.has('LLM Response Patterns') && existingNames.has('Interview Quality')) {
+    console.log('Default ontologies already exist, skipping...');
+    await store.close();
+    return;
+  }
+
   // LLM Response Patterns
   const responsePatterns = await store.createOntology(
     'LLM Response Patterns',

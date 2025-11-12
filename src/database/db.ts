@@ -56,17 +56,35 @@ export class AnnotationDatabase {
 
   getSelection(id: string): Selection | null {
     const row = this.db.prepare('SELECT * FROM selections WHERE id = ?').get(id);
-    return row ? this.rowToSelection(row) : null;
+    if (!row) return null;
+    
+    const selection = this.rowToSelection(row);
+    // Populate annotation_tags from selection_tags table
+    const tagRows = this.db.prepare('SELECT DISTINCT tag_id FROM selection_tags WHERE selection_id = ?').all(id);
+    selection.annotation_tags = tagRows.map((r: any) => r.tag_id);
+    return selection;
   }
 
   getSelectionsBySubmission(submissionId: string): Selection[] {
     const rows = this.db.prepare('SELECT * FROM selections WHERE submission_id = ? ORDER BY created_at').all(submissionId);
-    return rows.map(row => this.rowToSelection(row));
+    return rows.map(row => {
+      const selection = this.rowToSelection(row);
+      // Populate annotation_tags from selection_tags table
+      const tagRows = this.db.prepare('SELECT DISTINCT tag_id FROM selection_tags WHERE selection_id = ?').all(row.id);
+      selection.annotation_tags = tagRows.map((r: any) => r.tag_id);
+      return selection;
+    });
   }
 
   getSelectionsByUser(userId: string): Selection[] {
     const rows = this.db.prepare('SELECT * FROM selections WHERE created_by = ? ORDER BY created_at DESC').all(userId);
-    return rows.map(row => this.rowToSelection(row));
+    return rows.map(row => {
+      const selection = this.rowToSelection(row);
+      // Populate annotation_tags from selection_tags table
+      const tagRows = this.db.prepare('SELECT DISTINCT tag_id FROM selection_tags WHERE selection_id = ?').all(row.id);
+      selection.annotation_tags = tagRows.map((r: any) => r.tag_id);
+      return selection;
+    });
   }
 
   deleteSelection(id: string): void {

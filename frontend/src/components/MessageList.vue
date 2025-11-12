@@ -1,40 +1,15 @@
 <template>
   <div class="message-list-container">
-    <!-- Selection Mode Toolbar (Fixed at top of viewport) -->
-    <Teleport to="body">
-      <transition name="slide-down">
-        <div v-if="selectionMode" class="fixed top-0 left-0 right-0 bg-indigo-600 text-white p-3 flex items-center justify-between z-50 shadow-md">
-          <span class="text-sm font-medium">
-            📌 {{ selectedMessageIds.size }} message(s) selected for annotation
-          </span>
-          <div class="flex gap-2">
-            <button @click="exitSelectionMode" class="px-4 py-2 rounded bg-indigo-500 hover:bg-indigo-400">
-              Cancel
-            </button>
-            <button 
-              @click="proceedToAnnotation"
-              :disabled="selectedMessageIds.size === 0"
-              class="px-4 py-2 rounded bg-white text-indigo-600 font-medium hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Create Annotation →
-            </button>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
-
     <!-- Messages -->
     <div class="messages-container space-y-4">
       <template v-for="msg in messages" :key="msg.id">
         <Message
           :message="msg"
-          :selection-mode="selectionMode"
-          :is-selected="selectedMessageIds.has(msg.id)"
           :has-annotation="hasAnnotation(msg.id)"
-          @toggle-select="toggleMessageSelection"
           @text-selected="onTextSelected"
-          @annotate-message="onAnnotateMessage"
-          @start-multi-select="enterAnnotationMode"
+          @add-tag-to-message="onAddTagToMessage"
+          @add-comment-to-message="onAddCommentToMessage"
+          @copy-message="onCopyMessage"
         />
         
         <!-- Inline annotations (mobile only) -->
@@ -62,28 +37,6 @@
         </div>
       </template>
     </div>
-
-    <!-- Selection Popup (after text drag) -->
-    <Teleport to="body">
-      <div
-        v-if="showSelectionPopup"
-        class="fixed bg-white rounded-lg shadow-xl border border-gray-200 p-2 z-50"
-        :style="{ left: popupPosition.x + 'px', top: popupPosition.y + 'px' }"
-      >
-        <button
-          @click="confirmTextSelection"
-          class="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-        >
-          📌 Create Selection
-        </button>
-        <button
-          @click="quickComment"
-          class="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-        >
-          💬 Quick Comment
-        </button>
-      </div>
-    </Teleport>
   </div>
 </template>
 
@@ -110,9 +63,10 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  'annotate-message': [messageId: string]
-  'start-multi-select': [messageId: string]
-  'selection-mode-changed': [active: boolean]
+  'add-tag-to-message': [messageId: string]
+  'add-comment-to-message': [messageId: string]
+  'copy-message': [messageId: string]
+  'text-selected': [messageId: string, text: string, start: number, end: number]
   'add-tag': [selectionId: string]
   'add-tag-vote': [selectionId: string, tagId: string]
   'add-comment': [selectionId: string]
@@ -125,112 +79,24 @@ function getUserName(userId: string): string {
   return props.userNames?.get(userId) || 'User'
 }
 
-const selectionMode = ref(false)
-const selectedMessageIds = ref<Set<string>>(new Set())
-const pendingSelection = ref<any>(null)
-const showSelectionPopup = ref(false)
-const popupPosition = ref({ x: 0, y: 0 })
-
-function toggleMessageSelection(messageId: string) {
-  if (selectedMessageIds.value.has(messageId)) {
-    selectedMessageIds.value.delete(messageId)
-  } else {
-    selectedMessageIds.value.add(messageId)
-  }
-}
-
-function onTextSelected(messageId: string, text: string, start: number, end: number, event?: MouseEvent) {
-  pendingSelection.value = {
-    messageId,
-    text,
-    startOffset: start,
-    endOffset: end
-  }
-  
-  // Show popup near cursor
-  const e = event || window.event as MouseEvent
-  popupPosition.value = {
-    x: e.clientX + 10,
-    y: e.clientY + 10
-  }
-  showSelectionPopup.value = true
-  
-  // Hide popup when clicking elsewhere
-  setTimeout(() => {
-    document.addEventListener('click', hidePopup, { once: true })
-  }, 100)
-}
-
-function hidePopup() {
-  showSelectionPopup.value = false
-  pendingSelection.value = null
-}
-
-function confirmTextSelection() {
-  if (!pendingSelection.value) return
-  
-  // Enter selection mode with this message checked
-  selectedMessageIds.value = new Set([pendingSelection.value.messageId])
-  selectionMode.value = true
-  emit('selection-mode-changed', true)
-  showSelectionPopup.value = false
-}
-
-function quickComment() {
-  if (!pendingSelection.value) return
-  
-  // Create selection and immediately open comment
-  const messageId = pendingSelection.value.messageId
-  const text = pendingSelection.value.text
-  
-  emit('create-comment', messageId, text)
-  showSelectionPopup.value = false
-  pendingSelection.value = null
-}
-
-function onAnnotateMessage(messageId: string) {
-  // Immediately create annotation for single message
-  emit('annotate-message', messageId)
-}
-
-function enterAnnotationMode(messageId: string) {
-  // Enter multi-select mode
-  selectedMessageIds.value = new Set([messageId])
-  selectionMode.value = true
-  emit('selection-mode-changed', true)
-}
-
-function exitSelectionMode() {
-  selectionMode.value = false
-  selectedMessageIds.value.clear()
-  pendingSelection.value = null
-  emit('selection-mode-changed', false)
-}
-
 function hasAnnotation(messageId: string): boolean {
   return props.annotatedMessageIds.has(messageId)
 }
 
-function proceedToAnnotation() {
-  const messageIds = Array.from(selectedMessageIds.value)
-  
-  // Sort by order in conversation
-  const sortedMessages = messageIds
-    .map(id => props.messages.find(m => m.id === id))
-    .filter(m => m)
-    .sort((a, b) => a!.order - b!.order)
-  
-  if (sortedMessages.length === 0) return
-  
-  // Create annotation for first message (or range if multiple selected)
-  // For now, just emit first message - parent component will handle spanning logic
-  emit('annotate-message', sortedMessages[0]!.id)
-  
-  // Exit selection mode
-  selectionMode.value = false
-  selectedMessageIds.value.clear()
-  pendingSelection.value = null
-  emit('selection-mode-changed', false)
+function onTextSelected(messageId: string, text: string, start: number, end: number) {
+  emit('text-selected', messageId, text, start, end)
+}
+
+function onAddTagToMessage(messageId: string) {
+  emit('add-tag-to-message', messageId)
+}
+
+function onAddCommentToMessage(messageId: string) {
+  emit('add-comment-to-message', messageId)
+}
+
+function onCopyMessage(messageId: string) {
+  emit('copy-message', messageId)
 }
 </script>
 
