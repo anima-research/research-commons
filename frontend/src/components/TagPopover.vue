@@ -1,86 +1,79 @@
 <template>
-  <div 
+  <div
     v-if="show"
-    class="absolute z-50 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 transition-colors"
+    class="fixed z-50 w-56 bg-gray-800/95 backdrop-blur-xl rounded-lg shadow-2xl border border-gray-700/50"
     :style="{ left: `${position.x}px`, top: `${position.y}px` }"
     @click.stop
   >
     <!-- Search Input -->
-    <div class="p-3 border-b border-gray-200 dark:border-gray-700">
+    <div class="flex items-center justify-between px-2 py-1.5 border-b border-gray-700/50">
       <input
         v-model="searchQuery"
         type="text"
         placeholder="Search tags..."
-        class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+        class="w-full px-2 py-1 bg-gray-900 border border-gray-600 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-[11px] text-gray-100 placeholder-gray-500"
         autofocus
       />
+      <button
+        class="ml-2 text-gray-400 hover:text-gray-200 transition-colors"
+        aria-label="Close tag picker"
+        @click="$emit('cancel')"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
 
     <!-- Tag List -->
-    <div class="max-h-96 overflow-y-auto">
+    <div class="max-h-64 overflow-y-auto py-1">
       <div
         v-for="onto in filteredOntologies"
         :key="onto.ontology.id"
-        class="border-b border-gray-100 dark:border-gray-700 last:border-0"
+        class="border-b border-gray-700/70 last:border-0"
       >
         <!-- Ontology Header -->
-        <div class="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 text-xs font-semibold text-gray-700 dark:text-gray-300 transition-colors">
+        <div class="px-2 py-1 bg-gray-900/40 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
           {{ onto.ontology.name }}
         </div>
 
         <!-- Tags -->
-        <div class="p-2 space-y-1">
+        <div class="px-1.5 py-1 flex flex-col gap-1">
           <button
             v-for="tag in onto.tags"
             :key="tag.id"
             @click="toggleTag(tag.id)"
-            class="w-full px-3 py-2 rounded flex items-center justify-between text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            class="w-full px-2.5 py-1.5 rounded flex items-center justify-between text-left hover:bg-gray-700 transition-colors"
             :class="{
-              'bg-indigo-50 dark:bg-indigo-900/20 ring-1 ring-indigo-500': selectedTagIds.has(tag.id)
+              'bg-indigo-50 dark:bg-indigo-900/20 ring-1 ring-indigo-400 dark:ring-indigo-500 text-indigo-700 dark:text-indigo-200': selectedTagIds.has(tag.id),
+              'text-gray-800 dark:text-gray-100': !selectedTagIds.has(tag.id)
             }"
           >
-            <span class="text-sm text-gray-900 dark:text-gray-100">{{ tag.name }}</span>
+            <span class="text-[11px] font-medium">{{ tag.name }}</span>
             <svg 
               v-if="selectedTagIds.has(tag.id)" 
-              class="w-4 h-4 text-indigo-600 dark:text-indigo-400" 
+              class="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300" 
               fill="currentColor" 
               viewBox="0 0 20 20"
             >
               <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
             </svg>
           </button>
-          <div v-if="onto.tags.length === 0" class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 italic">
+          <div v-if="onto.tags.length === 0" class="px-2.5 py-1 text-[11px] text-gray-500 dark:text-gray-400 italic">
             No matching tags
           </div>
         </div>
       </div>
 
-      <div v-if="filteredOntologies.length === 0" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400 text-sm">
+      <div v-if="filteredOntologies.length === 0" class="px-4 py-6 text-center text-gray-500 dark:text-gray-400 text-xs">
         No tags found
       </div>
-    </div>
-
-    <!-- Actions -->
-    <div class="p-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-900/30 rounded-b-lg">
-      <button
-        @click="$emit('cancel')"
-        class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-      >
-        Cancel
-      </button>
-      <button
-        @click="apply"
-        :disabled="selectedTagIds.size === 0"
-        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed"
-      >
-        Apply {{ selectedTagIds.size > 0 ? `(${selectedTagIds.size})` : '' }}
-      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 interface Tag {
   id: string
@@ -111,12 +104,13 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  'apply': [tagIds: string[]]
+  'tag-toggled': [tagId: string, isSelected: boolean]
   'cancel': []
 }>()
 
 const searchQuery = ref('')
 const selectedTagIds = ref<Set<string>>(new Set(props.existingTagIds))
+const syncing = ref(false)
 
 // Filter tags based on search query
 const filteredOntologies = computed(() => {
@@ -137,15 +131,45 @@ const filteredOntologies = computed(() => {
 })
 
 function toggleTag(tagId: string) {
-  if (selectedTagIds.value.has(tagId)) {
-    selectedTagIds.value.delete(tagId)
+  const isSelected = selectedTagIds.value.has(tagId)
+  
+  // Create a new Set to trigger reactivity
+  const newSet = new Set(selectedTagIds.value)
+  if (isSelected) {
+    newSet.delete(tagId)
   } else {
-    selectedTagIds.value.add(tagId)
+    newSet.add(tagId)
   }
+  selectedTagIds.value = newSet
+  
+  syncing.value = true
+  emit('tag-toggled', tagId, !isSelected)
 }
 
-function apply() {
-  emit('apply', Array.from(selectedTagIds.value))
-}
+watch(
+  () => props.existingTagIds,
+  (ids) => {
+    const incoming = new Set(ids)
+    const differs =
+      incoming.size !== selectedTagIds.value.size ||
+      ids.some(id => !selectedTagIds.value.has(id))
+
+    if (!syncing.value || differs) {
+      selectedTagIds.value = incoming
+    }
+    if (syncing.value) {
+      syncing.value = false
+    }
+  }
+)
+
+watch(
+  () => props.show,
+  (visible) => {
+    if (visible) {
+      searchQuery.value = ''
+      selectedTagIds.value = new Set(props.existingTagIds)
+    }
+  }
+)
 </script>
-
