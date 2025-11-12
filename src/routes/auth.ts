@@ -11,15 +11,33 @@ export function createAuthRoutes(context: AppContext): Router {
     try {
       const { email, password, name } = RegisterUserRequestSchema.parse(req.body);
 
+      // Check if this is the first user
+      const allUsers = await context.userStore.getAllUsers();
+      const isFirstUser = allUsers.length === 0;
+
       const user = await context.userStore.createUser(email, password, name);
-      const token = generateToken(user);
+      
+      // Make first user admin and researcher automatically
+      if (isFirstUser) {
+        await context.userStore.addUserRole(user.id, 'admin');
+        await context.userStore.addUserRole(user.id, 'researcher');
+        // Refresh user object to include new roles
+        const updatedUser = await context.userStore.getUserById(user.id);
+        if (updatedUser) {
+          console.log(`✅ First user registered as admin: ${updatedUser.email}`);
+        }
+      }
+      
+      // Get the latest user object with all roles
+      const finalUser = await context.userStore.getUserById(user.id) || user;
+      const token = generateToken(finalUser);
 
       res.status(201).json({
         user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          roles: user.roles
+          id: finalUser.id,
+          email: finalUser.email,
+          name: finalUser.name,
+          roles: finalUser.roles
         },
         token
       });

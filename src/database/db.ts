@@ -67,7 +67,7 @@ export class AnnotationDatabase {
 
   getSelectionsBySubmission(submissionId: string): Selection[] {
     const rows = this.db.prepare('SELECT * FROM selections WHERE submission_id = ? ORDER BY created_at').all(submissionId);
-    return rows.map(row => {
+    return rows.map((row: any) => {
       const selection = this.rowToSelection(row);
       // Populate annotation_tags from selection_tags table
       const tagRows = this.db.prepare('SELECT DISTINCT tag_id FROM selection_tags WHERE selection_id = ?').all(row.id);
@@ -78,7 +78,7 @@ export class AnnotationDatabase {
 
   getSelectionsByUser(userId: string): Selection[] {
     const rows = this.db.prepare('SELECT * FROM selections WHERE created_by = ? ORDER BY created_at DESC').all(userId);
-    return rows.map(row => {
+    return rows.map((row: any) => {
       const selection = this.rowToSelection(row);
       // Populate annotation_tags from selection_tags table
       const tagRows = this.db.prepare('SELECT DISTINCT tag_id FROM selection_tags WHERE selection_id = ?').all(row.id);
