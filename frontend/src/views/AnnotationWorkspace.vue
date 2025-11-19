@@ -513,14 +513,25 @@ function abbreviate(name: string): string {
 async function loadData() {
   loading.value = true
   try {
-    // Load basic submission data
+    // Load submission metadata FIRST (lightweight, fast) to check for pinned message
     submission.value = await submissionsStore.fetchSubmission(submissionId)
-    messages.value = await submissionsStore.fetchMessages(submissionId)
-    selections.value = await submissionsStore.fetchSelections(submissionId)
     
-    // Load available topics for selector
-    const topicsResponse = await researchAPI.getTopics()
-    availableTopics.value = topicsResponse.data.topics
+    // Check for pinned message and show overlay immediately
+    pinnedMessageId.value = (submission.value.metadata as any)?.pinned_message_id || null
+    if (pinnedMessageId.value) {
+      loadingPinnedMessage.value = true
+    }
+    
+    // Now load messages and other data in parallel
+    const [messagesData, selectionsData, topicsData] = await Promise.all([
+      submissionsStore.fetchMessages(submissionId),
+      submissionsStore.fetchSelections(submissionId),
+      researchAPI.getTopics()
+    ])
+    
+    messages.value = messagesData
+    selections.value = selectionsData
+    availableTopics.value = topicsData.data.topics
     
     // Build user names map - collect all user IDs from all sources
     userNames.value.clear()
@@ -656,13 +667,6 @@ async function loadData() {
     
     // TODO: Load submission-level comments
     submissionComments.value = []
-    // Load pinned message ID from submission metadata
-    pinnedMessageId.value = (submission.value.metadata as any)?.pinned_message_id || null
-    
-    // If there's a pinned message, show loading overlay
-    if (pinnedMessageId.value) {
-      loadingPinnedMessage.value = true
-    }
     
     // Load hidden messages (for researchers/admins)
     console.log('[AnnotationWorkspace] Current user roles:', authStore.user?.roles)
