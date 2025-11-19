@@ -67,7 +67,11 @@ export function createSubmissionRoutes(context: AppContext): Router {
   // Create submission
   router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      console.log('[Submissions POST] Received request body:', JSON.stringify(req.body, null, 2));
+      console.log('[Submissions POST] User ID:', req.userId);
+      
       const data = CreateSubmissionRequestSchema.parse(req.body);
+      console.log('[Submissions POST] Validation passed');
       
       const tempSubmissionId = uuidv4();
       
@@ -137,12 +141,22 @@ export function createSubmissionRoutes(context: AppContext): Router {
 
       res.status(201).json(submission);
     } catch (error: any) {
+      console.error('[Submissions POST] Error occurred:', error);
+      console.error('[Submissions POST] Error name:', error.name);
+      console.error('[Submissions POST] Error message:', error.message);
+      
       if (error.name === 'ZodError') {
-        res.status(400).json({ error: 'Invalid request', details: error.errors });
+        console.error('[Submissions POST] Zod validation errors:', JSON.stringify(error.errors, null, 2));
+        res.status(400).json({ 
+          error: 'Invalid request', 
+          details: error.errors,
+          message: 'Validation failed - check details for specific field errors'
+        });
       } else if (error.message.includes('tree')) {
+        console.error('[Submissions POST] Tree validation error');
         res.status(400).json({ error: error.message });
       } else {
-        console.error('Submission creation error:', error);
+        console.error('[Submissions POST] Unexpected error:', error.stack);
         res.status(500).json({ error: 'Internal server error' });
       }
     }
