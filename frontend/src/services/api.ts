@@ -66,7 +66,16 @@ export const submissionsAPI = {
     api.delete<{ reactions: Array<{ user_id: string; reaction_type: string }> }>(`/submissions/${submissionId}/messages/${messageId}/reactions/${reactionType}`),
   
   getReactions: (submissionId: string, messageId: string) =>
-    api.get<{ reactions: Array<{ user_id: string; reaction_type: string; created_at: string }> }>(`/submissions/${submissionId}/messages/${messageId}/reactions`)
+    api.get<{ reactions: Array<{ user_id: string; reaction_type: string; created_at: string }> }>(`/submissions/${submissionId}/messages/${messageId}/reactions`),
+  
+  hideMessage: (submissionId: string, messageId: string, reason?: string) =>
+    api.post<{ success: boolean }>(`/submissions/${submissionId}/messages/${messageId}/hide`, { reason }),
+  
+  unhideMessage: (submissionId: string, messageId: string) =>
+    api.delete<{ success: boolean }>(`/submissions/${submissionId}/messages/${messageId}/hide`),
+  
+  getHiddenMessages: (submissionId: string) =>
+    api.get<{ hidden_message_ids: string[] }>(`/submissions/${submissionId}/hidden-messages`)
 }
 
 export const annotationsAPI = {

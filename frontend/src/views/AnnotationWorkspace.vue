@@ -150,16 +150,18 @@
             v-if="messages.length > 0"
             :messages="messages"
             :annotated-message-ids="annotatedMessageIds"
-            :inline-annotations="isMobile ? inlineAnnotations : new Map()"
+            :inline-annotations="new Map()"
             :user-names="userNames"
             :current-user-id="authStore.user?.id"
             :can-moderate="canModerate"
             :pinned-message-id="pinnedMessageId"
+            :hidden-message-ids="hiddenMessageIds"
             :message-reactions="messageReactions"
             @add-tag-to-message="handleAddTagToMessage"
             @add-comment-to-message="handleAddCommentToMessage"
             @copy-message="handleCopyMessage"
             @toggle-pin="handleTogglePin"
+            @toggle-hide="handleToggleHide"
             @toggle-reaction="handleToggleReaction"
             @text-selected="handleTextSelected"
             @add-tag="handleAddTag"
@@ -398,6 +400,7 @@ const submission = ref()
 const messages = ref<Message[]>([])
 const selections = ref<Selection[]>([])
 const pinnedMessageId = ref<string | null>(null)
+const hiddenMessageIds = ref<Set<string>>(new Set())
 const messageReactions = ref<Map<string, Array<{ user_id: string; reaction_type: string }>>>(new Map())
 const selectionData = ref<Map<string, {
   comments: Comment[]
@@ -661,6 +664,20 @@ async function loadData() {
       loadingPinnedMessage.value = true
     }
     
+    // Load hidden messages (for researchers/admins)
+    console.log('[AnnotationWorkspace] Current user roles:', authStore.user?.roles)
+    if (authStore.user?.roles.includes('researcher') || authStore.user?.roles.includes('admin')) {
+      try {
+        console.log('[AnnotationWorkspace] Loading hidden messages...')
+        const hiddenResponse = await submissionsAPI.getHiddenMessages(submissionId)
+        console.log('[AnnotationWorkspace] Hidden messages response:', hiddenResponse.data)
+        hiddenMessageIds.value = new Set(hiddenResponse.data.hidden_message_ids)
+        console.log('[AnnotationWorkspace] Hidden message IDs set:', Array.from(hiddenMessageIds.value))
+      } catch (err) {
+        console.error('Failed to load hidden messages:', err)
+      }
+    }
+    
     // Load reactions for all messages
     messageReactions.value.clear()
     for (const msg of messages.value) {
@@ -803,6 +820,26 @@ async function handleTogglePin(messageId: string) {
     submission.value = await submissionsStore.fetchSubmission(submissionId)
   } catch (err) {
     console.error('Failed to toggle pin:', err)
+  }
+}
+
+async function handleToggleHide(messageId: string) {
+  try {
+    // If message is hidden, unhide it
+    if (hiddenMessageIds.value.has(messageId)) {
+      console.log('[AnnotationWorkspace] Unhiding message:', messageId)
+      await submissionsAPI.unhideMessage(submissionId, messageId)
+      hiddenMessageIds.value.delete(messageId)
+      console.log('[AnnotationWorkspace] Message unhidden, current hidden IDs:', Array.from(hiddenMessageIds.value))
+    } else {
+      // Hide this message
+      console.log('[AnnotationWorkspace] Hiding message:', messageId)
+      await submissionsAPI.hideMessage(submissionId, messageId)
+      hiddenMessageIds.value.add(messageId)
+      console.log('[AnnotationWorkspace] Message hidden, current hidden IDs:', Array.from(hiddenMessageIds.value))
+    }
+  } catch (err) {
+    console.error('Failed to toggle hide:', err)
   }
 }
 
@@ -1396,28 +1433,7 @@ const marginAnnotations = computed<MarginAnnotation[]>(() => {
 })
 
 // Build inline annotations for mobile (grouped by message)
-const inlineAnnotations = computed(() => {
-  const annotationsByMessage = new Map<string, any[]>()
-  
-  for (const sel of selections.value) {
-    const data = selectionData.value.get(sel.id)
-    if (!data) continue
-    
-    const messageId = sel.start_message_id
-    if (!annotationsByMessage.has(messageId)) {
-      annotationsByMessage.set(messageId, [])
-    }
-    
-    annotationsByMessage.get(messageId)!.push({
-      selection: sel,
-      tags: data.tags,
-      comments: data.comments,
-      tagAttributions: sel.tag_attributions || []
-    })
-  }
-  
-  return annotationsByMessage
-})
+// Removed inlineAnnotations - now using margin annotations on all screen sizes
 
 // Annotations are now created directly, no form needed
 

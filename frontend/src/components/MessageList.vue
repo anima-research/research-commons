@@ -7,6 +7,8 @@
           :message="msg"
           :has-annotation="hasAnnotation(msg.id)"
           :is-pinned="pinnedMessageId === msg.id"
+          :is-hidden="hiddenMessageIds.has(msg.id)"
+          :can-hide-message="canModerate"
           :reactions="messageReactions.get(msg.id)"
           :current-user-id="currentUserId"
           @text-selected="onTextSelected"
@@ -14,32 +16,9 @@
           @add-comment-to-message="onAddCommentToMessage"
           @copy-message="onCopyMessage"
           @toggle-pin="onTogglePin"
+          @toggle-hide="onToggleHide"
           @toggle-reaction="onToggleReaction"
         />
-        
-        <!-- Inline annotations (mobile only) -->
-        <div v-if="inlineAnnotations.has(msg.id)" class="ml-12 space-y-2">
-          <SelectionCard
-            v-for="(annotation, idx) in inlineAnnotations.get(msg.id)"
-            :key="annotation.selection.id"
-            :selection="annotation.selection"
-            :tags="annotation.tags"
-            :comments="annotation.comments"
-            :tag-attributions="annotation.tagAttributions || []"
-            :created-by="getUserName(annotation.selection.created_by)"
-            :user-names="userNames"
-            :current-user-id="currentUserId"
-            :can-delete="canModerate || annotation.selection.created_by === currentUserId"
-            :can-delete-comments="canModerate"
-            :can-remove-tags="canModerate"
-            @add-tag="$emit('add-tag', annotation.selection.id)"
-            @add-tag-vote="$emit('add-tag-vote', annotation.selection.id, $event)"
-            @add-comment="$emit('add-comment', annotation.selection.id)"
-            @delete="$emit('delete-selection', annotation.selection.id)"
-            @delete-comment="$emit('delete-comment', $event)"
-            @remove-tag="$emit('remove-tag', annotation.selection.id, $event)"
-          />
-        </div>
       </template>
     </div>
   </div>
@@ -48,26 +27,25 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import Message from './Message.vue'
-import SelectionCard from './SelectionCard.vue'
 import type { Message as MessageType } from '@/types'
 
 interface Props {
   messages: MessageType[]
   annotatedMessageIds?: Set<string>
-  inlineAnnotations?: Map<string, any[]>
   userNames?: Map<string, string>
   currentUserId?: string
   canModerate?: boolean
   pinnedMessageId?: string | null
+  hiddenMessageIds?: Set<string>
   messageReactions?: Map<string, Array<{ user_id: string; reaction_type: string }>>
 }
 
 const props = withDefaults(defineProps<Props>(), {
   annotatedMessageIds: () => new Set(),
-  inlineAnnotations: () => new Map(),
   userNames: () => new Map(),
   canModerate: false,
   pinnedMessageId: null,
+  hiddenMessageIds: () => new Set(),
   messageReactions: () => new Map()
 })
 
@@ -76,6 +54,7 @@ const emit = defineEmits<{
   'add-comment-to-message': [messageId: string]
   'copy-message': [messageId: string]
   'toggle-pin': [messageId: string]
+  'toggle-hide': [messageId: string]
   'toggle-reaction': [messageId: string, reactionType: 'star' | 'laugh' | 'sparkles']
   'text-selected': [messageId: string, text: string, start: number, end: number]
   'add-tag': [selectionId: string]
@@ -112,6 +91,10 @@ function onCopyMessage(messageId: string) {
 
 function onTogglePin(messageId: string) {
   emit('toggle-pin', messageId)
+}
+
+function onToggleHide(messageId: string) {
+  emit('toggle-hide', messageId)
 }
 
 function onToggleReaction(messageId: string, reactionType: 'star' | 'laugh' | 'sparkles') {

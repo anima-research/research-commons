@@ -13,14 +13,22 @@
     <div 
       class="message-card group relative transition-all"
       :class="{
-        'bg-indigo-500/10 border-indigo-500/20': isUser && !hasReactions,
-        'bg-indigo-500/15 border-indigo-400 border-2': isUser && hasReactions,
-        'bg-gray-800/40 border-gray-700/40': !isUser && !hasReactions,
-        'bg-gray-800/60 border-gray-500 border-2': !isUser && hasReactions,
-        'ring-2 ring-indigo-400/50': hasAnnotation
+        'bg-indigo-500/10 border-indigo-500/20': isUser && !hasReactions && !isHidden,
+        'bg-indigo-500/15 border-indigo-400 border-2': isUser && hasReactions && !isHidden,
+        'bg-gray-800/40 border-gray-700/40': !isUser && !hasReactions && !isHidden,
+        'bg-gray-800/60 border-gray-500 border-2': !isUser && hasReactions && !isHidden,
+        'bg-red-900/20 border-red-600/50 border-2': isHidden,
+        'ring-2 ring-indigo-400/50': hasAnnotation && !isHidden
       }"
       :style="{ maxWidth: isMobile ? '95%' : '80%' }"
     >
+      <!-- Hidden badge (for researchers/admins) -->
+      <div v-if="isHidden" class="absolute -top-2 -left-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+        </svg>
+        Hidden
+      </div>
       <!-- Participant header -->
       <div class="flex items-center gap-2 mb-2">
         
@@ -77,12 +85,27 @@
 
       <!-- Content -->
       <div 
-        class="message-text text-gray-200 leading-relaxed"
+        class="message-text text-gray-200 leading-relaxed relative"
         @mouseup="onTextSelect"
         ref="contentEl"
       >
         <template v-for="(block, idx) in message.content_blocks" :key="idx">
-          <div v-if="block.type === 'text'" v-html="renderMarkdown(block.text || '')" class="prose prose-invert prose-sm max-w-none" />
+          <!-- Check if this is a redacted message (block characters) -->
+          <div v-if="block.type === 'text' && block.text?.includes('▓')" class="relative">
+            <div class="text-gray-500 select-none font-mono" style="filter: blur(1.5px); letter-spacing: 0.05em; line-height: 1.6;">
+              {{ block.text }}
+            </div>
+            <!-- Centered overlay caption -->
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div class="bg-gray-900/90 backdrop-blur-sm px-4 py-2 rounded-lg border border-gray-700/50 flex items-center gap-2">
+                <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
+                <span class="text-sm text-gray-300 font-medium">Content hidden</span>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="block.type === 'text'" v-html="renderMarkdown(block.text || '')" class="prose prose-invert prose-sm max-w-none" />
           <div v-else-if="block.type === 'thinking'" class="mt-3 p-3 bg-gray-900/50 border border-gray-700/50 rounded text-xs">
             <div class="text-gray-500 mb-1 uppercase tracking-wide">Thinking</div>
             <div class="text-gray-400" v-html="renderMarkdown(block.thinking?.content || '')" />
@@ -146,6 +169,20 @@
                 <path v-else d="M16 12V4h1a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h1v8l-4.5 4.5A1 1 0 0 0 3 16v2a1 1 0 0 0 1 1h6v5l1 1 1-1v-5h6a1 1 0 0 0 1-1v-2a1 1 0 0 0-.5-.87L16 12z" fill-opacity="0.4" />
               </svg>
             </button>
+            <div v-if="canHideMessage" class="w-px h-4 bg-gray-700" />
+            <button 
+              v-if="canHideMessage"
+              @click="toggleHide"
+              class="px-2 py-1 text-xs transition-colors"
+              :class="isHidden ? 'text-red-400 hover:text-red-300' : 'text-gray-500 hover:text-gray-400'"
+              :title="isHidden ? 'Unhide message (visible to all)' : 'Hide message (visible only to researchers)'"
+            >
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path v-if="isHidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path v-if="isHidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+              </svg>
+            </button>
           </div>
           
           <!-- Row 2: Reactions -->
@@ -183,6 +220,8 @@ interface Props {
   selectionMode?: boolean
   isSelected?: boolean
   isPinned?: boolean
+  isHidden?: boolean
+  canHideMessage?: boolean
   reactions?: Array<{ user_id: string; reaction_type: string }>
   currentUserId?: string
 }
@@ -192,6 +231,8 @@ const props = withDefaults(defineProps<Props>(), {
   hasBranches: false,
   branchIndex: 0,
   isPinned: false,
+  isHidden: false,
+  canHideMessage: false,
   branchCount: 1,
   selectionMode: false,
   isSelected: false,
@@ -205,6 +246,7 @@ const emit = defineEmits<{
   'add-comment-to-message': [messageId: string]
   'copy-message': [messageId: string]
   'toggle-pin': [messageId: string]
+  'toggle-hide': [messageId: string]
   'toggle-reaction': [messageId: string, reactionType: 'star' | 'laugh' | 'sparkles']
   'prev-branch': []
   'next-branch': []
@@ -372,6 +414,11 @@ function copyMessage() {
 function togglePin() {
   actionsExpanded.value = false
   emit('toggle-pin', props.message.id)
+}
+
+function toggleHide() {
+  actionsExpanded.value = false
+  emit('toggle-hide', props.message.id)
 }
 
 // Reaction helpers

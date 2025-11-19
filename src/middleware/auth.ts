@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../types/research.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production';
+export const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production';
 
 export interface AuthRequest extends Request {
   user?: User;

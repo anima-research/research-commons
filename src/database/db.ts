@@ -429,6 +429,45 @@ export class AnnotationDatabase {
     return new Map();
   }
 
+  // Hidden message methods
+  hideMessage(messageId: string, submissionId: string, hiddenBy: string, reason?: string): void {
+    console.log('[DB] Hiding message:', messageId, 'in submission:', submissionId, 'by:', hiddenBy);
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO hidden_messages (message_id, submission_id, hidden_by, hidden_at, reason)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    stmt.run(messageId, submissionId, hiddenBy, new Date().toISOString(), reason || null);
+    console.log('[DB] Message hidden successfully');
+    
+    // Verify it was saved
+    const verify = this.db.prepare('SELECT * FROM hidden_messages WHERE message_id = ?').get(messageId);
+    console.log('[DB] Verification - row exists:', verify);
+  }
+
+  unhideMessage(messageId: string): void {
+    const stmt = this.db.prepare(`
+      DELETE FROM hidden_messages WHERE message_id = ?
+    `);
+    stmt.run(messageId);
+  }
+
+  isMessageHidden(messageId: string): boolean {
+    const stmt = this.db.prepare(`
+      SELECT 1 FROM hidden_messages WHERE message_id = ? LIMIT 1
+    `);
+    const result = stmt.get(messageId);
+    return !!result;
+  }
+
+  getHiddenMessagesBySubmission(submissionId: string): string[] {
+    const stmt = this.db.prepare(`
+      SELECT message_id FROM hidden_messages WHERE submission_id = ?
+    `);
+    const rows = stmt.all(submissionId) as Array<{ message_id: string }>;
+    console.log('[DB] getHiddenMessagesBySubmission for', submissionId, ':', rows);
+    return rows.map(r => r.message_id);
+  }
+
   close(): void {
     this.db.close();
   }

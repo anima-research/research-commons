@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import jwt from 'jsonwebtoken';
 import { AppContext } from '../index.js';
-import { authenticateToken, AuthRequest } from '../middleware/auth.js';
+import { authenticateToken, AuthRequest, JWT_SECRET } from '../middleware/auth.js';
 import { CreateSubmissionRequestSchema, Message } from '../types/submission.js';
 
 export function createSubmissionRoutes(context: AppContext): Router {
@@ -338,10 +339,29 @@ export function createSubmissionRoutes(context: AppContext): Router {
     }
   });
 
-  // Get submission messages
+  // Get hidden messages for a submission (researchers/admins only)
+  router.get('/:submissionId/hidden-messages', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const user = await context.userStore.getUserById(req.userId!);
+      const isResearcherOrAdmin = user?.roles.includes('researcher') || user?.roles.includes('admin');
+      
+      if (!isResearcherOrAdmin) {
+        res.status(403).json({ error: 'Only researchers and admins can view hidden messages' });
+        return;
+      }
+      
+      const hiddenMessageIds = context.annotationDb.getHiddenMessagesBySubmission(req.params.submissionId);
+      res.json({ hidden_message_ids: hiddenMessageIds });
+    } catch (error) {
+      console.error('Get hidden messages error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Get submission messages (supports both authenticated and anonymous access)
   router.get('/:submissionId/messages', async (req, res) => {
     try {
-      const messages = await context.submissionStore.getMessages(req.params.submissionId);
+      let messages = await context.submissionStore.getMessages(req.params.submissionId);
       
       if (messages.length === 0) {
         // Check if submission exists
@@ -352,9 +372,151 @@ export function createSubmissionRoutes(context: AppContext): Router {
         }
       }
 
+      // Filter hidden messages for non-researchers
+      // Try to get user from token if present (optional auth)
+      const authHeader = req.headers.authorization;
+      let userRoles: string[] = [];
+      let userId: string | undefined;
+      
+      console.log('[GET messages] Auth header present:', !!authHeader);
+      console.log('[GET messages] Auth header value:', authHeader?.substring(0, 20) + '...');
+      
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET) as any;
+          console.log('[GET messages] Full decoded token:', JSON.stringify(decoded, null, 2));
+          userRoles = decoded.roles || [];
+          userId = decoded.userId;
+          console.log('[GET messages] Extracted - userId:', userId, 'roles:', userRoles);
+        } catch (err: any) {
+          console.log('[GET messages] Token decode failed:', err.message);
+          // Invalid/expired token - treat as guest
+        }
+      } else {
+        console.log('[GET messages] No Bearer token in auth header');
+      }
+      
+      console.log('[GET messages] Final user roles:', userRoles);
+      
+      // Redact hidden messages for non-researchers (don't remove them entirely)
+      const isResearcherOrAdmin = userRoles.includes('researcher') || userRoles.includes('admin');
+      const hiddenMessageIds = new Set(context.annotationDb.getHiddenMessagesBySubmission(req.params.submissionId));
+      
+      console.log('[GET messages] Hidden message IDs:', Array.from(hiddenMessageIds));
+      console.log('[GET messages] Is researcher/admin:', isResearcherOrAdmin);
+      
+      if (!isResearcherOrAdmin && hiddenMessageIds.size > 0) {
+        // Replace content of hidden messages with block characters
+        messages = messages.map(msg => {
+          if (hiddenMessageIds.has(msg.id)) {
+            // Count total characters in all text blocks
+            const totalChars = msg.content_blocks
+              .filter(b => b.type === 'text')
+              .reduce((sum, b) => sum + (b.text?.length || 0), 0);
+            
+            // Generate block text with realistic word patterns
+            let blockedText = '';
+            let currentWordLength = 0;
+            const maxWordLength = 12; // Cap word length
+            
+            for (let i = 0; i < totalChars; i++) {
+              // Create spaces at word boundaries or randomly (30% chance)
+              const shouldSpace = currentWordLength >= maxWordLength || 
+                                  (currentWordLength > 2 && Math.random() < 0.30);
+              
+              if (shouldSpace) {
+                blockedText += ' ';
+                currentWordLength = 0;
+              } else {
+                blockedText += '▓'; // Medium shade block (darker than █)
+                currentWordLength++;
+              }
+            }
+            
+            // Replace with redacted content
+            return {
+              ...msg,
+              content_blocks: [{
+                type: 'text' as const,
+                text: blockedText
+              }],
+              _isHidden: true
+            };
+          }
+          return msg;
+        });
+        console.log('[GET messages] Redacted', hiddenMessageIds.size, 'messages');
+      }
+
       res.json({ messages });
     } catch (error) {
       console.error('Get messages error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Hide a message (admin or owner only)
+  router.post('/:submissionId/messages/:messageId/hide', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      console.log('[POST hide] Hiding message:', req.params.messageId, 'in submission:', req.params.submissionId);
+      
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Check if user is admin or submission owner
+      const user = await context.userStore.getUserById(req.userId!);
+      const isAdmin = user?.roles.includes('admin');
+      const isOwner = submission.submitter_id === req.userId;
+      
+      console.log('[POST hide] User:', req.userId, 'isAdmin:', isAdmin, 'isOwner:', isOwner);
+      
+      if (!isAdmin && !isOwner) {
+        res.status(403).json({ error: 'Only admins and submission owners can hide messages' });
+        return;
+      }
+
+      const { reason } = req.body;
+      context.annotationDb.hideMessage(req.params.messageId, req.params.submissionId, req.userId!, reason);
+      
+      console.log('[POST hide] Message hidden successfully');
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Hide message error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Unhide a message (admin or owner only)
+  router.delete('/:submissionId/messages/:messageId/hide', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Check if user is admin or submission owner
+      const user = await context.userStore.getUserById(req.userId!);
+      const isAdmin = user?.roles.includes('admin');
+      const isOwner = submission.submitter_id === req.userId;
+      
+      if (!isAdmin && !isOwner) {
+        res.status(403).json({ error: 'Only admins and submission owners can unhide messages' });
+        return;
+      }
+
+      context.annotationDb.unhideMessage(req.params.messageId);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Unhide message error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   });

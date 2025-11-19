@@ -102,3 +102,14 @@ CREATE TABLE IF NOT EXISTS message_reactions (
 CREATE INDEX IF NOT EXISTS idx_message_reactions_message ON message_reactions(message_id);
 CREATE INDEX IF NOT EXISTS idx_message_reactions_user ON message_reactions(user_id);
 
+-- Hidden messages: Messages hidden from non-researchers by admins/owners
+CREATE TABLE IF NOT EXISTS hidden_messages (
+  message_id TEXT PRIMARY KEY,
+  submission_id TEXT NOT NULL,
+  hidden_by TEXT NOT NULL,
+  hidden_at TEXT NOT NULL,
+  reason TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_hidden_messages_submission ON hidden_messages(submission_id);
+
