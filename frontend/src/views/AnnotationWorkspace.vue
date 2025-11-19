@@ -143,10 +143,12 @@
             :current-user-id="authStore.user?.id"
             :can-moderate="canModerate"
             :pinned-message-id="pinnedMessageId"
+            :message-reactions="messageReactions"
             @add-tag-to-message="handleAddTagToMessage"
             @add-comment-to-message="handleAddCommentToMessage"
             @copy-message="handleCopyMessage"
             @toggle-pin="handleTogglePin"
+            @toggle-reaction="handleToggleReaction"
             @text-selected="handleTextSelected"
             @add-tag="handleAddTag"
             @add-tag-vote="handleAddTagVote"
@@ -383,6 +385,7 @@ const submission = ref()
 const messages = ref<Message[]>([])
 const selections = ref<Selection[]>([])
 const pinnedMessageId = ref<string | null>(null)
+const messageReactions = ref<Map<string, Array<{ user_id: string; reaction_type: string }>>>(new Map())
 const selectionData = ref<Map<string, {
   comments: Comment[]
   tags: any[]
@@ -640,6 +643,19 @@ async function loadData() {
     // Load pinned message ID from submission metadata
     pinnedMessageId.value = (submission.value.metadata as any)?.pinned_message_id || null
     
+    // Load reactions for all messages
+    messageReactions.value.clear()
+    for (const msg of messages.value) {
+      try {
+        const reactionResponse = await submissionsAPI.getReactions(submissionId, msg.id)
+        if (reactionResponse.data.reactions.length > 0) {
+          messageReactions.value.set(msg.id, reactionResponse.data.reactions)
+        }
+      } catch (err) {
+        console.error('Failed to load reactions for message:', msg.id, err)
+      }
+    }
+    
     // Auto-scroll to pinned message after next tick (once DOM is ready)
     if (pinnedMessageId.value) {
       nextTick(() => {
@@ -792,6 +808,34 @@ function scrollToPinnedMessage() {
     setTimeout(() => {
       messageEl.classList.remove('ring-2', 'ring-amber-400')
     }, 2000)
+  }
+}
+
+async function handleToggleReaction(messageId: string, reactionType: 'star' | 'laugh' | 'sparkles') {
+  try {
+    const currentUserId = authStore.user?.id
+    if (!currentUserId) return
+    
+    const reactions = messageReactions.value.get(messageId) || []
+    const hasReacted = reactions.some(r => r.user_id === currentUserId && r.reaction_type === reactionType)
+    
+    if (hasReacted) {
+      // Remove reaction
+      await submissionsAPI.removeReaction(submissionId, messageId, reactionType)
+    } else {
+      // Add reaction
+      await submissionsAPI.addReaction(submissionId, messageId, reactionType)
+    }
+    
+    // Reload reactions for this message
+    const reactionResponse = await submissionsAPI.getReactions(submissionId, messageId)
+    if (reactionResponse.data.reactions.length > 0) {
+      messageReactions.value.set(messageId, reactionResponse.data.reactions)
+    } else {
+      messageReactions.value.delete(messageId)
+    }
+  } catch (err) {
+    console.error('Failed to toggle reaction:', err)
   }
 }
 

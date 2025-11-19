@@ -287,6 +287,57 @@ export function createSubmissionRoutes(context: AppContext): Router {
     }
   });
 
+  // Add reaction to message
+  router.post('/:submissionId/messages/:messageId/reactions/:reactionType', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { messageId, reactionType } = req.params;
+      
+      if (!['star', 'laugh', 'sparkles'].includes(reactionType)) {
+        res.status(400).json({ error: 'Invalid reaction type' });
+        return;
+      }
+      
+      context.annotationDb.addReaction(messageId, req.userId!, reactionType as 'star' | 'laugh' | 'sparkles');
+      
+      const reactions = context.annotationDb.getReactionsByMessage(messageId);
+      res.json({ reactions });
+    } catch (error) {
+      console.error('Add reaction error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Remove reaction from message
+  router.delete('/:submissionId/messages/:messageId/reactions/:reactionType', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { messageId, reactionType } = req.params;
+      
+      if (!['star', 'laugh', 'sparkles'].includes(reactionType)) {
+        res.status(400).json({ error: 'Invalid reaction type' });
+        return;
+      }
+      
+      context.annotationDb.removeReaction(messageId, req.userId!, reactionType as 'star' | 'laugh' | 'sparkles');
+      
+      const reactions = context.annotationDb.getReactionsByMessage(messageId);
+      res.json({ reactions });
+    } catch (error) {
+      console.error('Remove reaction error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Get reactions for a message
+  router.get('/:submissionId/messages/:messageId/reactions', async (req, res) => {
+    try {
+      const reactions = context.annotationDb.getReactionsByMessage(req.params.messageId);
+      res.json({ reactions });
+    } catch (error) {
+      console.error('Get reactions error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // Get submission messages
   router.get('/:submissionId/messages', async (req, res) => {
     try {

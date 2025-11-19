@@ -90,3 +90,15 @@ CREATE TABLE IF NOT EXISTS submission_ranking_systems (
 CREATE INDEX IF NOT EXISTS idx_sub_ranking_systems_submission ON submission_ranking_systems(submission_id);
 CREATE INDEX IF NOT EXISTS idx_sub_ranking_systems_ranking ON submission_ranking_systems(ranking_system_id);
 
+-- Message reactions: Quick reactions to messages
+CREATE TABLE IF NOT EXISTS message_reactions (
+  message_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  reaction_type TEXT NOT NULL CHECK(reaction_type IN ('star', 'laugh', 'sparkles')),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (message_id, user_id, reaction_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_message_reactions_message ON message_reactions(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_reactions_user ON message_reactions(user_id);
+

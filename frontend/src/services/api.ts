@@ -57,7 +57,16 @@ export const submissionsAPI = {
     api.post<Submission>(`/submissions/${submissionId}/pin/${messageId}`),
   
   unpinMessage: (submissionId: string) =>
-    api.delete<Submission>(`/submissions/${submissionId}/pin`)
+    api.delete<Submission>(`/submissions/${submissionId}/pin`),
+  
+  addReaction: (submissionId: string, messageId: string, reactionType: 'star' | 'laugh' | 'sparkles') =>
+    api.post<{ reactions: Array<{ user_id: string; reaction_type: string }> }>(`/submissions/${submissionId}/messages/${messageId}/reactions/${reactionType}`),
+  
+  removeReaction: (submissionId: string, messageId: string, reactionType: 'star' | 'laugh' | 'sparkles') =>
+    api.delete<{ reactions: Array<{ user_id: string; reaction_type: string }> }>(`/submissions/${submissionId}/messages/${messageId}/reactions/${reactionType}`),
+  
+  getReactions: (submissionId: string, messageId: string) =>
+    api.get<{ reactions: Array<{ user_id: string; reaction_type: string; created_at: string }> }>(`/submissions/${submissionId}/messages/${messageId}/reactions`)
 }
 
 export const annotationsAPI = {
