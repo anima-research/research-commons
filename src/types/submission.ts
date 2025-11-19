@@ -18,10 +18,30 @@ export const ThinkingContentBlockSchema = z.object({
   signature: z.string().optional()
 });
 
+export const FileAttachmentBlockSchema = z.object({
+  type: z.literal('tm_blob_file'),
+  text: z.string(),
+  id: z.string().optional(),
+  sync: z.object({
+    at: z.string(),
+    url: z.string(),
+    blobID: z.number()
+  }).optional(),
+  metadata: z.object({
+    name: z.string(),
+    size: z.number(),
+    type: z.string(),
+    characters: z.number().optional(),
+    fileFormat: z.string().optional(),
+    estimatedTokens: z.number().optional()
+  }).optional()
+});
+
 export const ContentBlockSchema = z.discriminatedUnion('type', [
   TextContentBlockSchema,
   ImageContentBlockSchema,
-  ThinkingContentBlockSchema
+  ThinkingContentBlockSchema,
+  FileAttachmentBlockSchema
 ]);
 
 export type ContentBlock = z.infer<typeof ContentBlockSchema>;
