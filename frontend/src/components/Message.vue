@@ -14,9 +14,9 @@
       class="message-card group relative transition-all"
       :class="{
         'bg-indigo-500/10 border-indigo-500/20': isUser && !hasReactions,
-        'bg-indigo-500/30 border-indigo-500/50': isUser && hasReactions,
+        'bg-indigo-500/15 border-indigo-400 border-2': isUser && hasReactions,
         'bg-gray-800/40 border-gray-700/40': !isUser && !hasReactions,
-        'bg-gray-700/90 border-gray-600': !isUser && hasReactions,
+        'bg-gray-800/60 border-gray-500 border-2': !isUser && hasReactions,
         'ring-2 ring-indigo-400/50': hasAnnotation
       }"
       :style="{ maxWidth: '80%' }"
