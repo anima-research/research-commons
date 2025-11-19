@@ -51,7 +51,13 @@ export const submissionsAPI = {
     api.get<{ messages: Message[] }>(`/submissions/${id}/messages`),
   
   getRatings: (id: string) =>
-    api.get<{ ratings: Rating[] }>(`/submissions/${id}/ratings`)
+    api.get<{ ratings: Rating[] }>(`/submissions/${id}/ratings`),
+  
+  pinMessage: (submissionId: string, messageId: string) =>
+    api.post<Submission>(`/submissions/${submissionId}/pin/${messageId}`),
+  
+  unpinMessage: (submissionId: string) =>
+    api.delete<Submission>(`/submissions/${submissionId}/pin`)
 }
 
 export const annotationsAPI = {

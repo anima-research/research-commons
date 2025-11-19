@@ -107,6 +107,18 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
           </button>
+          <div class="w-px h-4 bg-gray-700" />
+          <button 
+            @click="togglePin"
+            class="px-2 py-1 text-xs transition-colors"
+            :class="isPinned ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-400'"
+            :title="isPinned ? 'Unpin message' : 'Pin message (scroll to on open)'"
+          >
+            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path v-if="isPinned" d="M16 12V4h1a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h1v8l-4.5 4.5A1 1 0 0 0 3 16v2a1 1 0 0 0 1 1h6v5l1 1 1-1v-5h6a1 1 0 0 0 1-1v-2a1 1 0 0 0-.5-.87L16 12z" />
+              <path v-else d="M16 12V4h1a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h1v8l-4.5 4.5A1 1 0 0 0 3 16v2a1 1 0 0 0 1 1h6v5l1 1 1-1v-5h6a1 1 0 0 0 1-1v-2a1 1 0 0 0-.5-.87L16 12z" fill-opacity="0.4" />
+            </svg>
+          </button>
         </div>
       </transition>
     </div>
@@ -126,12 +138,14 @@ interface Props {
   branchCount?: number
   selectionMode?: boolean
   isSelected?: boolean
+  isPinned?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   hasAnnotation: false,
   hasBranches: false,
   branchIndex: 0,
+  isPinned: false,
   branchCount: 1,
   selectionMode: false,
   isSelected: false
@@ -142,6 +156,7 @@ const emit = defineEmits<{
   'add-tag-to-message': [messageId: string]
   'add-comment-to-message': [messageId: string]
   'copy-message': [messageId: string]
+  'toggle-pin': [messageId: string]
   'prev-branch': []
   'next-branch': []
 }>()
@@ -209,6 +224,11 @@ function copyMessage() {
   const content = contentEl.value?.textContent || ''
   navigator.clipboard.writeText(content)
   emit('copy-message', props.message.id)
+}
+
+function togglePin() {
+  actionsExpanded.value = false
+  emit('toggle-pin', props.message.id)
 }
 
 function formatTime(timestamp?: string) {

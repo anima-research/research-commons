@@ -142,9 +142,11 @@
             :user-names="userNames"
             :current-user-id="authStore.user?.id"
             :can-moderate="canModerate"
+            :pinned-message-id="pinnedMessageId"
             @add-tag-to-message="handleAddTagToMessage"
             @add-comment-to-message="handleAddCommentToMessage"
             @copy-message="handleCopyMessage"
+            @toggle-pin="handleTogglePin"
             @text-selected="handleTextSelected"
             @add-tag="handleAddTag"
             @add-tag-vote="handleAddTagVote"
@@ -351,7 +353,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSubmissionsStore } from '@/stores/submissions'
@@ -380,6 +382,7 @@ const isMobile = ref(window.innerWidth < 1024)
 const submission = ref()
 const messages = ref<Message[]>([])
 const selections = ref<Selection[]>([])
+const pinnedMessageId = ref<string | null>(null)
 const selectionData = ref<Map<string, {
   comments: Comment[]
   tags: any[]
@@ -634,6 +637,15 @@ async function loadData() {
     
     // TODO: Load submission-level comments
     submissionComments.value = []
+    // Load pinned message ID from submission metadata
+    pinnedMessageId.value = (submission.value.metadata as any)?.pinned_message_id || null
+    
+    // Auto-scroll to pinned message after next tick (once DOM is ready)
+    if (pinnedMessageId.value) {
+      nextTick(() => {
+        scrollToPinnedMessage()
+      })
+    }
     
   } catch (err) {
     console.error('Failed to load submission:', err)
@@ -737,6 +749,50 @@ function handleCopyMessage(messageId: string) {
     .catch(err => {
       console.error('Failed to copy message:', err)
     })
+}
+
+async function handleTogglePin(messageId: string) {
+  try {
+    // If this message is already pinned, unpin it
+    if (pinnedMessageId.value === messageId) {
+      await submissionsAPI.unpinMessage(submissionId)
+      pinnedMessageId.value = null
+      console.log('Message unpinned')
+    } else {
+      // Pin this message
+      await submissionsAPI.pinMessage(submissionId, messageId)
+      pinnedMessageId.value = messageId
+      console.log('Message pinned')
+    }
+    
+    // Reload submission to get updated metadata
+    submission.value = await submissionsStore.fetchSubmission(submissionId)
+  } catch (err) {
+    console.error('Failed to toggle pin:', err)
+  }
+}
+
+function scrollToPinnedMessage() {
+  if (!pinnedMessageId.value) return
+  
+  const messageEl = document.querySelector(`[data-message-id="${pinnedMessageId.value}"]`) as HTMLElement
+  if (messageEl) {
+    // Calculate position accounting for fixed header
+    const messageRect = messageEl.getBoundingClientRect()
+    const scrollOffset = window.scrollY + messageRect.top - headerHeight.value - 20 // 20px extra padding
+    
+    // Smooth scroll to calculated position
+    window.scrollTo({
+      top: scrollOffset,
+      behavior: 'smooth'
+    })
+    
+    // Briefly highlight the pinned message
+    messageEl.classList.add('ring-2', 'ring-amber-400')
+    setTimeout(() => {
+      messageEl.classList.remove('ring-2', 'ring-amber-400')
+    }, 2000)
+  }
 }
 
 function handleTextSelected(messageId: string, text: string, start: number, end: number) {

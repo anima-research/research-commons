@@ -94,7 +94,8 @@ export const SubmissionSchema = z.object({
     original_date: z.date().optional(),
     participants_summary: z.array(z.string()).optional(),
     model_summary: z.array(z.string()).optional(),
-    tags: z.array(z.string()).optional()
+    tags: z.array(z.string()).optional(),
+    pinned_message_id: z.string().uuid().optional()
   }).passthrough(), // Allow additional fields
   submitted_at: z.date(),
   deleted: z.boolean().optional(),

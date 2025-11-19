@@ -179,6 +179,72 @@ export function createSubmissionRoutes(context: AppContext): Router {
     }
   });
 
+  // Pin a message (set pinned_message_id in metadata)
+  router.post('/:submissionId/pin/:messageId', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Update metadata with pinned message ID
+      const updatedSubmission = {
+        ...submission,
+        metadata: {
+          ...submission.metadata,
+          pinned_message_id: req.params.messageId
+        }
+      };
+
+      await context.submissionStore.updateSubmission(
+        req.params.submissionId,
+        updatedSubmission
+      );
+
+      const result = await context.submissionStore.getSubmission(req.params.submissionId);
+      res.json(result);
+    } catch (error) {
+      console.error('Pin message error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Unpin message (remove pinned_message_id from metadata)
+  router.delete('/:submissionId/pin', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Remove pinned_message_id from metadata
+      const updatedMetadata = {
+        ...submission.metadata
+      };
+      delete (updatedMetadata as any).pinned_message_id;
+
+      const updatedSubmission = {
+        ...submission,
+        metadata: updatedMetadata
+      };
+
+      await context.submissionStore.updateSubmission(
+        req.params.submissionId,
+        updatedSubmission
+      );
+
+      const result = await context.submissionStore.getSubmission(req.params.submissionId);
+      res.json(result);
+    } catch (error) {
+      console.error('Unpin message error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // Update submission metadata
   router.patch('/:submissionId', authenticateToken, async (req: AuthRequest, res) => {
     try {

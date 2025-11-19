@@ -6,10 +6,12 @@
         <Message
           :message="msg"
           :has-annotation="hasAnnotation(msg.id)"
+          :is-pinned="pinnedMessageId === msg.id"
           @text-selected="onTextSelected"
           @add-tag-to-message="onAddTagToMessage"
           @add-comment-to-message="onAddCommentToMessage"
           @copy-message="onCopyMessage"
+          @toggle-pin="onTogglePin"
         />
         
         <!-- Inline annotations (mobile only) -->
@@ -53,19 +55,22 @@ interface Props {
   userNames?: Map<string, string>
   currentUserId?: string
   canModerate?: boolean
+  pinnedMessageId?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   annotatedMessageIds: () => new Set(),
   inlineAnnotations: () => new Map(),
   userNames: () => new Map(),
-  canModerate: false
+  canModerate: false,
+  pinnedMessageId: null
 })
 
 const emit = defineEmits<{
   'add-tag-to-message': [messageId: string]
   'add-comment-to-message': [messageId: string]
   'copy-message': [messageId: string]
+  'toggle-pin': [messageId: string]
   'text-selected': [messageId: string, text: string, start: number, end: number]
   'add-tag': [selectionId: string]
   'add-tag-vote': [selectionId: string, tagId: string]
@@ -97,6 +102,10 @@ function onAddCommentToMessage(messageId: string) {
 
 function onCopyMessage(messageId: string) {
   emit('copy-message', messageId)
+}
+
+function onTogglePin(messageId: string) {
+  emit('toggle-pin', messageId)
 }
 </script>
 
