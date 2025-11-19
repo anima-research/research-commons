@@ -9,7 +9,7 @@
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
   >
-    <!-- Message card (max 80% width, alternating alignment) -->
+    <!-- Message card (max width responsive: 95% mobile, 80% desktop) -->
     <div 
       class="message-card group relative transition-all"
       :class="{
@@ -19,7 +19,7 @@
         'bg-gray-800/60 border-gray-500 border-2': !isUser && hasReactions,
         'ring-2 ring-indigo-400/50': hasAnnotation
       }"
-      :style="{ maxWidth: '80%' }"
+      :style="{ maxWidth: isMobile ? '95%' : '80%' }"
     >
       <!-- Participant header -->
       <div class="flex items-center gap-2 mb-2">

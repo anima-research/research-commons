@@ -128,6 +128,18 @@
       </div>
     </div>
 
+    <!-- Loading overlay for pinned message -->
+    <div
+      v-if="loadingPinnedMessage"
+      class="fixed inset-0 z-40 flex items-center justify-center bg-gray-950/50 backdrop-blur-sm"
+      :style="{ paddingTop: contentPaddingTop }"
+    >
+      <div class="flex flex-col items-center gap-3">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500/30 border-t-indigo-500"></div>
+        <div class="text-sm text-gray-400">Loading pinned message...</div>
+      </div>
+    </div>
+
     <!-- Main Content (below fixed header - dynamic padding) -->
     <div :style="{ paddingTop: contentPaddingTop }" class="min-h-screen">
       <!-- Two-column layout for desktop, single column for mobile -->
@@ -379,6 +391,7 @@ const submissionsStore = useSubmissionsStore()
 
 const submissionId = route.params.id as string
 const loading = ref(true)
+const loadingPinnedMessage = ref(false)
 const isMobile = ref(window.innerWidth < 1024)
 
 const submission = ref()
@@ -643,6 +656,11 @@ async function loadData() {
     // Load pinned message ID from submission metadata
     pinnedMessageId.value = (submission.value.metadata as any)?.pinned_message_id || null
     
+    // If there's a pinned message, show loading overlay
+    if (pinnedMessageId.value) {
+      loadingPinnedMessage.value = true
+    }
+    
     // Load reactions for all messages
     messageReactions.value.clear()
     for (const msg of messages.value) {
@@ -789,26 +807,49 @@ async function handleTogglePin(messageId: string) {
 }
 
 function scrollToPinnedMessage() {
-  if (!pinnedMessageId.value) return
-  
-  const messageEl = document.querySelector(`[data-message-id="${pinnedMessageId.value}"]`) as HTMLElement
-  if (messageEl) {
-    // Calculate position accounting for fixed header
-    const messageRect = messageEl.getBoundingClientRect()
-    const scrollOffset = window.scrollY + messageRect.top - headerHeight.value - 20 // 20px extra padding
-    
-    // Smooth scroll to calculated position
-    window.scrollTo({
-      top: scrollOffset,
-      behavior: 'smooth'
-    })
-    
-    // Briefly highlight the pinned message
-    messageEl.classList.add('ring-2', 'ring-amber-400')
-    setTimeout(() => {
-      messageEl.classList.remove('ring-2', 'ring-amber-400')
-    }, 2000)
+  if (!pinnedMessageId.value) {
+    loadingPinnedMessage.value = false
+    return
   }
+  
+  // Wait for the pinned message element to exist in DOM (with timeout)
+  const maxAttempts = 50 // 5 seconds max
+  let attempts = 0
+  
+  const checkAndScroll = () => {
+    const messageEl = document.querySelector(`[data-message-id="${pinnedMessageId.value}"]`) as HTMLElement
+    
+    if (messageEl) {
+      // Clear loading overlay immediately - we found the element!
+      loadingPinnedMessage.value = false
+      
+      // Calculate position accounting for fixed header
+      const messageRect = messageEl.getBoundingClientRect()
+      const scrollOffset = window.scrollY + messageRect.top - headerHeight.value - 20 // 20px extra padding
+      
+      // Smooth scroll to calculated position
+      window.scrollTo({
+        top: scrollOffset,
+        behavior: 'smooth'
+      })
+      
+      // Briefly highlight the pinned message
+      messageEl.classList.add('ring-2', 'ring-amber-400')
+      setTimeout(() => {
+        messageEl.classList.remove('ring-2', 'ring-amber-400')
+      }, 2000)
+    } else if (attempts < maxAttempts) {
+      // Element not ready yet, try again
+      attempts++
+      setTimeout(checkAndScroll, 100)
+    } else {
+      // Timeout - element never appeared
+      console.error('Pinned message element never loaded:', pinnedMessageId.value)
+      loadingPinnedMessage.value = false
+    }
+  }
+  
+  checkAndScroll()
 }
 
 async function handleToggleReaction(messageId: string, reactionType: 'star' | 'laugh' | 'sparkles') {
