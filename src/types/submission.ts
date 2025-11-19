@@ -93,7 +93,7 @@ export const CreateMessageRequestSchema = z.object({
   participant_type: z.enum(['human', 'model', 'system']),
   content_blocks: z.array(ContentBlockSchema),
   model_info: ModelInfoSchema.optional(),
-  timestamp: z.date().optional()
+  timestamp: z.coerce.date().optional()
 });
 
 // For API requests
