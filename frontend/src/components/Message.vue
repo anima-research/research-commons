@@ -58,7 +58,7 @@
             </div>
           </div>
           
-          <span class="text-xs text-gray-600">
+          <span class="text-xs text-gray-600 hidden sm:inline">
             {{ formatTime(props.message.timestamp) }}
           </span>
         </div>

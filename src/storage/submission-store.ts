@@ -182,10 +182,13 @@ export class SubmissionStore {
     
     let submission = submissionEvent.data as Submission;
     
-    // Apply updates
+    // Apply all updates (not just metadata)
     const updateEvents = events.filter(e => e.type === 'submission_updated');
     for (const event of updateEvents) {
       const updates = event.data.updates;
+      // Apply all fields from updates
+      submission = { ...submission, ...updates };
+      // Merge metadata separately to avoid overwriting
       if (updates.metadata) {
         submission.metadata = { ...submission.metadata, ...updates.metadata };
       }
