@@ -106,47 +106,52 @@
           @click="router.push(`/submissions/${submission.id}`)"
           class="group bg-gray-800/40 backdrop-blur-sm rounded border border-gray-700/50 hover:border-indigo-500/30 hover:bg-gray-800/60 transition-all cursor-pointer px-3 py-2"
         >
-          <!-- Single compact row -->
-          <div class="flex items-center gap-3">
-            <!-- Title -->
-            <h3 class="text-sm font-medium text-gray-100 group-hover:text-indigo-300 transition-colors truncate" style="flex: 0 1 240px; min-width: 0;">
-              {{ submission.title }}
-            </h3>
-            
-            <!-- Metadata -->
-            <div class="flex items-center gap-2 text-[11px] text-gray-500 shrink-0">
-              <span>{{ formatDate(submission.submitted_at) }}</span>
-              <span class="text-gray-700">•</span>
-              <span class="truncate max-w-[100px]">by {{ (submission as any).submitter_name || 'Unknown' }}</span>
+          <!-- Responsive layout: 2 rows on mobile, 1 row on desktop -->
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <!-- Row 1 (mobile) / Left section (desktop): Title + Metadata -->
+            <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+              <!-- Title -->
+              <h3 class="text-sm font-medium text-gray-100 group-hover:text-indigo-300 transition-colors truncate flex-1 min-w-0">
+                {{ submission.title }}
+              </h3>
+              
+              <!-- Metadata -->
+              <div class="flex items-center gap-2 text-[11px] text-gray-500 shrink-0">
+                <span class="hidden sm:inline">{{ formatDate(submission.submitted_at) }}</span>
+                <span class="hidden sm:inline text-gray-700">•</span>
+                <span class="truncate max-w-[100px]">{{ (submission as any).submitter_name || 'Unknown' }}</span>
+              </div>
             </div>
             
-            <!-- Model & Participants -->
-            <div class="flex items-center gap-2 text-[11px] text-gray-500 shrink-0">
-              <span v-if="submission.metadata.model_summary?.length" class="truncate max-w-[120px]" :title="submission.metadata.model_summary.join(', ')">
-                {{ submission.metadata.model_summary[0] }}{{ submission.metadata.model_summary.length > 1 ? ` +${submission.metadata.model_summary.length - 1}` : '' }}
-              </span>
-              <span v-if="submission.metadata.participants_summary?.length" class="text-gray-600">
-                ({{ submission.metadata.participants_summary.length }} participants)
-              </span>
-            </div>
-            
-            <!-- Topic tags (max 2) -->
-            <div class="flex items-center gap-1 shrink-0">
-              <button
-                v-for="tag in submission.metadata.tags?.slice(0, 2)"
-                :key="tag"
-                class="px-1.5 py-0.5 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] rounded hover:bg-indigo-500/30 transition-all"
-                @click.stop
-              >
-                #{{ tag }}
-              </button>
-              <span v-if="(submission.metadata.tags?.length || 0) > 2" class="text-[10px] text-gray-600">
-                +{{ (submission.metadata.tags?.length || 0) - 2 }}
-              </span>
-            </div>
-            
-            <!-- Stats pills -->
-            <div class="flex items-center gap-1.5 ml-auto shrink-0">
+            <!-- Row 2 (mobile) / Right section (desktop): Model, Tags, Stats -->
+            <div class="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
+              <!-- Model & Participants -->
+              <div class="flex items-center gap-2 text-[11px] text-gray-500 shrink-0">
+                <span v-if="submission.metadata.model_summary?.length" class="truncate max-w-[120px]" :title="submission.metadata.model_summary.join(', ')">
+                  {{ submission.metadata.model_summary[0] }}{{ submission.metadata.model_summary.length > 1 ? ` +${submission.metadata.model_summary.length - 1}` : '' }}
+                </span>
+                <span v-if="submission.metadata.participants_summary?.length" class="text-gray-600 hidden sm:inline">
+                  ({{ submission.metadata.participants_summary.length }} participants)
+                </span>
+              </div>
+              
+              <!-- Topic tags (max 2 on mobile, hide on very small) -->
+              <div class="hidden xs:flex items-center gap-1 shrink-0">
+                <button
+                  v-for="tag in submission.metadata.tags?.slice(0, 2)"
+                  :key="tag"
+                  class="px-1.5 py-0.5 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] rounded hover:bg-indigo-500/30 transition-all"
+                  @click.stop
+                >
+                  #{{ tag }}
+                </button>
+                <span v-if="(submission.metadata.tags?.length || 0) > 2" class="text-[10px] text-gray-600">
+                  +{{ (submission.metadata.tags?.length || 0) - 2 }}
+                </span>
+              </div>
+              
+              <!-- Stats pills -->
+              <div class="flex items-center gap-1.5 shrink-0">
               <!-- Message count -->
               <div v-if="(submission.metadata as any).message_count" class="px-1.5 py-0.5 bg-gray-700/50 text-gray-400 text-[10px] rounded font-mono flex items-center gap-1">
                 <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
@@ -189,6 +194,7 @@
                 </svg>
                 ARC
               </span>
+              </div>
             </div>
           </div>
         </div>
