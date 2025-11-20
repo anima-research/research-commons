@@ -9,7 +9,7 @@
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
   >
-    <!-- Message card (max width responsive: 95% mobile, 80% desktop) -->
+    <!-- Message card (assistant full width, user variable) -->
     <div 
       class="message-card group relative transition-all"
       :class="{
@@ -20,7 +20,7 @@
         'bg-red-900/20 border-red-600/50 border-2': isHidden,
         'ring-2 ring-indigo-400/50': hasAnnotation && !isHidden
       }"
-      :style="{ maxWidth: isMobile ? '95%' : '80%' }"
+      :style="{ maxWidth: isUser ? (isMobile ? '95%' : '80%') : '100%' }"
     >
       <!-- Hidden badge (for researchers/admins) -->
       <div v-if="isHidden" class="absolute -top-2 -left-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
