@@ -110,11 +110,6 @@
         Get Started
       </router-link>
 
-      <!-- Theme toggle -->
-      <div class="flex items-center justify-between px-3 py-2">
-        <span class="text-xs text-gray-500 dark:text-gray-400">Appearance</span>
-        <ThemeToggle />
-      </div>
     </div>
   </div>
 </template>
@@ -123,7 +118,6 @@
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import NavItem from '@/components/NavItem.vue'
-import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()

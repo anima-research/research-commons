@@ -1,10 +1,5 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
-    <!-- Theme toggle (top right) -->
-    <div class="absolute top-6 right-6 z-50">
-      <ThemeToggle />
-    </div>
-
     <!-- Hero Section -->
     <div class="container mx-auto px-6 pt-24 pb-20">
       <div class="max-w-5xl mx-auto">
@@ -130,7 +125,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

@@ -1,45 +1,29 @@
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 
-// Singleton reactive state
-const isDark = ref(false)
+// Singleton reactive state - always dark mode
+const isDark = ref(true)
 
-// Apply theme to DOM
-function applyTheme(dark: boolean) {
-  if (dark) {
-    document.documentElement.classList.add('dark')
-    localStorage.setItem('theme', 'dark')
-  } else {
-    document.documentElement.classList.remove('dark')
-    localStorage.setItem('theme', 'light')
-  }
+// Apply dark theme to DOM
+function applyTheme() {
+  document.documentElement.classList.add('dark')
+  localStorage.setItem('theme', 'dark')
 }
 
-// Watch for changes and update DOM + localStorage
-watch(isDark, (dark) => {
-  applyTheme(dark)
-}, { immediate: false })
-
-// Initialize from localStorage or system preference
+// Initialize - always dark mode
 function initTheme() {
-  const savedTheme = localStorage.getItem('theme')
-  if (savedTheme) {
-    isDark.value = savedTheme === 'dark'
-  } else {
-    // Check system preference
-    isDark.value = window.matchMedia('(prefers-color-scheme: dark)').matches
-  }
-  // Apply immediately without triggering watcher
-  applyTheme(isDark.value)
+  isDark.value = true
+  applyTheme()
 }
 
-// Toggle function
+// Deprecated - kept for compatibility but does nothing
 function toggleTheme() {
-  isDark.value = !isDark.value
+  // No-op - dark mode only
 }
 
-// Set theme explicitly
+// Deprecated - kept for compatibility but always sets dark
 function setTheme(dark: boolean) {
-  isDark.value = dark
+  // Ignore parameter - always dark mode
+  isDark.value = true
 }
 
 // Export singleton
