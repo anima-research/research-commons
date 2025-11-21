@@ -65,11 +65,19 @@
           
           <!-- Actions -->
           <button
+            v-if="authStore.isAuthenticated()"
             @click="showRatingForm = true"
             class="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 text-xs rounded font-medium transition-all"
           >
             Rate
           </button>
+          <router-link
+            v-else
+            to="/login"
+            class="px-3 py-1.5 bg-gray-800/50 border border-gray-700/50 text-gray-400 text-xs rounded font-medium transition-all hover:text-gray-300 hover:border-gray-600/50"
+          >
+            Login to Rate
+          </router-link>
           
           <button
             v-if="canDeleteSubmission"
@@ -341,7 +349,7 @@
 
     <!-- Text Selection Context Menu -->
     <div
-      v-if="showTextSelectionMenu"
+      v-if="showTextSelectionMenu && authStore.isAuthenticated()"
       class="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 transition-colors"
       :style="{ left: textSelectionMenuPosition.x + 'px', top: textSelectionMenuPosition.y + 'px' }"
       @click.stop

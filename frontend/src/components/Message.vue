@@ -127,6 +127,7 @@
           <!-- Row 1: Main actions -->
           <div class="flex items-center gap-1">
             <button 
+              v-if="currentUserId"
               @click="addTag" 
               class="px-2 py-1 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded transition-all flex items-center gap-1.5"
               title="Add tag to message"
@@ -136,8 +137,9 @@
               </svg>
               Tag
             </button>
-            <div class="w-px h-4 bg-gray-700" />
+            <div v-if="currentUserId" class="w-px h-4 bg-gray-700" />
             <button 
+              v-if="currentUserId"
               @click="addComment" 
               class="px-2 py-1 text-xs text-gray-400 hover:text-gray-300 hover:bg-gray-700/50 rounded transition-all flex items-center gap-1.5"
               title="Add comment to message"
@@ -147,7 +149,7 @@
               </svg>
               Comment
             </button>
-            <div class="w-px h-4 bg-gray-700" />
+            <div v-if="currentUserId" class="w-px h-4 bg-gray-700" />
             <button 
               @click="copyMessage"
               class="px-2 py-1 text-xs text-gray-500 hover:text-gray-400 transition-colors"
@@ -159,6 +161,7 @@
             </button>
             <div class="w-px h-4 bg-gray-700" />
             <button 
+              v-if="currentUserId"
               @click="togglePin"
               class="px-2 py-1 text-xs transition-colors"
               :class="isPinned ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-400'"
@@ -186,7 +189,7 @@
           </div>
           
           <!-- Row 2: Reactions -->
-          <div class="flex items-center gap-1 pt-1 border-t border-gray-700/50">
+          <div v-if="currentUserId" class="flex items-center gap-1 pt-1 border-t border-gray-700/50">
             <button
               v-for="reactionType in ['star', 'laugh', 'sparkles']"
               :key="reactionType"

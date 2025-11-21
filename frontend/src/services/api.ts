@@ -120,6 +120,9 @@ export const ontologiesAPI = {
   create: (data: any) =>
     api.post<any>('/ontologies', data),
   
+  update: (id: string, data: any) =>
+    api.put<any>(`/ontologies/${id}`, data),
+  
   attach: (submissionId: string, ontologyId: string, usagePermissions: string) =>
     api.post<any>('/ontologies/attach', { submission_id: submissionId, ontology_id: ontologyId, usage_permissions: usagePermissions }),
   

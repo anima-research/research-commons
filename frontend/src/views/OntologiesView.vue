@@ -112,8 +112,8 @@
                 v-model="ontologyForm.category"
                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 transition-colors"
               >
-                <option value="response-patterns">Response Patterns</option>
-                <option value="interview-quality">Interview Quality</option>
+                <option value="model-behavior">Model Behavior</option>
+                <option value="interviewer-quality">Interviewer Quality</option>
                 <option value="custom">Custom</option>
               </select>
             </div>
@@ -217,7 +217,7 @@ const editingOntologyId = ref<string | null>(null)
 const ontologyForm = ref({
   name: '',
   description: '',
-  category: 'response-patterns' as const,
+  category: 'model-behavior' as const,
   permissions: 'public' as const,
   tags: [] as Array<{
     name: string
@@ -273,7 +273,7 @@ function closeCreateForm() {
   ontologyForm.value = {
     name: '',
     description: '',
-    category: 'response-patterns',
+    category: 'model-behavior',
     permissions: 'public',
     tags: []
   }
@@ -318,7 +318,7 @@ function closeEditForm() {
   ontologyForm.value = {
     name: '',
     description: '',
-    category: 'response-patterns',
+    category: 'model-behavior',
     permissions: 'public',
     tags: []
   }

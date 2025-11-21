@@ -114,7 +114,14 @@
             <router-link to="/browse" class="hover:text-indigo-400 transition-colors">Browse</router-link>
             <router-link to="/topics" class="hover:text-indigo-400 transition-colors">Topics</router-link>
             <router-link to="/submit" class="hover:text-indigo-400 transition-colors">Submit</router-link>
-            <router-link to="/login" class="hover:text-indigo-400 transition-colors">Login</router-link>
+            <button
+              v-if="authStore.isAuthenticated()"
+              @click="handleLogout"
+              class="hover:text-indigo-400 transition-colors"
+            >
+              Sign Out
+            </button>
+            <router-link v-else to="/login" class="hover:text-indigo-400 transition-colors">Login</router-link>
           </div>
         </div>
       </div>
@@ -128,5 +135,11 @@ import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+function handleLogout() {
+  authStore.logout()
+  // Optionally refresh the page to update UI, or just let reactive state handle it
+  // The v-if will automatically hide the logout indicator
+}
 </script>
 
