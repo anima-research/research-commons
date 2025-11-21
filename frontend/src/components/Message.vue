@@ -119,6 +119,13 @@
             </div>
           </div>
           <div v-else-if="block.type === 'text'" v-html="renderMarkdown(block.text || '')" class="prose prose-invert prose-sm max-w-none" />
+          <div v-else-if="block.type === 'image'" class="mt-2">
+            <img 
+              :src="'data:' + block.mime_type + ';base64,' + block.data" 
+              class="max-w-full rounded border border-gray-700"
+              alt="Discord attachment"
+            />
+          </div>
           <div v-else-if="block.type === 'thinking'" class="mt-3 p-3 bg-gray-900/50 border border-gray-700/50 rounded text-xs">
             <div class="text-gray-500 mb-1 uppercase tracking-wide">Thinking</div>
             <div class="text-gray-400" v-html="renderMarkdown(block.thinking?.content || '')" />

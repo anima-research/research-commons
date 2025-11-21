@@ -17,10 +17,12 @@ interface DiscordMessage {
     count: number;
   }>;
   attachments?: Array<{
-    id: string;
-    url: string;
-    filename: string;
+    id?: string;
+    url?: string;
+    filename?: string;
     contentType?: string;
+    mediaType?: string;
+    data?: string; // base64 encoded image data
     size?: number;
   }>;
   referencedMessageId?: string;
@@ -162,13 +164,35 @@ export class DiscordImporter extends BaseImporter {
         });
       }
       
-      // Add attachment references
+      // Add attachments
       if (msg.attachments && msg.attachments.length > 0) {
         for (const attachment of msg.attachments) {
-          contentBlocks.push({
-            type: 'text' as const,
-            text: `[Attachment: ${attachment.filename}](${attachment.url})`
-          });
+          // Check if it's an image by mediaType or contentType
+          const mediaType = attachment.mediaType || attachment.contentType;
+          const isImage = mediaType?.startsWith('image/');
+          
+          if (isImage) {
+            if (attachment.data) {
+              // Base64 encoded image
+              contentBlocks.push({
+                type: 'image' as const,
+                mime_type: mediaType,
+                data: attachment.data
+              });
+            } else if (attachment.url) {
+              // Image URL from CDN - embed as markdown
+              contentBlocks.push({
+                type: 'text' as const,
+                text: `![Discord Image](${attachment.url})`
+              });
+            }
+          } else if (attachment.url) {
+            // Non-image attachment - show as link
+            contentBlocks.push({
+              type: 'text' as const,
+              text: `[Attachment: ${attachment.filename || 'file'}](${attachment.url})`
+            });
+          }
         }
       }
       
