@@ -22,7 +22,7 @@ interface DiscordMessage {
     filename?: string;
     contentType?: string;
     mediaType?: string;
-    data?: string; // base64 encoded image data
+    base64Data?: string; // base64 encoded image data
     size?: number;
   }>;
   referencedMessageId?: string;
@@ -172,15 +172,15 @@ export class DiscordImporter extends BaseImporter {
           const isImage = mediaType?.startsWith('image/');
           
           if (isImage) {
-            if (attachment.data) {
+            if (attachment.base64Data) {
               // Base64 encoded image
               contentBlocks.push({
                 type: 'image' as const,
                 mime_type: mediaType,
-                data: attachment.data
+                data: attachment.base64Data
               });
             } else if (attachment.url) {
-              // Image URL from CDN - embed as markdown
+              // Image URL from CDN - embed as markdown (fallback)
               contentBlocks.push({
                 type: 'text' as const,
                 text: `![Discord Image](${attachment.url})`
