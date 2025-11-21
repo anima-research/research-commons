@@ -15,3 +15,4 @@ data/submissions/*
 frontend/dist/
 frontend/node_modules/
 API.md
+files/

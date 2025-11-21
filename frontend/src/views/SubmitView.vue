@@ -42,11 +42,12 @@
 
           <!-- Discord Import -->
           <div v-if="sourceType === 'discord'" class="space-y-4 mb-6">
-            <div class="p-3 bg-gray-800/50 border border-gray-700 rounded text-sm text-gray-400">
+            <div class="p-3 bg-blue-900/20 border border-blue-700/50 rounded text-sm text-blue-200">
               <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
               </svg>
-              Discord integration configured server-side. Imports are authenticated and secure.
+              <strong>Discord Bridge Required:</strong> This feature only works with Discord servers that have the export bridge bot installed. 
+              Imports are authenticated server-side and message history is fetched securely.
             </div>
             
             <div>
@@ -299,8 +300,8 @@
           </div>
 
           <!-- Create Model Modal -->
-          <div v-if="showCreateModel" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showCreateModel = false">
-            <div class="bg-gray-900 rounded-lg border border-gray-700 p-6 max-w-md w-full mx-4">
+          <div v-if="showCreateModel" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" @mousedown.self="showCreateModel = false">
+            <div class="bg-gray-900 rounded-lg border border-gray-700 p-6 max-w-md w-full mx-4" @mousedown.stop>
               <h3 class="text-lg font-semibold text-gray-100 mb-4">
                 Create Model{{ creatingModelForParticipant ? ` for "${creatingModelForParticipant}"` : '' }}
               </h3>
@@ -440,8 +441,8 @@
     </div>
     
     <!-- Message Selector Modal (outside step sections) -->
-    <div v-if="showMessageSelector" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showMessageSelector = false">
-      <div class="bg-gray-900 rounded-lg border border-gray-700 max-w-3xl w-full max-h-[80vh] flex flex-col">
+    <div v-if="showMessageSelector" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" @mousedown.self="showMessageSelector = false">
+      <div class="bg-gray-900 rounded-lg border border-gray-700 max-w-3xl w-full max-h-[80vh] flex flex-col" @mousedown.stop>
         <div class="p-4 border-b border-gray-700">
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold text-gray-100">Select Starting Message</h3>

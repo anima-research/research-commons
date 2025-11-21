@@ -70,15 +70,30 @@ export class DiscordImporter extends BaseImporter {
       };
     }
 
-    // Fetch messages from Discord export API
-    const response = await fetch(`${this.config.apiUrl}/api/messages/export`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.config.apiToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
+    // Fetch messages from Discord export API with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+    let response;
+    try {
+      response = await fetch(`${this.config.apiUrl}/api/messages/export`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
+      });
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Discord API request timed out after 30 seconds. The Discord bridge service may be temporarily unavailable. Please try again later or contact your administrator.');
+      }
+      throw new Error(`Discord API connection failed: ${fetchError.message}`);
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();

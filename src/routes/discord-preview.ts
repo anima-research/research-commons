@@ -22,7 +22,7 @@ export function createDiscordPreviewRoutes(context: AppContext): Router {
 
       console.log('[Discord Preview] Fetching messages from:', data.lastMessageUrl, 'to:', data.firstMessageUrl);
 
-      // Call Discord export API with minimal data
+      // Build request body - support both range queries and recency window
       const requestBody: any = {
         last: data.lastMessageUrl
       };
@@ -36,15 +36,31 @@ export function createDiscordPreviewRoutes(context: AppContext): Router {
           messages: data.limit
         };
       }
-      
-      const response = await fetch(`${context.discordConfig.apiUrl}/api/messages/export`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${context.discordConfig.apiToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
+
+      // Call Discord export API with timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+      let response;
+      try {
+        response = await fetch(`${context.discordConfig.apiUrl}/api/messages/export`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${context.discordConfig.apiToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
+        });
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Discord API request timed out after 30 seconds. The Discord bridge service may be temporarily unavailable.');
+        }
+        throw new Error(`Discord API connection failed: ${fetchError.message}`);
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
