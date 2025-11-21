@@ -66,13 +66,23 @@
               <label class="block text-sm font-medium text-gray-300 mb-2">
                 First Message URL <span class="text-gray-500">(optional)</span>
               </label>
-              <input
-                v-model="discordFirstMessageUrl"
-                type="text"
-                placeholder="https://discord.com/channels/GUILD_ID/CHANNEL_ID/MESSAGE_ID"
-                class="w-full px-3 py-2 border border-gray-700 rounded bg-gray-800 text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-              <p class="mt-1 text-xs text-gray-500">The starting message URL (oldest) - leave empty for all messages</p>
+              <div class="flex gap-2">
+                <input
+                  v-model="discordFirstMessageUrl"
+                  type="text"
+                  placeholder="https://discord.com/channels/GUILD_ID/CHANNEL_ID/MESSAGE_ID"
+                  class="flex-1 px-3 py-2 border border-gray-700 rounded bg-gray-800 text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <button
+                  @click="openMessageSelector"
+                  :disabled="!discordLastMessageUrl"
+                  class="px-3 py-2 border border-indigo-500/50 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 rounded text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Browse messages to select starting point"
+                >
+                  Browse
+                </button>
+              </div>
+              <p class="mt-1 text-xs text-gray-500">The starting message URL (oldest) - or click Browse to select</p>
             </div>
             
             <div>
@@ -422,6 +432,72 @@
       </div>
       </div>
     </div>
+    
+    <!-- Message Selector Modal (outside step sections) -->
+    <div v-if="showMessageSelector" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showMessageSelector = false">
+      <div class="bg-gray-900 rounded-lg border border-gray-700 max-w-3xl w-full max-h-[80vh] flex flex-col">
+        <div class="p-4 border-b border-gray-700">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-100">Select Starting Message</h3>
+            <button @click="showMessageSelector = false" class="text-gray-400 hover:text-gray-200">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p class="text-sm text-gray-400 mt-1">Click a message to set it as the starting point</p>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-4 space-y-2">
+          <div v-if="loadingPreview" class="text-center py-8 text-gray-400">
+            <div class="animate-spin rounded-full h-8 w-8 border-4 border-indigo-500/30 border-t-indigo-500 mx-auto mb-2"></div>
+            Loading messages...
+          </div>
+          
+          <button
+            v-for="msg in selectorPreviewMessages"
+            :key="msg.id"
+            @click="selectFirstMessage(msg.message_url)"
+            class="w-full text-left p-3 bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-indigo-500/50 rounded transition-all group"
+          >
+            <div class="flex items-start gap-2">
+              <div class="text-xs text-gray-500 w-16 shrink-0">
+                {{ formatPreviewTime(msg.timestamp) }}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-gray-300 mb-1">
+                  {{ msg.author_name }}
+                  <span class="text-xs text-gray-500">@{{ msg.author_username }}</span>
+                </div>
+                <div class="text-xs text-gray-400 line-clamp-2">
+                  {{ msg.content || '[No text content]' }}
+                </div>
+              </div>
+              <svg class="w-4 h-4 text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+              </svg>
+            </div>
+          </button>
+        </div>
+        
+        <div class="p-4 border-t border-gray-700 flex justify-between">
+          <button
+            v-if="canLoadEarlier"
+            @click="loadEarlierMessages"
+            :disabled="loadingPreview"
+            class="px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded transition-colors disabled:opacity-50"
+          >
+            ← Load Earlier
+          </button>
+          <button
+            @click="showMessageSelector = false"
+            class="px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -429,7 +505,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { submissionsAPI, researchAPI, modelsAPI, importsAPI } from '@/services/api'
+import { submissionsAPI, researchAPI, modelsAPI, importsAPI, discordPreviewAPI } from '@/services/api'
 import type { Message } from '@/types'
 import LeftSidebar from '@/components/LeftSidebar.vue'
 
@@ -526,7 +602,16 @@ const discordParticipantsWithIds = ref<Array<{
   display_name: string;
   is_bot: boolean;
   avatar_url?: string;
-}>>([])
+}>>([]
+
+)
+
+// Message selector modal
+const showMessageSelector = ref(false)
+const selectorPreviewMessages = ref<any[]>([])
+const loadingPreview = ref(false)
+const canLoadEarlier = ref(false)
+const oldestMessageUrl = ref('')
 
 // Model creation
 const showCreateModel = ref(false)
@@ -562,6 +647,71 @@ function getParticipantUsername(participantName: string): string {
 function getParticipantDisplayName(participantName: string): string {
   const participant = discordParticipantsWithIds.value.find(p => p.name === participantName)
   return participant?.display_name || participantName
+}
+
+// Message selector functions
+async function openMessageSelector() {
+  if (!discordLastMessageUrl.value) return
+  
+  showMessageSelector.value = true
+  selectorPreviewMessages.value = []
+  oldestMessageUrl.value = discordLastMessageUrl.value
+  
+  await loadSelectorMessages(discordLastMessageUrl.value)
+}
+
+async function loadSelectorMessages(fromUrl: string) {
+  loadingPreview.value = true
+  
+  try {
+    const response = await discordPreviewAPI.fetchMessages(fromUrl, 50)
+    selectorPreviewMessages.value = response.data.messages
+    canLoadEarlier.value = response.data.has_more
+    
+    // Update oldest message URL for pagination
+    if (response.data.messages.length > 0) {
+      oldestMessageUrl.value = response.data.messages[response.data.messages.length - 1].message_url
+    }
+  } catch (err: any) {
+    console.error('[Message Selector] Failed to load messages:', err)
+    error.value = 'Failed to load message preview'
+  } finally {
+    loadingPreview.value = false
+  }
+}
+
+async function loadEarlierMessages() {
+  if (!oldestMessageUrl.value) return
+  
+  loadingPreview.value = true
+  
+  try {
+    const response = await discordPreviewAPI.fetchMessages(oldestMessageUrl.value, 50)
+    
+    // Append older messages
+    selectorPreviewMessages.value.push(...response.data.messages)
+    canLoadEarlier.value = response.data.has_more
+    
+    // Update oldest message URL
+    if (response.data.messages.length > 0) {
+      oldestMessageUrl.value = response.data.messages[response.data.messages.length - 1].message_url
+    }
+  } catch (err: any) {
+    console.error('[Message Selector] Failed to load earlier messages:', err)
+  } finally {
+    loadingPreview.value = false
+  }
+}
+
+function selectFirstMessage(messageUrl: string) {
+  discordFirstMessageUrl.value = messageUrl
+  showMessageSelector.value = false
+  console.log('[Message Selector] Selected first message:', messageUrl)
+}
+
+function formatPreviewTime(timestamp: string): string {
+  const date = new Date(timestamp)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 async function updateModelAvatar(participantName: string, modelId: string) {

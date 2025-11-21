@@ -19,6 +19,7 @@ import { createRankingRoutes } from './routes/rankings.js';
 import { createModelRoutes } from './routes/models.js';
 import { createAdminRoutes } from './routes/admin.js';
 import { createImportRoutes } from './routes/imports.js';
+import { createDiscordPreviewRoutes } from './routes/discord-preview.js';
 
 dotenv.config();
 
@@ -225,6 +226,7 @@ async function main() {
   app.use('/api/models', createModelRoutes(context));
   app.use('/api/admin', createAdminRoutes(context));
   app.use('/api/imports', createImportRoutes(context));
+  app.use('/api/discord-preview', createDiscordPreviewRoutes(context));
 
   // Serve frontend in production
   if (process.env.NODE_ENV === 'production') {

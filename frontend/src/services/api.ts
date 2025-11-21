@@ -48,6 +48,23 @@ export const importsAPI = {
     api.get<{ available: boolean; configured: boolean }>('/imports/discord/status')
 }
 
+export const discordPreviewAPI = {
+  fetchMessages: (lastMessageUrl: string, limit?: number) =>
+    api.post<{ messages: Array<{
+      id: string;
+      discord_message_id: string;
+      author_name: string;
+      author_username: string;
+      content: string;
+      timestamp: string;
+      is_bot: boolean;
+      message_url: string;
+    }>; has_more: boolean }>('/discord-preview/messages', {
+      lastMessageUrl,
+      limit: limit || 50
+    })
+}
+
 export const authAPI = {
   register: (email: string, password: string, name: string) =>
     api.post<{ user: User; token: string }>('/auth/register', { email, password, name }),
