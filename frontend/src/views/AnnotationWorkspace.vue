@@ -161,7 +161,8 @@
             :inline-annotations="new Map()"
             :user-names="userNames"
             :current-user-id="authStore.user?.id"
-            :can-moderate="canModerate"
+            :can-moderate="canHideMessages"
+            :can-pin="canPin"
             :pinned-message-id="pinnedMessageId"
             :hidden-message-ids="hiddenMessageIds"
             :message-reactions="messageReactions"
@@ -193,7 +194,7 @@
             :conversation-el="conversationContainerEl"
             :user-names="userNames"
             :current-user-id="authStore.user?.id"
-            :can-moderate="canModerate"
+            :can-moderate="canHideMessages"
             @add-tag-vote="handleAddTagVote"
             @delete-comment="handleDeleteComment"
             @remove-tag="handleRemoveTag"
@@ -224,7 +225,8 @@
     <RatingForm
       :show="showRatingForm"
       :ranking-systems-with-criteria="rankingSystemsForPicker"
-      :existing-ratings="submissionRatings"
+      :existing-ratings="currentUserRatings"
+      :criterion-aggregates="criterionAggregates"
       @submit="submitRatings"
       @cancel="showRatingForm = false"
     />
@@ -442,10 +444,25 @@ const canDeleteSubmission = computed(() => {
          authStore.user.roles.includes('admin')
 })
 
-const canModerate = computed(() => {
+// Permission to hide messages (owner or admin only)
+const canHideMessages = computed(() => {
+  if (!authStore.user || !submission.value) return false
+  return submission.value.submitter_id === authStore.user.id ||
+         authStore.user.roles.includes('admin')
+})
+
+// Permission to view hidden messages (researchers can see what's hidden, but not hide)
+const canViewHiddenMessages = computed(() => {
   if (!authStore.user) return false
   return authStore.user.roles.includes('researcher') || 
          authStore.user.roles.includes('admin')
+})
+
+const canPin = computed(() => {
+  if (!authStore.user || !submission.value) return false
+  return submission.value.submitter_id === authStore.user.id ||
+         authStore.user.roles.includes('admin') ||
+         authStore.user.roles.includes('researcher')
 })
 
 const contentPaddingTop = computed(() => {
@@ -678,7 +695,7 @@ async function loadData() {
     
     // Load hidden messages (for researchers/admins)
     console.log('[AnnotationWorkspace] Current user roles:', authStore.user?.roles)
-    if (authStore.user?.roles.includes('researcher') || authStore.user?.roles.includes('admin')) {
+    if (canViewHiddenMessages.value) {
       try {
         console.log('[AnnotationWorkspace] Loading hidden messages...')
         const hiddenResponse = await submissionsAPI.getHiddenMessages(submissionId)
@@ -1292,6 +1309,36 @@ const ratingStats = computed(() => {
     max: stat.max,
     scores: stat.scores
   })).sort((a, b) => b.count - a.count)
+})
+
+// Filter ratings to only current user's ratings
+const currentUserRatings = computed(() => {
+  const currentUserId = authStore.user?.id
+  if (!currentUserId) return []
+  return submissionRatings.value.filter(r => r.rater_id === currentUserId)
+})
+
+// Compute aggregates per criterion for display
+const criterionAggregates = computed(() => {
+  const aggregates = new Map<string, { avg: number; count: number; max: number }>()
+  
+  for (const rating of submissionRatings.value) {
+    const criterion = allCriteria.value.get(rating.criterion_id)
+    if (!criterion) continue
+    
+    if (!aggregates.has(rating.criterion_id)) {
+      aggregates.set(rating.criterion_id, {
+        avg: 0,
+        count: 0,
+        max: criterion.scale_max
+      })
+    }
+    const agg = aggregates.get(rating.criterion_id)!
+    agg.avg = ((agg.avg * agg.count) + rating.score) / (agg.count + 1)
+    agg.count++
+  }
+  
+  return aggregates
 })
 
 // Tag statistics

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AppContext } from '../index.js';
-import { authenticateToken, AuthRequest } from '../middleware/auth.js';
+import { authenticateToken, AuthRequest, requireAnyRole } from '../middleware/auth.js';
 import {
   CreateSelectionRequestSchema,
   CreateCommentRequestSchema,
@@ -14,7 +14,26 @@ import {
 export function createAnnotationRoutes(context: AppContext): Router {
   const router = Router();
 
-  // Create selection
+  // ============================================================================
+  // ANNOTATION PERMISSIONS MODEL (as of 2025-11-21)
+  // ============================================================================
+  // 
+  // SELECTIONS, TAGS, COMMENTS: Open to ANY authenticated user (including contributors)
+  //   - Rationale: These are collaborative contributions, not formal evaluations
+  //   - Tags use voting system, so multiple users can apply same tag
+  //   - Comments are community discussion
+  //   - Selections are the foundation for both
+  // 
+  // RATINGS: Restricted to 'rater', 'expert', 'researcher', 'agent', 'admin'
+  //   - Rationale: Ratings are formal numerical evaluations against criteria
+  //   - Requires understanding of rating systems and criteria
+  //   - "Rater" role exists specifically for this purpose
+  // 
+  // This model may be refined based on usage patterns and manager guidance.
+  // If changing permissions, update this comment to explain the new model.
+  // ============================================================================
+
+  // Create selection (open to all authenticated users)
   router.post('/selections', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const data = CreateSelectionRequestSchema.parse(req.body);
@@ -63,7 +82,7 @@ export function createAnnotationRoutes(context: AppContext): Router {
     }
   });
 
-  // Create comment
+  // Create comment (open to all authenticated users)
   router.post('/comments', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const data = CreateCommentRequestSchema.parse(req.body);
@@ -101,8 +120,8 @@ export function createAnnotationRoutes(context: AppContext): Router {
     }
   });
 
-  // Create rating
-  router.post('/ratings', authenticateToken, async (req: AuthRequest, res) => {
+  // Create rating (restricted to rater+ roles - formal evaluation)
+  router.post('/ratings', authenticateToken, requireAnyRole(['rater', 'expert', 'researcher', 'agent', 'admin']), async (req: AuthRequest, res) => {
     try {
       const data = CreateRatingRequestSchema.parse(req.body);
 

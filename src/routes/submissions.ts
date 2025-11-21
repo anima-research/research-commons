@@ -190,6 +190,17 @@ export function createSubmissionRoutes(context: AppContext): Router {
         return;
       }
 
+      // Check permissions: owner, admin, or researcher can pin
+      const user = await context.userStore.getUserById(req.userId!);
+      const canPin = submission.submitter_id === req.userId! ||
+                     user?.roles.includes('admin') ||
+                     user?.roles.includes('researcher');
+      
+      if (!canPin) {
+        res.status(403).json({ error: 'Only submission owner, researchers, and admins can pin messages' });
+        return;
+      }
+
       // Update metadata with pinned message ID
       const updatedSubmission = {
         ...submission,
@@ -219,6 +230,17 @@ export function createSubmissionRoutes(context: AppContext): Router {
       
       if (!submission) {
         res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Check permissions: owner, admin, or researcher can unpin
+      const user = await context.userStore.getUserById(req.userId!);
+      const canPin = submission.submitter_id === req.userId! ||
+                     user?.roles.includes('admin') ||
+                     user?.roles.includes('researcher');
+      
+      if (!canPin) {
+        res.status(403).json({ error: 'Only submission owner, researchers, and admins can unpin messages' });
         return;
       }
 

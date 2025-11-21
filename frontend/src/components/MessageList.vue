@@ -9,6 +9,7 @@
           :is-pinned="pinnedMessageId === msg.id"
           :is-hidden="hiddenMessageIds.has(msg.id)"
           :can-hide-message="canModerate"
+          :can-pin="canPin"
           :reactions="messageReactions.get(msg.id)"
           :current-user-id="currentUserId"
           @text-selected="onTextSelected"
@@ -35,6 +36,7 @@ interface Props {
   userNames?: Map<string, string>
   currentUserId?: string
   canModerate?: boolean
+  canPin?: boolean
   pinnedMessageId?: string | null
   hiddenMessageIds?: Set<string>
   messageReactions?: Map<string, Array<{ user_id: string; reaction_type: string }>>
@@ -44,6 +46,7 @@ const props = withDefaults(defineProps<Props>(), {
   annotatedMessageIds: () => new Set(),
   userNames: () => new Map(),
   canModerate: false,
+  canPin: false,
   pinnedMessageId: null,
   hiddenMessageIds: () => new Set(),
   messageReactions: () => new Map()

@@ -161,7 +161,7 @@
             </button>
             <div class="w-px h-4 bg-gray-700" />
             <button 
-              v-if="currentUserId"
+              v-if="currentUserId && canPin"
               @click="togglePin"
               class="px-2 py-1 text-xs transition-colors"
               :class="isPinned ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-400'"
@@ -225,6 +225,7 @@ interface Props {
   isPinned?: boolean
   isHidden?: boolean
   canHideMessage?: boolean
+  canPin?: boolean
   reactions?: Array<{ user_id: string; reaction_type: string }>
   currentUserId?: string
 }
@@ -236,6 +237,7 @@ const props = withDefaults(defineProps<Props>(), {
   isPinned: false,
   isHidden: false,
   canHideMessage: false,
+  canPin: false,
   branchCount: 1,
   selectionMode: false,
   isSelected: false,

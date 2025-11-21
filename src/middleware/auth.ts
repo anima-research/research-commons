@@ -58,6 +58,16 @@ export function requireRole(role: User['roles'][0]) {
   };
 }
 
+export function requireAnyRole(roles: User['roles']) {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user || !roles.some(role => req.user!.roles.includes(role))) {
+      res.status(403).json({ error: `Requires one of: ${roles.join(', ')}` });
+      return;
+    }
+    next();
+  };
+}
+
 export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
