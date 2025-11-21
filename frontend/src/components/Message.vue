@@ -32,7 +32,15 @@
       <!-- Participant header -->
       <div class="flex items-center gap-2 mb-2">
         
+        <!-- Avatar -->
+        <img 
+          v-if="participantAvatarUrl"
+          :src="participantAvatarUrl"
+          :alt="props.message.participant_name"
+          class="w-6 h-6 rounded-full object-cover border border-gray-600"
+        />
         <div 
+          v-else
           class="w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium"
           :class="{
             'bg-indigo-500 text-white': isUser,
@@ -42,9 +50,14 @@
         >
           {{ props.message.participant_name.charAt(0) }}
         </div>
-        <span class="text-sm font-medium text-gray-300">
-          {{ props.message.participant_name }}
-        </span>
+        <div class="flex flex-col">
+          <span class="text-sm font-medium text-gray-300">
+            {{ props.message.participant_name }}
+          </span>
+          <span v-if="props.message.metadata?.discord_username && props.message.metadata.discord_username !== props.message.participant_name" class="text-[10px] text-gray-500">
+            @{{ props.message.metadata.discord_username }}
+          </span>
+        </div>
         <span v-if="props.message.model_info" class="text-xs text-gray-500 font-mono">
           {{ props.message.model_info.model_id.split('-')[0] }}
         </span>
@@ -228,6 +241,7 @@ interface Props {
   canPin?: boolean
   reactions?: Array<{ user_id: string; reaction_type: string }>
   currentUserId?: string
+  participantAvatars?: Map<string, string>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -242,7 +256,29 @@ const props = withDefaults(defineProps<Props>(), {
   selectionMode: false,
   isSelected: false,
   reactions: () => [],
-  currentUserId: ''
+  currentUserId: '',
+  participantAvatars: () => new Map()
+})
+
+// Get avatar URL for this message's participant
+const participantAvatarUrl = computed(() => {
+  // First check message metadata
+  if (props.message.metadata?.avatar_url && typeof props.message.metadata.avatar_url === 'string') {
+    console.log('[Message] Using avatar from metadata for', props.message.participant_name, ':', props.message.metadata.avatar_url)
+    return props.message.metadata.avatar_url as string
+  }
+  
+  // Fall back to participant avatars map
+  if (props.participantAvatars) {
+    const avatar = props.participantAvatars.get(props.message.participant_name)
+    if (avatar && avatar.startsWith('http')) {
+      console.log('[Message] Using avatar from map for', props.message.participant_name, ':', avatar)
+      return avatar
+    }
+  }
+  
+  console.log('[Message] No avatar found for', props.message.participant_name, 'metadata:', props.message.metadata)
+  return undefined
 })
 
 const emit = defineEmits<{

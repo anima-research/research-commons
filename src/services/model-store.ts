@@ -41,7 +41,7 @@ export class ModelStore {
 
   async createModel(
     name: string,
-    description: string,
+    description: string | undefined,
     provider: Model['provider'],
     modelId: string,
     avatar: string,
@@ -51,7 +51,7 @@ export class ModelStore {
     const model: Model = {
       id: uuidv4(),
       name,
-      description,
+      description: description || '',
       provider,
       model_id: modelId,
       avatar,

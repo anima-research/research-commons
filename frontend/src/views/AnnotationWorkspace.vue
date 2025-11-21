@@ -166,6 +166,7 @@
             :pinned-message-id="pinnedMessageId"
             :hidden-message-ids="hiddenMessageIds"
             :message-reactions="messageReactions"
+            :participant-avatars="participantAvatars"
             @add-tag-to-message="handleAddTagToMessage"
             @add-comment-to-message="handleAddCommentToMessage"
             @copy-message="handleCopyMessage"
@@ -412,6 +413,18 @@ const selections = ref<Selection[]>([])
 const pinnedMessageId = ref<string | null>(null)
 const hiddenMessageIds = ref<Set<string>>(new Set())
 const messageReactions = ref<Map<string, Array<{ user_id: string; reaction_type: string }>>>(new Map())
+
+// Build participant avatars map from message metadata
+const participantAvatars = computed(() => {
+  const avatars = new Map<string, string>()
+  for (const msg of messages.value) {
+    if (msg.metadata?.avatar_url && typeof msg.metadata.avatar_url === 'string') {
+      avatars.set(msg.participant_name, msg.metadata.avatar_url as string)
+    }
+  }
+  console.log('[AnnotationWorkspace] Participant avatars map:', Array.from(avatars.entries()))
+  return avatars
+})
 const selectionData = ref<Map<string, {
   comments: Comment[]
   tags: any[]

@@ -14,3 +14,4 @@ data/submissions/*
 # Frontend build
 frontend/dist/
 frontend/node_modules/
+API.md

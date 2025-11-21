@@ -8,6 +8,7 @@ import { ResearchStore } from './services/research-store.js';
 import { OntologyStore } from './services/ontology-store.js';
 import { RankingStore } from './services/ranking-store.js';
 import { ModelStore } from './services/model-store.js';
+import { ParticipantMappingStore } from './services/participant-mapping-store.js';
 import { createAuthRoutes } from './routes/auth.js';
 import { createSubmissionRoutes } from './routes/submissions.js';
 import { createSubmissionSystemsRoutes } from './routes/submission-systems.js';
@@ -17,6 +18,7 @@ import { createOntologyRoutes } from './routes/ontologies.js';
 import { createRankingRoutes } from './routes/rankings.js';
 import { createModelRoutes } from './routes/models.js';
 import { createAdminRoutes } from './routes/admin.js';
+import { createImportRoutes } from './routes/imports.js';
 
 dotenv.config();
 
@@ -24,6 +26,10 @@ const PORT = process.env.PORT || 3020;
 const DATABASE_PATH = process.env.DATABASE_PATH || './data/research.db';
 const SUBMISSIONS_PATH = process.env.SUBMISSIONS_PATH || './data/submissions';
 const DATA_PATH = process.env.DATA_PATH || './data';
+
+// Discord import configuration (server-side)
+const DISCORD_API_URL = process.env.DISCORD_API_URL || 'http://borgs.tesserae.cc:3305';
+const DISCORD_API_TOKEN = process.env.DISCORD_API_TOKEN || '8aaa4d29defc9de6fd4ac4971b32b8d5b8c3265eeed584017829979534da8696';
 
 export interface AppContext {
   submissionStore: SubmissionStore;
@@ -33,6 +39,11 @@ export interface AppContext {
   ontologyStore: OntologyStore;
   rankingStore: RankingStore;
   modelStore: ModelStore;
+  participantMappingStore: ParticipantMappingStore;
+  discordConfig: {
+    apiUrl: string;
+    apiToken: string;
+  };
 }
 
 async function initializeDefaults(
@@ -175,6 +186,7 @@ async function main() {
   const ontologyStore = new OntologyStore(DATA_PATH);
   const rankingStore = new RankingStore(DATA_PATH);
   const modelStore = new ModelStore(DATA_PATH);
+  const participantMappingStore = new ParticipantMappingStore(DATA_PATH);
 
   await submissionStore.init();
   await userStore.init();
@@ -182,6 +194,7 @@ async function main() {
   await ontologyStore.init();
   await rankingStore.init();
   await modelStore.init();
+  await participantMappingStore.init();
 
   // Auto-create defaults if needed
   await initializeDefaults(ontologyStore, rankingStore, modelStore, researchStore);
@@ -193,7 +206,12 @@ async function main() {
     researchStore,
     ontologyStore,
     rankingStore,
-    modelStore
+    modelStore,
+    participantMappingStore,
+    discordConfig: {
+      apiUrl: DISCORD_API_URL,
+      apiToken: DISCORD_API_TOKEN
+    }
   };
 
   // Routes
@@ -206,6 +224,7 @@ async function main() {
   app.use('/api/rankings', createRankingRoutes(context));
   app.use('/api/models', createModelRoutes(context));
   app.use('/api/admin', createAdminRoutes(context));
+  app.use('/api/imports', createImportRoutes(context));
 
   // Serve frontend in production
   if (process.env.NODE_ENV === 'production') {

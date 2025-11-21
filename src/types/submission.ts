@@ -69,7 +69,8 @@ export const MessageSchema = z.object({
   participant_type: z.enum(['human', 'model', 'system']),
   content_blocks: z.array(ContentBlockSchema),
   model_info: ModelInfoSchema.optional(),
-  timestamp: z.date().optional()
+  timestamp: z.date().optional(),
+  metadata: z.record(z.unknown()).optional() // Store Discord message ID, avatar URL, etc.
 });
 
 export type Message = z.infer<typeof MessageSchema>;
@@ -114,7 +115,8 @@ export const CreateMessageRequestSchema = z.object({
   participant_type: z.enum(['human', 'model', 'system']),
   content_blocks: z.array(ContentBlockSchema),
   model_info: ModelInfoSchema.optional(),
-  timestamp: z.coerce.date().optional()
+  timestamp: z.coerce.date().optional(),
+  metadata: z.record(z.unknown()).optional()
 });
 
 // For API requests

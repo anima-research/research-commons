@@ -26,7 +26,7 @@ export type Model = z.infer<typeof ModelSchema>;
 // API request schemas
 export const CreateModelRequestSchema = z.object({
   name: z.string(),
-  description: z.string(),
+  description: z.string().optional(),
   provider: z.enum(['anthropic', 'openai', 'google', 'meta', 'other']),
   model_id: z.string(),
   avatar: z.string().default('🤖'),

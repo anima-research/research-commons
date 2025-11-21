@@ -12,6 +12,7 @@
           :can-pin="canPin"
           :reactions="messageReactions.get(msg.id)"
           :current-user-id="currentUserId"
+          :participant-avatars="participantAvatars"
           @text-selected="onTextSelected"
           @add-tag-to-message="onAddTagToMessage"
           @add-comment-to-message="onAddCommentToMessage"
@@ -40,6 +41,7 @@ interface Props {
   pinnedMessageId?: string | null
   hiddenMessageIds?: Set<string>
   messageReactions?: Map<string, Array<{ user_id: string; reaction_type: string }>>
+  participantAvatars?: Map<string, string>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -49,7 +51,8 @@ const props = withDefaults(defineProps<Props>(), {
   canPin: false,
   pinnedMessageId: null,
   hiddenMessageIds: () => new Set(),
-  messageReactions: () => new Map()
+  messageReactions: () => new Map(),
+  participantAvatars: () => new Map()
 })
 
 const emit = defineEmits<{

@@ -34,6 +34,7 @@ export interface Message {
   content_blocks: ContentBlock[]
   model_info?: ModelInfo
   timestamp?: string
+  metadata?: Record<string, any> // Discord message ID, avatar URL, etc.
 }
 
 export interface Submission {

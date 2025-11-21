@@ -17,6 +17,37 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+export const importsAPI = {
+  fetchDiscordMessages: (params: { lastMessageUrl: string; firstMessageUrl?: string; maxMessages?: number }) =>
+    api.post<{ messages: any[]; title: string; metadata: any; existing_mappings_by_user_id: any }>('/imports/discord/fetch', {
+      source_type: 'discord',
+      discord_params: params
+    }),
+
+  saveMappings: (sourceType: string, mappings: Array<{ 
+    source_user_id: string; 
+    source_username: string; 
+    source_display_name?: string;
+    avatar_url?: string;
+    model_id?: string; 
+    is_human: boolean 
+  }>) =>
+    api.post<{ success: boolean; count: number }>('/imports/save-mappings', {
+      source_type: sourceType,
+      mappings
+    }),
+
+  importDiscord: (params: { lastMessageUrl: string; firstMessageUrl?: string; maxMessages?: number }, topicTags?: string[]) =>
+    api.post<{ submission_id: string; message_count: number; title: string }>('/imports/discord', {
+      source_type: 'discord',
+      discord_params: params,
+      topic_tags: topicTags || []
+    }),
+  
+  checkDiscordStatus: () =>
+    api.get<{ available: boolean; configured: boolean }>('/imports/discord/status')
+}
+
 export const authAPI = {
   register: (email: string, password: string, name: string) =>
     api.post<{ user: User; token: string }>('/auth/register', { email, password, name }),
