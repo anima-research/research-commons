@@ -49,7 +49,7 @@ export const importsAPI = {
 }
 
 export const discordPreviewAPI = {
-  fetchMessages: (lastMessageUrl: string, limit?: number) =>
+  fetchMessages: (lastMessageUrl: string, firstMessageUrl?: string, limit?: number) =>
     api.post<{ messages: Array<{
       id: string;
       discord_message_id: string;
@@ -61,6 +61,7 @@ export const discordPreviewAPI = {
       message_url: string;
     }>; has_more: boolean }>('/discord-preview/messages', {
       lastMessageUrl,
+      firstMessageUrl,
       limit: limit || 50
     })
 }

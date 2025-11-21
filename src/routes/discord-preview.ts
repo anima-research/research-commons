@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 const PreviewRequestSchema = z.object({
   lastMessageUrl: z.string(),
+  firstMessageUrl: z.string().optional(),
   limit: z.number().optional().default(50)
 });
 
@@ -19,21 +20,30 @@ export function createDiscordPreviewRoutes(context: AppContext): Router {
     try {
       const data = PreviewRequestSchema.parse(req.body);
 
-      console.log('[Discord Preview] Fetching messages from:', data.lastMessageUrl);
+      console.log('[Discord Preview] Fetching messages from:', data.lastMessageUrl, 'to:', data.firstMessageUrl);
 
       // Call Discord export API with minimal data
+      const requestBody: any = {
+        last: data.lastMessageUrl
+      };
+      
+      // Add first message URL if provided (for range queries)
+      if (data.firstMessageUrl) {
+        requestBody.first = data.firstMessageUrl;
+      } else {
+        // Use recency window for open-ended queries
+        requestBody.recencyWindow = {
+          messages: data.limit
+        };
+      }
+      
       const response = await fetch(`${context.discordConfig.apiUrl}/api/messages/export`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${context.discordConfig.apiToken}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          last: data.lastMessageUrl,
-          recencyWindow: {
-            messages: data.limit
-          }
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {

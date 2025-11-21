@@ -388,21 +388,27 @@
             <div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               📝 Preview: {{ previewMessages.length }} messages
             </div>
-            <div class="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+            <div class="space-y-2 text-xs text-gray-400">
               <div v-for="(msg, idx) in previewMessages.slice(0, 5)" :key="idx" class="flex items-start gap-2">
-                <span 
-                  v-if="participantMapping[msg.participant_name] && participantMapping[msg.participant_name] !== 'human'"
-                  class="text-lg"
-                >
-                  {{ getModelAvatar(participantMapping[msg.participant_name]) }}
-                </span>
-                <span v-else>👤</span>
-                <span>
-                  <span class="font-medium text-gray-900 dark:text-gray-100">{{ msg.participant_name }}</span>: 
+                <!-- Avatar -->
+                <div class="shrink-0">
+                  <img
+                    v-if="msg.metadata?.avatar_url"
+                    :src="msg.metadata.avatar_url"
+                    class="w-6 h-6 rounded-full"
+                    :alt="msg.participant_name"
+                  />
+                  <div v-else-if="participantMapping[msg.participant_name] && participantMapping[msg.participant_name] !== 'human'" class="text-lg">
+                    {{ getModelAvatar(participantMapping[msg.participant_name]) && !getModelAvatar(participantMapping[msg.participant_name]).startsWith('http') ? getModelAvatar(participantMapping[msg.participant_name]) : '🤖' }}
+                  </div>
+                  <span v-else>👤</span>
+                </div>
+                <span class="flex-1 min-w-0">
+                  <span class="font-medium text-gray-100">{{ msg.participant_name }}</span>: 
                   {{ truncate(getMessageText(msg), 50) }}
                 </span>
               </div>
-              <div v-if="previewMessages.length > 5" class="text-gray-500 dark:text-gray-400 mt-2">
+              <div v-if="previewMessages.length > 5" class="text-gray-500 mt-2">
                 ... and {{ previewMessages.length - 5 }} more
               </div>
             </div>
@@ -460,19 +466,19 @@
             @click="selectFirstMessage(msg.message_url)"
             class="w-full text-left p-3 bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-indigo-500/50 rounded transition-all group"
           >
-            <div class="flex items-start gap-2">
-              <div class="text-xs text-gray-500 w-16 shrink-0">
-                {{ formatPreviewTime(msg.timestamp) }}
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium text-gray-300 mb-1">
-                  {{ msg.author_name }}
-                  <span class="text-xs text-gray-500">@{{ msg.author_username }}</span>
-                </div>
-                <div class="text-xs text-gray-400 line-clamp-2">
-                  {{ msg.content || '[No text content]' }}
-                </div>
-              </div>
+                  <div class="flex items-start gap-3">
+                    <div class="text-xs text-gray-500 w-14 shrink-0 text-right">
+                      {{ formatPreviewTime(msg.timestamp) }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm font-medium text-gray-300 mb-1">
+                        {{ msg.author_name }}
+                        <span class="text-xs text-gray-500">@{{ msg.author_username }}</span>
+                      </div>
+                      <div class="text-xs text-gray-400 line-clamp-2">
+                        {{ msg.content || '[No text content]' }}
+                      </div>
+                    </div>
               <svg class="w-4 h-4 text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
               </svg>
@@ -480,22 +486,28 @@
           </button>
         </div>
         
-        <div class="p-4 border-t border-gray-700 flex justify-between">
-          <button
-            v-if="canLoadEarlier"
-            @click="loadEarlierMessages"
-            :disabled="loadingPreview"
-            class="px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded transition-colors disabled:opacity-50"
-          >
-            ← Load Earlier
-          </button>
-          <button
-            @click="showMessageSelector = false"
-            class="px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
+              <div class="p-4 border-t border-gray-700 flex justify-between items-center">
+                <div>
+                  <button
+                    v-if="canLoadEarlier"
+                    @click="loadEarlierMessages"
+                    :disabled="loadingPreview"
+                    class="px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <svg v-if="loadingPreview" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>{{ loadingPreview ? 'Loading...' : '← Load Earlier' }}</span>
+                  </button>
+                </div>
+                <button
+                  @click="showMessageSelector = false"
+                  class="px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
       </div>
     </div>
   </div>
@@ -660,18 +672,39 @@ async function openMessageSelector() {
   await loadSelectorMessages(discordLastMessageUrl.value)
 }
 
-async function loadSelectorMessages(fromUrl: string) {
+async function loadSelectorMessages(fromUrl: string, appendToExisting: boolean = false) {
   loadingPreview.value = true
   
   try {
-    const response = await discordPreviewAPI.fetchMessages(fromUrl, 50)
-    selectorPreviewMessages.value = response.data.messages
+    // When loading earlier: fromUrl is the oldest message, we want to fetch 50 messages before it
+    // Don't pass firstParam - let the API work backwards from fromUrl
+    console.log('[Message Selector] Fetching from:', fromUrl, 'append:', appendToExisting)
+    
+    const response = await discordPreviewAPI.fetchMessages(fromUrl, undefined, 50)
+    
+    console.log('[Message Selector] Got messages:', response.data.messages.length)
+    
+    // Sort messages by timestamp (oldest first, like a chat)
+    const sorted = response.data.messages.sort((a: any, b: any) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    )
+    
+    if (appendToExisting) {
+      // Prepend older messages to the beginning of the list
+      selectorPreviewMessages.value = [...sorted, ...selectorPreviewMessages.value]
+    } else {
+      // Initial load - replace list
+      selectorPreviewMessages.value = sorted
+    }
+    
     canLoadEarlier.value = response.data.has_more
     
-    // Update oldest message URL for pagination
-    if (response.data.messages.length > 0) {
-      oldestMessageUrl.value = response.data.messages[response.data.messages.length - 1].message_url
+    // Update oldest message URL (first item after sorting = oldest)
+    if (selectorPreviewMessages.value.length > 0) {
+      oldestMessageUrl.value = selectorPreviewMessages.value[0].message_url
     }
+    
+    console.log('[Message Selector] Total messages now:', selectorPreviewMessages.value.length)
   } catch (err: any) {
     console.error('[Message Selector] Failed to load messages:', err)
     error.value = 'Failed to load message preview'
@@ -681,26 +714,15 @@ async function loadSelectorMessages(fromUrl: string) {
 }
 
 async function loadEarlierMessages() {
-  if (!oldestMessageUrl.value) return
-  
-  loadingPreview.value = true
-  
-  try {
-    const response = await discordPreviewAPI.fetchMessages(oldestMessageUrl.value, 50)
-    
-    // Append older messages
-    selectorPreviewMessages.value.push(...response.data.messages)
-    canLoadEarlier.value = response.data.has_more
-    
-    // Update oldest message URL
-    if (response.data.messages.length > 0) {
-      oldestMessageUrl.value = response.data.messages[response.data.messages.length - 1].message_url
-    }
-  } catch (err: any) {
-    console.error('[Message Selector] Failed to load earlier messages:', err)
-  } finally {
-    loadingPreview.value = false
+  if (!oldestMessageUrl.value || !selectorPreviewMessages.value.length) {
+    console.log('[Message Selector] Cannot load earlier - no oldest URL or no messages')
+    return
   }
+  
+  console.log('[Message Selector] Load Earlier clicked, current count:', selectorPreviewMessages.value.length)
+  
+  // Call with append mode - fetch from oldest we have going back 50 more
+  await loadSelectorMessages(oldestMessageUrl.value, true)
 }
 
 function selectFirstMessage(messageUrl: string) {
@@ -710,8 +732,29 @@ function selectFirstMessage(messageUrl: string) {
 }
 
 function formatPreviewTime(timestamp: string): string {
-  const date = new Date(timestamp)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  // Get the most recent message (LAST in the list since we sort oldest first) as reference
+  if (selectorPreviewMessages.value.length === 0) return ''
+  
+  const messageDate = new Date(timestamp)
+  const latestMessage = selectorPreviewMessages.value[selectorPreviewMessages.value.length - 1]  // Last = newest
+  const latestDate = new Date(latestMessage.timestamp)
+  
+  const diffMs = latestDate.getTime() - messageDate.getTime()
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  const diffWeeks = Math.floor(diffDays / 7)
+  const diffMonths = Math.floor(diffDays / 30)
+  
+  if (diffMinutes < 1) return 'now'
+  if (diffMinutes < 60) return `${diffMinutes}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffWeeks < 4) return `${diffWeeks}w ago`
+  if (diffMonths < 12) return `${diffMonths}mo ago`
+  
+  const diffYears = Math.floor(diffMonths / 12)
+  return `${diffYears}y ago`
 }
 
 async function updateModelAvatar(participantName: string, modelId: string) {
