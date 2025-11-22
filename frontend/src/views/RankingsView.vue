@@ -46,13 +46,20 @@
                   Category: {{ system.category }} • {{ system.permissions }}
                 </div>
               </div>
-              <button
-                v-if="canEdit(system)"
-                @click.stop="startEditSystem(system)"
-                class="px-3 py-1 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
-              >
-                ✏️ Edit
-              </button>
+              <div v-if="canEdit(system)" class="flex gap-2">
+                <button
+                  @click.stop="startEditSystem(system)"
+                  class="px-3 py-1 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
+                >
+                  ✏️ Edit
+                </button>
+                <button
+                  @click.stop="confirmDeleteSystem(system)"
+                  class="px-3 py-1 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                >
+                  🗑️ Delete
+                </button>
+              </div>
             </div>
 
             <!-- Criteria list -->
@@ -163,12 +170,14 @@
                   <input
                     v-model.number="criterion.scale_min"
                     type="number"
+                    min="0"
                     placeholder="Min"
                     class="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 transition-colors"
                   />
                   <input
                     v-model.number="criterion.scale_max"
                     type="number"
+                    min="0"
                     placeholder="Max"
                     class="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 transition-colors"
                   />
@@ -348,6 +357,19 @@ async function updateSystem() {
     closeEditForm()
   } catch (err) {
     console.error('Failed to update ranking system:', err)
+  }
+}
+
+async function confirmDeleteSystem(system: any) {
+  if (!confirm(`Delete ranking system "${system.name}"? This cannot be undone.`)) {
+    return
+  }
+  try {
+    await rankingsAPI.delete(system.id)
+    await loadRankingSystems()
+  } catch (err) {
+    console.error('Failed to delete ranking system:', err)
+    alert('Failed to delete ranking system. You may not have permission.')
   }
 }
 </script>

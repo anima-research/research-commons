@@ -39,6 +39,9 @@ export class RankingStore {
             ...event.data.updates
           });
         }
+      } else if (event.type === 'ranking_system_deleted') {
+        this.rankingSystems.delete(event.data.id);
+        this.systemCriteria.delete(event.data.id);
       }
     }
 
@@ -218,6 +221,27 @@ export class RankingStore {
     );
 
     this.criteria.delete(id);
+  }
+
+  async deleteRankingSystem(id: string): Promise<void> {
+    const system = this.rankingSystems.get(id);
+    if (!system) return;
+
+    // Delete all associated criteria first
+    const systemCriteriaList = this.systemCriteria.get(id) || [];
+    for (const criterionId of systemCriteriaList) {
+      await this.deleteCriterion(criterionId);
+    }
+
+    // Delete the ranking system
+    await this.rankingSystemsFile.appendEvent({
+      timestamp: new Date(),
+      type: 'ranking_system_deleted',
+      data: { id }
+    });
+
+    this.rankingSystems.delete(id);
+    this.systemCriteria.delete(id);
   }
 
   async close(): Promise<void> {

@@ -213,6 +213,9 @@ export const rankingsAPI = {
   update: (id: string, data: any) =>
     api.put<any>(`/rankings/${id}`, data),
   
+  delete: (id: string) =>
+    api.delete<{ success: boolean }>(`/rankings/${id}`),
+  
   attach: (submissionId: string, rankingSystemId: string, usagePermissions: string) =>
     api.post<any>('/rankings/attach', { submission_id: submissionId, ranking_system_id: rankingSystemId, usage_permissions: usagePermissions }),
   

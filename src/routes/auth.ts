@@ -45,7 +45,9 @@ export function createAuthRoutes(context: AppContext): Router {
       if (error.message === 'User already exists') {
         res.status(409).json({ error: 'User already exists' });
       } else if (error.name === 'ZodError') {
-        res.status(400).json({ error: 'Invalid request', details: error.errors });
+        // Extract the first error message for user-friendly display
+        const firstError = error.errors?.[0]?.message || 'Invalid request';
+        res.status(400).json({ error: firstError, details: error.errors });
       } else {
         console.error('Registration error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -83,7 +85,9 @@ export function createAuthRoutes(context: AppContext): Router {
       });
     } catch (error: any) {
       if (error.name === 'ZodError') {
-        res.status(400).json({ error: 'Invalid request', details: error.errors });
+        // Extract the first error message for user-friendly display
+        const firstError = error.errors?.[0]?.message || 'Invalid request';
+        res.status(400).json({ error: firstError, details: error.errors });
       } else {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Internal server error' });
