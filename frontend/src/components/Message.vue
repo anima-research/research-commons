@@ -362,7 +362,7 @@ watch([showActions, actionsExpanded], () => {
   }
 })
 
-const isUser = computed(() => props.message.participant_type === 'human' && props.message.participant_name.toLowerCase().includes('user'))
+const isUser = computed(() => props.message.participant_type === 'human')
 
 onMounted(() => {
   checkMobile()

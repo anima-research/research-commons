@@ -54,13 +54,41 @@
               <label class="block text-sm font-medium text-gray-300 mb-2">
                 Last Message URL <span class="text-red-400">*</span>
               </label>
-              <input
-                v-model="discordLastMessageUrl"
-                type="text"
-                placeholder="https://discord.com/channels/GUILD_ID/CHANNEL_ID/MESSAGE_ID"
-                class="w-full px-3 py-2 border border-gray-700 rounded bg-gray-800 text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-              <p class="mt-1 text-xs text-gray-500">The ending message URL (most recent)</p>
+              <div class="relative">
+                <input
+                  v-model="discordLastMessageUrl"
+                  @blur="validateDiscordUrl"
+                  @change="discordUrlValidated = false; discordUrlError = ''"
+                  type="text"
+                  placeholder="https://discord.com/channels/GUILD_ID/CHANNEL_ID/MESSAGE_ID"
+                  :class="{
+                    'border-red-500 focus:ring-red-500': discordLastMessageUrl && (discordUrlError || !isValidDiscordUrl(discordLastMessageUrl)),
+                    'border-green-500 focus:ring-green-500': discordUrlValidated && !discordUrlError,
+                    'border-gray-700 focus:ring-indigo-500': !discordLastMessageUrl || (!discordUrlError && !discordUrlValidated)
+                  }"
+                  class="w-full px-3 py-2 rounded bg-gray-800 text-gray-100 placeholder-gray-500 focus:ring-2 focus:border-transparent pr-10"
+                />
+                <!-- Loading spinner while validating -->
+                <div v-if="discordUrlValidating" class="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div class="animate-spin h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+                </div>
+                <!-- Success checkmark -->
+                <div v-else-if="discordUrlValidated && !discordUrlError" class="absolute right-3 top-1/2 -translate-y-1/2">
+                  <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+              </div>
+              <p v-if="discordUrlError" class="mt-1 text-xs text-red-400">
+                {{ discordUrlError }}
+              </p>
+              <p v-else-if="discordUrlValidated" class="mt-1 text-xs text-green-400">
+                ✓ URL validated - ready to browse messages
+              </p>
+              <p v-else-if="discordLastMessageUrl && !isValidDiscordUrl(discordLastMessageUrl)" class="mt-1 text-xs text-red-400">
+                Invalid Discord message URL format
+              </p>
+              <p v-else class="mt-1 text-xs text-gray-500">The ending message URL (most recent)</p>
             </div>
             
             <div>
@@ -76,9 +104,9 @@
                 />
                 <button
                   @click="openMessageSelector"
-                  :disabled="!discordLastMessageUrl"
+                  :disabled="!discordUrlValidated || discordUrlValidating || !!discordUrlError"
                   class="px-3 py-2 border border-indigo-500/50 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 rounded text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Browse messages to select starting point"
+                  :title="discordUrlValidated ? 'Browse messages to select starting point' : 'Validate URL first (blur input or press Tab)'"
                 >
                   Browse
                 </button>
@@ -608,6 +636,9 @@ const step = ref<'upload' | 'configure'>('upload')
 const discordLastMessageUrl = ref('')
 const discordFirstMessageUrl = ref('')
 const discordMaxMessages = ref<number | undefined>(undefined)
+const discordUrlValidated = ref(false) // Track if URL has been validated
+const discordUrlValidating = ref(false) // Track validation in progress
+const discordUrlError = ref('') // Track validation error
 const discordParticipantsWithIds = ref<Array<{ 
   name: string; 
   discord_user_id: string; 
@@ -756,6 +787,69 @@ function formatPreviewTime(timestamp: string): string {
   
   const diffYears = Math.floor(diffMonths / 12)
   return `${diffYears}y ago`
+}
+
+function isValidDiscordUrl(url: string): boolean {
+  // Discord message URL format: https://discord.com/channels/GUILD_ID/CHANNEL_ID/MESSAGE_ID
+  const pattern = /^https:\/\/discord\.com\/channels\/\d+\/\d+\/\d+$/
+  return pattern.test(url)
+}
+
+async function validateDiscordUrl() {
+  if (!discordLastMessageUrl.value) {
+    discordUrlValidated.value = false
+    discordUrlError.value = ''
+    return
+  }
+  
+  // Check format first
+  if (!isValidDiscordUrl(discordLastMessageUrl.value)) {
+    discordUrlValidated.value = false
+    discordUrlError.value = 'Invalid URL format'
+    return
+  }
+  
+  // Test with actual API call (fetch 1 message)
+  discordUrlValidating.value = true
+  discordUrlError.value = ''
+  
+  try {
+    console.log('[Discord Validation] Testing URL:', discordLastMessageUrl.value)
+    const response = await discordPreviewAPI.fetchMessages(discordLastMessageUrl.value, undefined, 1)
+    
+    // Check if we actually got messages back
+    if (!response.data.messages || response.data.messages.length === 0) {
+      discordUrlValidated.value = false
+      discordUrlError.value = 'No messages found - Message ID may not exist in this channel'
+      console.log('[Discord Validation] URL valid but no messages returned')
+      return
+    }
+    
+    // Success!
+    discordUrlValidated.value = true
+    discordUrlError.value = ''
+    console.log('[Discord Validation] URL is valid and accessible')
+  } catch (err: any) {
+    console.error('[Discord Validation] Failed:', err)
+    discordUrlValidated.value = false
+    
+    // Provide specific error messages
+    if (err.response?.status === 403 || err.response?.status === 401) {
+      discordUrlError.value = 'Permission denied - Bridge bot may not have access to this channel'
+    } else if (err.response?.status === 404) {
+      discordUrlError.value = 'Message not found - URL may be invalid or message deleted'
+    } else if (err.response?.status === 400) {
+      discordUrlError.value = 'Invalid request - Please check the URL'
+    } else if (err.message?.includes('timeout') || err.message?.includes('timed out')) {
+      discordUrlError.value = 'Request timed out - Bridge service may be unavailable'
+    } else if (err.message?.includes('Network Error')) {
+      discordUrlError.value = 'Network error - Check your connection'
+    } else {
+      discordUrlError.value = 'Unable to access this URL - Please verify it is correct'
+    }
+  } finally {
+    discordUrlValidating.value = false
+  }
 }
 
 async function updateModelAvatar(participantName: string, modelId: string) {
@@ -1027,7 +1121,7 @@ async function fetchDiscordMessages() {
     const response = await importsAPI.fetchDiscordMessages({
       lastMessageUrl: discordLastMessageUrl.value,
       firstMessageUrl: discordFirstMessageUrl.value || undefined,
-      maxMessages: discordMaxMessages.value
+      maxMessages: discordMaxMessages.value || undefined  // Don't send empty string
     })
     
     console.log('[Discord Import] Fetched messages:', response.data)
@@ -1101,7 +1195,28 @@ async function fetchDiscordMessages() {
     step.value = 'configure'
   } catch (err: any) {
     console.error('[Discord Import] Fetch failed:', err)
-    error.value = err.response?.data?.error || err.message || 'Failed to fetch Discord messages'
+    
+    // Provide specific error messages based on response
+    if (err.response?.status === 403 || err.response?.status === 401) {
+      error.value = 'Permission denied: The Discord bridge bot may not have access to this channel. Please check that the bot is invited to the server and has permission to read message history.'
+    } else if (err.response?.status === 404) {
+      error.value = 'Message not found: The Discord message URL may be invalid or the message may have been deleted. Please verify the URL is correct.'
+    } else if (err.response?.status === 400) {
+      // Bad request - could be invalid URL format or bad parameters
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || ''
+      if (errorMsg.toLowerCase().includes('url') || errorMsg.toLowerCase().includes('format')) {
+        error.value = 'Invalid Discord URL format. Please use: https://discord.com/channels/GUILD_ID/CHANNEL_ID/MESSAGE_ID'
+      } else {
+        error.value = `Invalid request: ${errorMsg || 'Please check your input parameters'}`
+      }
+    } else if (err.message?.includes('timeout') || err.message?.includes('timed out')) {
+      error.value = 'Request timed out: The Discord bridge service is not responding. It may be temporarily unavailable. Please try again in a moment.'
+    } else if (err.message?.includes('Network Error') || err.message?.includes('fetch failed')) {
+      error.value = 'Network error: Unable to connect to Discord bridge service. Please check your internet connection and try again.'
+    } else {
+      // Generic error with whatever message we got
+      error.value = err.response?.data?.error || err.message || 'Failed to fetch Discord messages. Please try again or contact support.'
+    }
   } finally {
     submitting.value = false
   }
