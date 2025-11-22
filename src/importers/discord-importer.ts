@@ -32,7 +32,9 @@ interface DiscordExportData {
   messages: DiscordMessage[];
   metadata: {
     channelId: string;
+    channelName?: string;
     guildId?: string;
+    guildName?: string;
     firstMessageId: string;
     lastMessageId: string;
     totalCount: number;
@@ -254,9 +256,15 @@ export class DiscordImporter extends BaseImporter {
 
     // Use channel info extracted earlier (no redeclaration)
     const channelId = channelInfo?.[2] || data.metadata.channelId;
+    
+    // Generate title with channel name if available, otherwise use ID
+    const channelName = data.metadata.channelName;
+    const title = channelName 
+      ? `Discord: #${channelName}`
+      : `Discord: Channel ${channelId}`;
 
     return {
-      title: `Discord: Channel ${channelId}`,
+      title,
       messages,
       metadata: {
         original_date: data.messages.length > 0 ? new Date(data.messages[0].timestamp) : undefined,
@@ -264,7 +272,9 @@ export class DiscordImporter extends BaseImporter {
         model_summary: models.length > 0 ? models : undefined,
         source_identifier: channelId,
         channel_id: channelId,
+        channel_name: channelName,
         guild_id: guildId,
+        guild_name: data.metadata.guildName,
         message_count: data.messages.length,
         truncated: data.metadata.truncated,
         participants_with_ids // Include Discord user IDs for mapping

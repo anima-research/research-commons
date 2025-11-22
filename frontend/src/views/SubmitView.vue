@@ -134,6 +134,22 @@
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Upload JSON File (Anthropic format)
             </label>
+            
+            <!-- Claude.ai Exporter Info -->
+            <div class="mb-3 p-3 bg-purple-900/20 border border-purple-700/50 rounded text-sm text-purple-200">
+              <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+              </svg>
+              <strong>Need to export from Claude.ai?</strong> Use the 
+              <a 
+                href="https://github.com/socketteer/Claude-Conversation-Exporter" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                class="underline hover:text-purple-100 transition-colors"
+              >
+                Claude Conversation Exporter</a> Chrome extension to export your conversations in JSON format.
+            </div>
+            
             <div class="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center bg-gray-50 dark:bg-gray-800 transition-colors hover:border-indigo-400 dark:hover:border-indigo-600">
               <input
                 type="file"

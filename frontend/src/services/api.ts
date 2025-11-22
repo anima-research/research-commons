@@ -77,7 +77,19 @@ export const authAPI = {
     api.post<{ user: User; token: string }>('/auth/refresh'),
   
   getUserNames: (userIds: string[]) =>
-    api.post<{ user_names: Record<string, string> }>('/auth/users/names', { user_ids: userIds })
+    api.post<{ user_names: Record<string, string> }>('/auth/users/names', { user_ids: userIds }),
+  
+  getProfile: () =>
+    api.get<{ 
+      submissions: Array<Submission & { stats: { tag_count: number; comment_count: number } }>;
+      comments: Array<Comment & { submission_id: string; submission_title: string; selection_text: string }> 
+    }>('/auth/profile'),
+  
+  updateProfile: (updates: { name?: string; email?: string }) =>
+    api.patch<{ user: User; token: string; message: string }>('/auth/profile', updates),
+  
+  updatePassword: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
+    api.put<{ message: string }>('/auth/password', data)
 }
 
 export const submissionsAPI = {
