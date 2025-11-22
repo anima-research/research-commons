@@ -123,6 +123,9 @@ export const submissionsAPI = {
   unhideMessage: (submissionId: string, messageId: string) =>
     api.delete<{ success: boolean }>(`/submissions/${submissionId}/messages/${messageId}/hide`),
   
+  hideAllPrevious: (submissionId: string, messageId: string, reason?: string) =>
+    api.post<{ success: boolean; hidden_count: number; message_ids: string[] }>(`/submissions/${submissionId}/messages/${messageId}/hide-previous`, { reason }),
+  
   getHiddenMessages: (submissionId: string) =>
     api.get<{ hidden_message_ids: string[] }>(`/submissions/${submissionId}/hidden-messages`)
 }

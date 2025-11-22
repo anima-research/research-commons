@@ -162,6 +162,7 @@
             :user-names="userNames"
             :current-user-id="authStore.user?.id"
             :can-moderate="canHideMessages"
+            :can-view-hidden="canViewHiddenMessages"
             :can-pin="canPin"
             :pinned-message-id="pinnedMessageId"
             :hidden-message-ids="hiddenMessageIds"
@@ -172,6 +173,7 @@
             @copy-message="handleCopyMessage"
             @toggle-pin="handleTogglePin"
             @toggle-hide="handleToggleHide"
+            @hide-all-previous="handleHideAllPrevious"
             @toggle-reaction="handleToggleReaction"
             @text-selected="handleTextSelected"
             @add-tag="handleAddTag"
@@ -465,10 +467,16 @@ const canHideMessages = computed(() => {
 })
 
 // Permission to view hidden messages (researchers can see what's hidden, but not hide)
+// Owners can also see individual hidden messages so they can manage them
 const canViewHiddenMessages = computed(() => {
-  if (!authStore.user) return false
-  return authStore.user.roles.includes('researcher') || 
-         authStore.user.roles.includes('admin')
+  if (!authStore.user || !submission.value) return false
+  
+  // Check if user is researcher, admin, or the submission owner
+  const isOwner = submission.value.submitter_id === authStore.user.id
+  const isResearcher = authStore.user.roles.includes('researcher')
+  const isAdmin = authStore.user.roles.includes('admin')
+  
+  return isOwner || isResearcher || isAdmin
 })
 
 const canPin = computed(() => {
@@ -706,18 +714,20 @@ async function loadData() {
     // TODO: Load submission-level comments
     submissionComments.value = []
     
-    // Load hidden messages (for researchers/admins)
-    console.log('[AnnotationWorkspace] Current user roles:', authStore.user?.roles)
+    // Load hidden messages (for researchers/admins/owners who can see individual badges)
     if (canViewHiddenMessages.value) {
       try {
-        console.log('[AnnotationWorkspace] Loading hidden messages...')
         const hiddenResponse = await submissionsAPI.getHiddenMessages(submissionId)
-        console.log('[AnnotationWorkspace] Hidden messages response:', hiddenResponse.data)
         hiddenMessageIds.value = new Set(hiddenResponse.data.hidden_message_ids)
-        console.log('[AnnotationWorkspace] Hidden message IDs set:', Array.from(hiddenMessageIds.value))
       } catch (err) {
         console.error('Failed to load hidden messages:', err)
       }
+    } else {
+      // For regular users, detect hidden messages from the _isHidden flag
+      const hiddenIds = messages.value
+        .filter(msg => (msg as any)._isHidden === true)
+        .map(msg => msg.id)
+      hiddenMessageIds.value = new Set(hiddenIds)
     }
     
     // Auto-scroll to pinned message FIRST (before loading reactions)
@@ -885,19 +895,28 @@ async function handleToggleHide(messageId: string) {
   try {
     // If message is hidden, unhide it
     if (hiddenMessageIds.value.has(messageId)) {
-      console.log('[AnnotationWorkspace] Unhiding message:', messageId)
       await submissionsAPI.unhideMessage(submissionId, messageId)
       hiddenMessageIds.value.delete(messageId)
-      console.log('[AnnotationWorkspace] Message unhidden, current hidden IDs:', Array.from(hiddenMessageIds.value))
     } else {
       // Hide this message
-      console.log('[AnnotationWorkspace] Hiding message:', messageId)
       await submissionsAPI.hideMessage(submissionId, messageId)
       hiddenMessageIds.value.add(messageId)
-      console.log('[AnnotationWorkspace] Message hidden, current hidden IDs:', Array.from(hiddenMessageIds.value))
     }
   } catch (err) {
     console.error('Failed to toggle hide:', err)
+  }
+}
+
+async function handleHideAllPrevious(messageId: string) {
+  try {
+    const response = await submissionsAPI.hideAllPrevious(submissionId, messageId)
+    
+    // Add all newly hidden message IDs to the set
+    for (const hiddenId of response.data.message_ids) {
+      hiddenMessageIds.value.add(hiddenId)
+    }
+  } catch (err) {
+    console.error('Failed to hide all previous:', err)
   }
 }
 

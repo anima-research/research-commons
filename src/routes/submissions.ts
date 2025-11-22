@@ -361,14 +361,22 @@ export function createSubmissionRoutes(context: AppContext): Router {
     }
   });
 
-  // Get hidden messages for a submission (researchers/admins only)
+  // Get hidden messages for a submission (researchers/admins/owners only)
   router.get('/:submissionId/hidden-messages', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
       const user = await context.userStore.getUserById(req.userId!);
       const isResearcherOrAdmin = user?.roles.includes('researcher') || user?.roles.includes('admin');
+      const isOwner = submission.submitter_id === req.userId;
       
-      if (!isResearcherOrAdmin) {
-        res.status(403).json({ error: 'Only researchers and admins can view hidden messages' });
+      if (!isResearcherOrAdmin && !isOwner) {
+        res.status(403).json({ error: 'Only researchers, admins, and submission owners can view hidden messages' });
         return;
       }
       
@@ -385,16 +393,18 @@ export function createSubmissionRoutes(context: AppContext): Router {
     try {
       let messages = await context.submissionStore.getMessages(req.params.submissionId);
       
+      // Get submission to check ownership
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      
       if (messages.length === 0) {
         // Check if submission exists
-        const submission = await context.submissionStore.getSubmission(req.params.submissionId);
         if (!submission) {
           res.status(404).json({ error: 'Submission not found' });
           return;
         }
       }
 
-      // Filter hidden messages for non-researchers
+      // Filter hidden messages for non-privileged users
       // Try to get user from token if present (optional auth)
       const authHeader = req.headers.authorization;
       let userRoles: string[] = [];
@@ -421,14 +431,19 @@ export function createSubmissionRoutes(context: AppContext): Router {
       
       console.log('[GET messages] Final user roles:', userRoles);
       
-      // Redact hidden messages for non-researchers (don't remove them entirely)
+      // Redact hidden messages for non-privileged users (not researchers/admins/owners)
       const isResearcherOrAdmin = userRoles.includes('researcher') || userRoles.includes('admin');
+      const isOwner = submission && userId === submission.submitter_id;
+      const canViewHidden = isResearcherOrAdmin || isOwner;
+      
       const hiddenMessageIds = new Set(context.annotationDb.getHiddenMessagesBySubmission(req.params.submissionId));
       
       console.log('[GET messages] Hidden message IDs:', Array.from(hiddenMessageIds));
       console.log('[GET messages] Is researcher/admin:', isResearcherOrAdmin);
+      console.log('[GET messages] Is owner:', isOwner);
+      console.log('[GET messages] Can view hidden:', canViewHidden);
       
-      if (!isResearcherOrAdmin && hiddenMessageIds.size > 0) {
+      if (!canViewHidden && hiddenMessageIds.size > 0) {
         // Replace content of hidden messages with block characters
         messages = messages.map(msg => {
           if (hiddenMessageIds.has(msg.id)) {
@@ -539,6 +554,72 @@ export function createSubmissionRoutes(context: AppContext): Router {
       res.json({ success: true });
     } catch (error) {
       console.error('Unhide message error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Hide all previous messages (current message + all with order < current.order)
+  router.post('/:submissionId/messages/:messageId/hide-previous', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      console.log('[POST hide-previous] Hiding message and all previous:', req.params.messageId);
+      
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Check if user is admin or submission owner
+      const user = await context.userStore.getUserById(req.userId!);
+      const isAdmin = user?.roles.includes('admin');
+      const isOwner = submission.submitter_id === req.userId;
+      
+      console.log('[POST hide-previous] User:', req.userId, 'isAdmin:', isAdmin, 'isOwner:', isOwner);
+      
+      if (!isAdmin && !isOwner) {
+        res.status(403).json({ error: 'Only admins and submission owners can hide messages' });
+        return;
+      }
+
+      // Get all messages for this submission
+      const messages = await context.submissionStore.getMessages(req.params.submissionId);
+      
+      // Find the target message
+      const targetMessage = messages.find(m => m.id === req.params.messageId);
+      if (!targetMessage) {
+        res.status(404).json({ error: 'Message not found' });
+        return;
+      }
+      
+      // Find all messages with order <= target message order
+      const messagesToHide = messages.filter(m => m.order <= targetMessage.order);
+      
+      console.log('[POST hide-previous] Target message order:', targetMessage.order);
+      console.log('[POST hide-previous] Hiding', messagesToHide.length, 'messages');
+      
+      // Hide all of them
+      const { reason } = req.body;
+      let hiddenCount = 0;
+      for (const message of messagesToHide) {
+        try {
+          context.annotationDb.hideMessage(message.id, req.params.submissionId, req.userId!, reason);
+          hiddenCount++;
+        } catch (err) {
+          console.error('[POST hide-previous] Failed to hide message:', message.id, err);
+          // Continue hiding others even if one fails
+        }
+      }
+      
+      console.log('[POST hide-previous] Successfully hidden', hiddenCount, 'messages');
+      
+      res.json({ 
+        success: true,
+        hidden_count: hiddenCount,
+        message_ids: messagesToHide.map(m => m.id)
+      });
+    } catch (error) {
+      console.error('Hide previous messages error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   });

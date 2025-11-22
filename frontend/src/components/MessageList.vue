@@ -2,15 +2,17 @@
   <div class="message-list-container">
     <!-- Messages -->
     <div class="messages-container space-y-4">
-      <template v-for="msg in messages" :key="msg.id">
+      <template v-for="(item, index) in processedMessages" :key="item.type === 'message' ? item.message.id : `hidden-group-${index}`">
+        <!-- Regular message -->
         <Message
-          :message="msg"
-          :has-annotation="hasAnnotation(msg.id)"
-          :is-pinned="pinnedMessageId === msg.id"
-          :is-hidden="hiddenMessageIds.has(msg.id)"
+          v-if="item.type === 'message'"
+          :message="item.message"
+          :has-annotation="hasAnnotation(item.message.id)"
+          :is-pinned="pinnedMessageId === item.message.id"
+          :is-hidden="hiddenMessageIds.has(item.message.id)"
           :can-hide-message="canModerate"
           :can-pin="canPin"
-          :reactions="messageReactions.get(msg.id)"
+          :reactions="messageReactions.get(item.message.id)"
           :current-user-id="currentUserId"
           :participant-avatars="participantAvatars"
           @text-selected="onTextSelected"
@@ -19,8 +21,26 @@
           @copy-message="onCopyMessage"
           @toggle-pin="onTogglePin"
           @toggle-hide="onToggleHide"
+          @hide-all-previous="onHideAllPrevious"
           @toggle-reaction="onToggleReaction"
         />
+        
+        <!-- Hidden messages group placeholder -->
+        <div
+          v-else-if="item.type === 'hidden-group'"
+          class="hidden-group-placeholder mb-6 px-6 py-4 bg-red-900/20 border-2 border-red-600/50 rounded-xl text-center"
+        >
+          <div class="flex items-center justify-center gap-3">
+            <div class="flex items-center justify-center w-8 h-8 rounded-full bg-red-600/30">
+              <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+              </svg>
+            </div>
+            <div class="flex flex-col items-start">
+              <span class="text-red-400 font-medium text-sm">{{ item.count }} hidden {{ item.count === 1 ? 'message' : 'messages' }}</span>
+            </div>
+          </div>
+        </div>
       </template>
     </div>
   </div>
@@ -37,6 +57,7 @@ interface Props {
   userNames?: Map<string, string>
   currentUserId?: string
   canModerate?: boolean
+  canViewHidden?: boolean
   canPin?: boolean
   pinnedMessageId?: string | null
   hiddenMessageIds?: Set<string>
@@ -48,6 +69,7 @@ const props = withDefaults(defineProps<Props>(), {
   annotatedMessageIds: () => new Set(),
   userNames: () => new Map(),
   canModerate: false,
+  canViewHidden: false,
   canPin: false,
   pinnedMessageId: null,
   hiddenMessageIds: () => new Set(),
@@ -61,6 +83,7 @@ const emit = defineEmits<{
   'copy-message': [messageId: string]
   'toggle-pin': [messageId: string]
   'toggle-hide': [messageId: string]
+  'hide-all-previous': [messageId: string]
   'toggle-reaction': [messageId: string, reactionType: 'star' | 'laugh' | 'sparkles']
   'text-selected': [messageId: string, text: string, start: number, end: number]
   'add-tag': [selectionId: string]
@@ -70,6 +93,78 @@ const emit = defineEmits<{
   'delete-comment': [commentId: string]
   'remove-tag': [selectionId: string, tagId: string]
 }>()
+
+// Check if user is a researcher or admin (can see individual hidden messages)
+// If not, we group consecutive hidden messages
+const isPrivilegedUser = computed(() => {
+  // Researchers and admins can see individual hidden message badges
+  // Regular users see grouped placeholders
+  return props.canViewHidden
+})
+
+// Process messages to group consecutive hidden messages for non-privileged users
+const processedMessages = computed(() => {
+  console.log('[MessageList] Processing messages...')
+  console.log('[MessageList] Total messages:', props.messages.length)
+  console.log('[MessageList] Hidden message IDs:', Array.from(props.hiddenMessageIds))
+  console.log('[MessageList] canViewHidden:', props.canViewHidden)
+  console.log('[MessageList] isPrivilegedUser:', isPrivilegedUser.value)
+  
+  const result: Array<
+    | { type: 'message'; message: MessageType }
+    | { type: 'hidden-group'; count: number; messageIds: string[] }
+  > = []
+  
+  // If user is privileged (researcher/admin), show all messages individually
+  if (isPrivilegedUser.value) {
+    console.log('[MessageList] User is privileged - showing all messages individually')
+    return props.messages.map(msg => ({ type: 'message' as const, message: msg }))
+  }
+  
+  console.log('[MessageList] User is NOT privileged - grouping hidden messages')
+  
+  // For non-privileged users, group consecutive hidden messages
+  let currentHiddenGroup: string[] = []
+  
+  for (const msg of props.messages) {
+    const isHidden = props.hiddenMessageIds.has(msg.id)
+    console.log(`[MessageList] Message ${msg.id.substring(0, 8)} (order ${msg.order}): hidden=${isHidden}`)
+    
+    if (isHidden) {
+      // Add to current hidden group
+      currentHiddenGroup.push(msg.id)
+    } else {
+      // If we have a pending hidden group, flush it
+      if (currentHiddenGroup.length > 0) {
+        console.log('[MessageList] Flushing hidden group with', currentHiddenGroup.length, 'messages')
+        result.push({
+          type: 'hidden-group',
+          count: currentHiddenGroup.length,
+          messageIds: [...currentHiddenGroup]
+        })
+        currentHiddenGroup = []
+      }
+      
+      // Add the visible message
+      result.push({ type: 'message', message: msg })
+    }
+  }
+  
+  // Flush any remaining hidden group
+  if (currentHiddenGroup.length > 0) {
+    console.log('[MessageList] Flushing final hidden group with', currentHiddenGroup.length, 'messages')
+    result.push({
+      type: 'hidden-group',
+      count: currentHiddenGroup.length,
+      messageIds: currentHiddenGroup
+    })
+  }
+  
+  console.log('[MessageList] Final processed messages:', result.length, 'items')
+  console.log('[MessageList] Types:', result.map(r => r.type))
+  
+  return result
+})
 
 function getUserName(userId: string): string {
   return props.userNames?.get(userId) || 'User'
@@ -101,6 +196,10 @@ function onTogglePin(messageId: string) {
 
 function onToggleHide(messageId: string) {
   emit('toggle-hide', messageId)
+}
+
+function onHideAllPrevious(messageId: string) {
+  emit('hide-all-previous', messageId)
 }
 
 function onToggleReaction(messageId: string, reactionType: 'star' | 'laugh' | 'sparkles') {
