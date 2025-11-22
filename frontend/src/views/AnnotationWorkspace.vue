@@ -733,10 +733,15 @@ async function loadData() {
       }
     }
     
-    // Auto-scroll to pinned message after next tick (once DOM is ready)
+    // Auto-scroll to pinned message after Vue finishes rendering
     if (pinnedMessageId.value) {
+      // Wait for both next tick AND a brief delay to ensure all content is rendered
+      // (especially important for images and slow connections)
       nextTick(() => {
-        scrollToPinnedMessage()
+        // Give Vue and the browser time to render all messages
+        setTimeout(() => {
+          scrollToPinnedMessage()
+        }, 300) // 300ms delay to ensure rendering is complete
       })
     }
     
@@ -744,6 +749,15 @@ async function loadData() {
     console.error('Failed to load submission:', err)
   } finally {
     loading.value = false
+    
+    // Safety: if we're still showing the pinned message overlay after data loads,
+    // clear it (in case the pinned message doesn't exist)
+    setTimeout(() => {
+      if (loadingPinnedMessage.value) {
+        console.warn('[Pinned] Safety timeout: clearing overlay after data load')
+        loadingPinnedMessage.value = false
+      }
+    }, 2000)
   }
 }
 
@@ -907,7 +921,8 @@ function scrollToPinnedMessage() {
   console.log('[Pinned] Found in messages array, now waiting for DOM element')
   
   // Wait for the pinned message element to exist in DOM (with timeout)
-  const maxAttempts = 50 // 5 seconds max
+  // Longer timeout for slow connections and mobile
+  const maxAttempts = 100 // 10 seconds max (100 * 100ms)
   let attempts = 0
   
   const checkAndScroll = () => {
