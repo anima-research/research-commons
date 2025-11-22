@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import Message from './Message.vue'
 import type { Message as MessageType } from '@/types'
 
@@ -107,6 +107,7 @@ const processedMessages = computed(() => {
   console.log('[MessageList] Processing messages...')
   console.log('[MessageList] Total messages:', props.messages.length)
   console.log('[MessageList] Hidden message IDs:', Array.from(props.hiddenMessageIds))
+  console.log('[MessageList] Annotated message IDs:', Array.from(props.annotatedMessageIds))
   console.log('[MessageList] canViewHidden:', props.canViewHidden)
   console.log('[MessageList] isPrivilegedUser:', isPrivilegedUser.value)
   
@@ -124,40 +125,61 @@ const processedMessages = computed(() => {
   console.log('[MessageList] User is NOT privileged - grouping hidden messages')
   
   // For non-privileged users, group consecutive hidden messages
+  // BUT: Messages with annotations (comments/tags) should NOT be grouped
   let currentHiddenGroup: string[] = []
   
   for (const msg of props.messages) {
     const isHidden = props.hiddenMessageIds.has(msg.id)
-    console.log(`[MessageList] Message ${msg.id.substring(0, 8)} (order ${msg.order}): hidden=${isHidden}`)
+    const hasAnnotations = props.annotatedMessageIds.has(msg.id)
+    console.log(`[MessageList] Message ${msg.id.substring(0, 8)} (order ${msg.order}): hidden=${isHidden}, annotated=${hasAnnotations}`)
     
-    if (isHidden) {
-      // Add to current hidden group
+    if (isHidden && !hasAnnotations) {
+      // Hidden message WITHOUT annotations - can be grouped
       currentHiddenGroup.push(msg.id)
     } else {
-      // If we have a pending hidden group, flush it
+      // Either not hidden, OR hidden but has annotations
+      // Flush any pending hidden group first
       if (currentHiddenGroup.length > 0) {
-        console.log('[MessageList] Flushing hidden group with', currentHiddenGroup.length, 'messages')
-        result.push({
-          type: 'hidden-group',
-          count: currentHiddenGroup.length,
-          messageIds: [...currentHiddenGroup]
-        })
+        // Only create a group placeholder if there are 2+ messages
+        if (currentHiddenGroup.length >= 2) {
+          console.log('[MessageList] Flushing hidden group with', currentHiddenGroup.length, 'messages')
+          result.push({
+            type: 'hidden-group',
+            count: currentHiddenGroup.length,
+            messageIds: [...currentHiddenGroup]
+          })
+        } else {
+          // Single hidden message without annotations - show it normally (with redacted content)
+          const singleHiddenMsg = props.messages.find(m => m.id === currentHiddenGroup[0])
+          if (singleHiddenMsg) {
+            result.push({ type: 'message', message: singleHiddenMsg })
+          }
+        }
         currentHiddenGroup = []
       }
       
-      // Add the visible message
+      // Add the current message (either visible, or hidden with annotations)
       result.push({ type: 'message', message: msg })
     }
   }
   
   // Flush any remaining hidden group
   if (currentHiddenGroup.length > 0) {
-    console.log('[MessageList] Flushing final hidden group with', currentHiddenGroup.length, 'messages')
-    result.push({
-      type: 'hidden-group',
-      count: currentHiddenGroup.length,
-      messageIds: currentHiddenGroup
-    })
+    // Only create a group placeholder if there are 2+ messages
+    if (currentHiddenGroup.length >= 2) {
+      console.log('[MessageList] Flushing final hidden group with', currentHiddenGroup.length, 'messages')
+      result.push({
+        type: 'hidden-group',
+        count: currentHiddenGroup.length,
+        messageIds: currentHiddenGroup
+      })
+    } else {
+      // Single hidden message without annotations - show it normally (with redacted content)
+      const singleHiddenMsg = props.messages.find(m => m.id === currentHiddenGroup[0])
+      if (singleHiddenMsg) {
+        result.push({ type: 'message', message: singleHiddenMsg })
+      }
+    }
   }
   
   console.log('[MessageList] Final processed messages:', result.length, 'items')
