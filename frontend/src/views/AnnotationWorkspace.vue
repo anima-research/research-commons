@@ -735,13 +735,8 @@ async function loadData() {
     
     // Auto-scroll to pinned message after Vue finishes rendering
     if (pinnedMessageId.value) {
-      // Wait for both next tick AND a brief delay to ensure all content is rendered
-      // (especially important for images and slow connections)
       nextTick(() => {
-        // Give Vue and the browser time to render all messages
-        setTimeout(() => {
-          scrollToPinnedMessage()
-        }, 300) // 300ms delay to ensure rendering is complete
+        scrollToPinnedMessage()
       })
     }
     
