@@ -887,9 +887,24 @@ async function handleToggleHide(messageId: string) {
 
 function scrollToPinnedMessage() {
   if (!pinnedMessageId.value) {
+    console.log('[Pinned] No pinned message ID')
     loadingPinnedMessage.value = false
     return
   }
+  
+  console.log('[Pinned] Looking for message:', pinnedMessageId.value)
+  console.log('[Pinned] Total messages loaded:', messages.value.length)
+  console.log('[Pinned] Message IDs:', messages.value.map(m => m.id))
+  
+  // Check if pinned message is in the loaded messages
+  const pinnedMsg = messages.value.find(m => m.id === pinnedMessageId.value)
+  if (!pinnedMsg) {
+    console.error('[Pinned] Pinned message ID not found in loaded messages!')
+    loadingPinnedMessage.value = false
+    return
+  }
+  
+  console.log('[Pinned] Found in messages array, now waiting for DOM element')
   
   // Wait for the pinned message element to exist in DOM (with timeout)
   const maxAttempts = 50 // 5 seconds max
@@ -898,7 +913,10 @@ function scrollToPinnedMessage() {
   const checkAndScroll = () => {
     const messageEl = document.querySelector(`[data-message-id="${pinnedMessageId.value}"]`) as HTMLElement
     
+    console.log(`[Pinned] Attempt ${attempts + 1}/${maxAttempts} - Element found:`, !!messageEl)
+    
     if (messageEl) {
+      console.log('[Pinned] Element found! Clearing overlay and scrolling')
       // Clear loading overlay immediately - we found the element!
       loadingPinnedMessage.value = false
       
@@ -923,7 +941,8 @@ function scrollToPinnedMessage() {
       setTimeout(checkAndScroll, 100)
     } else {
       // Timeout - element never appeared
-      console.error('Pinned message element never loaded:', pinnedMessageId.value)
+      console.error('[Pinned] TIMEOUT! Element never appeared in DOM after', maxAttempts, 'attempts')
+      console.error('[Pinned] All message elements:', document.querySelectorAll('[data-message-id]').length)
       loadingPinnedMessage.value = false
     }
   }
