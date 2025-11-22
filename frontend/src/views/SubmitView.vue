@@ -1027,7 +1027,7 @@ async function fetchDiscordMessages() {
     const response = await importsAPI.fetchDiscordMessages({
       lastMessageUrl: discordLastMessageUrl.value,
       firstMessageUrl: discordFirstMessageUrl.value || undefined,
-      maxMessages: discordMaxMessages.value
+      maxMessages: discordMaxMessages.value || undefined  // Don't send empty string
     })
     
     console.log('[Discord Import] Fetched messages:', response.data)
