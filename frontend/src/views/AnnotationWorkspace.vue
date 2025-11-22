@@ -720,25 +720,32 @@ async function loadData() {
       }
     }
     
-    // Load reactions for all messages
-    messageReactions.value.clear()
-    for (const msg of messages.value) {
-      try {
-        const reactionResponse = await submissionsAPI.getReactions(submissionId, msg.id)
-        if (reactionResponse.data.reactions.length > 0) {
-          messageReactions.value.set(msg.id, reactionResponse.data.reactions)
-        }
-      } catch (err) {
-        console.error('Failed to load reactions for message:', msg.id, err)
-      }
-    }
-    
-    // Auto-scroll to pinned message after Vue finishes rendering
+    // Auto-scroll to pinned message FIRST (before loading reactions)
+    // This prevents blocking the UI on slow connections
     if (pinnedMessageId.value) {
       nextTick(() => {
         scrollToPinnedMessage()
       })
     }
+    
+    // Load reactions for all messages in parallel (background, non-blocking)
+    // Don't await - let them load after UI is ready
+    messageReactions.value.clear()
+    Promise.all(
+      messages.value.map(msg => 
+        submissionsAPI.getReactions(submissionId, msg.id)
+          .then(response => {
+            if (response.data.reactions.length > 0) {
+              messageReactions.value.set(msg.id, response.data.reactions)
+            }
+          })
+          .catch(err => {
+            console.error('Failed to load reactions for message:', msg.id, err)
+          })
+      )
+    ).then(() => {
+      console.log('[Reactions] All reactions loaded')
+    })
     
   } catch (err) {
     console.error('Failed to load submission:', err)
