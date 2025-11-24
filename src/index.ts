@@ -238,6 +238,11 @@ async function main() {
     
     // SPA fallback - serve index.html for all non-API routes
     app.get('*', (req, res) => {
+      // Don't fallback for asset requests (should 404 properly)
+      if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|map)$/)) {
+        return res.status(404).send('Asset not found');
+      }
+      
       if (!req.path.startsWith('/api') && !req.path.startsWith('/health')) {
         res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
       }
