@@ -132,22 +132,22 @@
           <!-- JSON Upload -->
           <div v-if="sourceType === 'json-upload' || sourceType === 'arc-certified' || sourceType === 'other'" class="mb-6">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Upload JSON File (Anthropic format)
+              Upload JSON File
             </label>
             
-            <!-- Claude.ai Exporter Info -->
+            <!-- Supported formats info -->
             <div class="mb-3 p-3 bg-purple-900/20 border border-purple-700/50 rounded text-sm text-purple-200">
               <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
               </svg>
-              <strong>Need to export from Claude.ai?</strong> Use the 
+              <strong>Supported formats:</strong> ARC conversation exports or Anthropic API format. For Claude.ai, use the 
               <a 
                 href="https://github.com/socketteer/Claude-Conversation-Exporter" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 class="underline hover:text-purple-100 transition-colors"
               >
-                Claude Conversation Exporter</a> Chrome extension to export your conversations in JSON format.
+                Claude Conversation Exporter</a> Chrome extension.
             </div>
             
             <div class="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center bg-gray-50 dark:bg-gray-800 transition-colors hover:border-indigo-400 dark:hover:border-indigo-600">
@@ -169,7 +169,7 @@
                 ✓ {{ uploadedFile.name }}
               </p>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Supports Anthropic API message format with "messages" array
+                ARC exports or Anthropic API message format
               </p>
             </div>
           </div>
@@ -1049,49 +1049,133 @@ async function parseJSON() {
     const text = await uploadedFile.value.text()
     const data = JSON.parse(text)
     
-    if (!data.messages || !Array.isArray(data.messages)) {
-      error.value = 'JSON must have a "messages" array'
-      return
-    }
-    
-    // Convert Anthropic format to our format
-    const converted: Message[] = []
-    const participants = new Set<string>()
-    let parentId: string | null = null
-    
-    data.messages.forEach((msg: any, idx: number) => {
-      const messageId = crypto.randomUUID()
+    // Check if this is ARC's branching conversation format
+    if (data.conversation && data.messages && Array.isArray(data.messages)) {
+      console.log('[Submit] Detected ARC conversation format')
       
-      // Extract content blocks
-      let contentBlocks = []
-      if (Array.isArray(msg.content)) {
-        contentBlocks = msg.content
-      } else if (typeof msg.content === 'string') {
-        contentBlocks = [{ type: 'text', text: msg.content }]
+      // Set title from conversation metadata
+      if (data.conversation.title && !title.value) {
+        title.value = data.conversation.title
       }
       
-      // Determine participant (but don't assume type yet)
-      const participantName = msg.role === 'user' ? 'User' : 
-                             msg.role === 'assistant' ? 'Assistant' : 
-                             msg.role || 'Unknown'
-      participants.add(participantName)
+      // Convert ARC branching format to linear format by following active branches
+      const converted: Message[] = []
+      const participants = new Set<string>()
+      let parentId: string | null = null
       
-      converted.push({
-        id: messageId,
-        submission_id: '', // Will be filled by server
-        parent_message_id: parentId,
-        order: idx,
-        participant_name: participantName,
-        participant_type: 'human' as any, // Will be updated based on selection
-        content_blocks: contentBlocks,
-        model_info: undefined // Will be set if this is the model
+      // Build map of branch IDs to their parent message IDs
+      const branchToMessageId = new Map<string, string>()
+      
+      data.messages.forEach((msg: any, idx: number) => {
+        // Get the active branch for this message
+        const activeBranch = msg.branches.find((b: any) => b.id === msg.activeBranchId)
+        
+        if (!activeBranch) {
+          console.warn('[Submit] Message has no active branch:', msg.id)
+          return
+        }
+        
+        const messageId = crypto.randomUUID()
+        
+        // Store mapping of branch ID to our message ID
+        branchToMessageId.set(activeBranch.id, messageId)
+        
+        // Extract content blocks from branch content
+        let contentBlocks = []
+        if (typeof activeBranch.content === 'string') {
+          contentBlocks = [{ type: 'text', text: activeBranch.content }]
+        } else if (Array.isArray(activeBranch.content)) {
+          contentBlocks = activeBranch.content
+        }
+        
+        // Determine participant name from role
+        let participantName = activeBranch.role === 'user' ? 'User' : 
+                             activeBranch.role === 'assistant' ? 'Assistant' : 
+                             activeBranch.role || 'Unknown'
+        
+        participants.add(participantName)
+        
+        // Figure out parent message ID by looking up parent branch
+        let actualParentId = parentId
+        if (activeBranch.parentBranchId && activeBranch.parentBranchId !== 'root') {
+          actualParentId = branchToMessageId.get(activeBranch.parentBranchId) || parentId
+        }
+        
+        converted.push({
+          id: messageId,
+          submission_id: '', // Will be filled by server
+          parent_message_id: actualParentId,
+          order: idx,
+          participant_name: participantName,
+          participant_type: 'human' as any, // Will be updated based on selection
+          content_blocks: contentBlocks,
+          model_info: activeBranch.model ? { 
+            model_id: activeBranch.model,
+            provider: 'other',
+            reasoning_enabled: false
+          } : undefined,
+          timestamp: activeBranch.createdAt || new Date().toISOString()
+        })
+        
+        parentId = messageId
       })
       
-      parentId = messageId
-    })
-    
-    previewMessages.value = converted
-    participantNames.value = Array.from(participants)
+      previewMessages.value = converted
+      participantNames.value = Array.from(participants)
+      
+      // Auto-detect source type based on conversation format
+      if (sourceType.value === 'json-upload') {
+        sourceType.value = 'arc-certified'
+      }
+      
+      console.log('[Submit] Converted', converted.length, 'messages from ARC format')
+      
+    } else if (data.messages && Array.isArray(data.messages)) {
+      // Standard Anthropic API format
+      console.log('[Submit] Detected standard Anthropic format')
+      
+      // Convert Anthropic format to our format
+      const converted: Message[] = []
+      const participants = new Set<string>()
+      let parentId: string | null = null
+      
+      data.messages.forEach((msg: any, idx: number) => {
+        const messageId = crypto.randomUUID()
+        
+        // Extract content blocks
+        let contentBlocks = []
+        if (Array.isArray(msg.content)) {
+          contentBlocks = msg.content
+        } else if (typeof msg.content === 'string') {
+          contentBlocks = [{ type: 'text', text: msg.content }]
+        }
+        
+        // Determine participant (but don't assume type yet)
+        const participantName = msg.role === 'user' ? 'User' : 
+                               msg.role === 'assistant' ? 'Assistant' : 
+                               msg.role || 'Unknown'
+        participants.add(participantName)
+        
+        converted.push({
+          id: messageId,
+          submission_id: '', // Will be filled by server
+          parent_message_id: parentId,
+          order: idx,
+          participant_name: participantName,
+          participant_type: 'human' as any, // Will be updated based on selection
+          content_blocks: contentBlocks,
+          model_info: undefined // Will be set if this is the model
+        })
+        
+        parentId = messageId
+      })
+      
+      previewMessages.value = converted
+      participantNames.value = Array.from(participants)
+    } else {
+      error.value = 'JSON must have a "messages" array (with optional "conversation" metadata for ARC format)'
+      return
+    }
     
     // Auto-map "Assistant" to Claude if available
     if (participantNames.value.includes('Assistant') && availableModels.value.length > 0) {
@@ -1109,6 +1193,7 @@ async function parseJSON() {
     step.value = 'configure'
   } catch (err: any) {
     error.value = 'Invalid JSON: ' + err.message
+    console.error('[Submit] Parse error:', err)
   }
 }
 
