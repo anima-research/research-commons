@@ -59,8 +59,8 @@
           >
             <div class="flex items-start justify-between mb-2">
               <h3 
-                class="text-lg font-semibold text-gray-900 dark:text-gray-100 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                @click="router.push(`/topics/${topic.id}`)"
+                class="text-lg font-semibold text-gray-900 dark:text-gray-100"
+                title="Topics pages in construction"
               >
                 {{ topic.name }}
               </h3>
