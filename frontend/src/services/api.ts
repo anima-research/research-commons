@@ -17,6 +17,27 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// Handle auth errors (expired/invalid tokens)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // If we get 401 or 403, the token is likely expired or invalid
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // Only logout if we had a token (avoid logout loop on login failures)
+      const hadToken = localStorage.getItem('auth_token')
+      if (hadToken) {
+        console.log('[API] Auth error detected, logging out...')
+        // Clear auth data
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_user')
+        // Dispatch event so Vue components can react (e.g., redirect to login)
+        window.dispatchEvent(new CustomEvent('auth:logout', { detail: { reason: 'token_expired' } }))
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 export const importsAPI = {
   fetchDiscordMessages: (params: { lastMessageUrl: string; firstMessageUrl?: string; maxMessages?: number }) =>
     api.post<{ messages: any[]; title: string; metadata: any; existing_mappings_by_user_id: any }>('/imports/discord/fetch', {
@@ -102,7 +123,7 @@ export const submissionsAPI = {
   get: (id: string) =>
     api.get<Submission>(`/submissions/${id}`),
   
-  update: (id: string, updates: { description?: string; tags?: string[] }) =>
+  update: (id: string, updates: { title?: string; description?: string; tags?: string[] }) =>
     api.patch<Submission>(`/submissions/${id}`, updates),
   
   delete: (id: string) =>

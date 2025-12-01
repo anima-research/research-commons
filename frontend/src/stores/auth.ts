@@ -9,6 +9,26 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  // Listen for auth:logout events from API interceptor
+  function handleAuthLogout() {
+    console.log('[Auth Store] Received logout event from API')
+    user.value = null
+    token.value = null
+    // Redirect to login page
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
+  }
+
+  // Set up event listener (call this from App.vue or main.ts)
+  function setupAuthListener() {
+    window.addEventListener('auth:logout', handleAuthLogout)
+  }
+
+  function teardownAuthListener() {
+    window.removeEventListener('auth:logout', handleAuthLogout)
+  }
+
   async function register(email: string, password: string, name: string) {
     loading.value = true
     error.value = null
@@ -96,7 +116,9 @@ export const useAuthStore = defineStore('auth', () => {
     restoreSession,
     refreshSession,
     hasRole,
-    isAuthenticated
+    isAuthenticated,
+    setupAuthListener,
+    teardownAuthListener
   }
 })
 

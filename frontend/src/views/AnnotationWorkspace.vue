@@ -14,9 +14,37 @@
           
           <!-- Title + metadata inline -->
           <div class="flex-1 flex items-baseline gap-3 min-w-0">
-            <h1 class="text-lg font-medium text-white truncate">
-              {{ submission?.title || 'Loading...' }}
-            </h1>
+            <!-- Editable title -->
+            <div v-if="!editingTitle" class="flex items-center gap-2 group min-w-0">
+              <h1 
+                class="text-lg font-medium text-white truncate"
+                :class="{ 'cursor-pointer hover:text-indigo-300 transition-colors': canEditSubmission }"
+                @click="canEditSubmission && startEditTitle()"
+              >
+                {{ submission?.title || 'Loading...' }}
+              </h1>
+              <button
+                v-if="canEditSubmission"
+                @click.stop="startEditTitle"
+                class="text-xs text-gray-500 hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                title="Edit title"
+              >
+                ✏️
+              </button>
+            </div>
+            <!-- Title edit input -->
+            <div v-else class="flex items-center gap-2 flex-1 min-w-0">
+              <input
+                v-model="titleEdit"
+                ref="titleInput"
+                type="text"
+                @keyup.enter="saveTitle"
+                @keyup.esc="cancelEditTitle"
+                @blur="saveTitle"
+                class="flex-1 px-2 py-1 text-lg font-medium bg-gray-800/50 border border-gray-600/50 text-white rounded focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 min-w-0"
+                placeholder="Conversation title..."
+              />
+            </div>
             <span class="text-xs text-gray-400 opacity-60">by {{ submitterName }}</span>
             <span class="text-xs text-gray-500 opacity-50">•</span>
             <span class="text-xs text-gray-400 opacity-60">{{ formatDate(submission?.submitted_at) }}</span>
@@ -443,6 +471,9 @@ const userNames = ref<Map<string, string>>(new Map())
 const editingDescription = ref(false)
 const descriptionEdit = ref('')
 const descriptionTextarea = ref<HTMLTextAreaElement>()
+const editingTitle = ref(false)
+const titleEdit = ref('')
+const titleInput = ref<HTMLInputElement>()
 const showTopicSelector = ref(false)
 const availableTopics = ref<Topic[]>([])
 
@@ -1614,6 +1645,39 @@ async function submitComment(text: string) {
   }
 }
 
+
+function startEditTitle() {
+  titleEdit.value = submission.value?.title || ''
+  editingTitle.value = true
+  setTimeout(() => titleInput.value?.focus(), 10)
+}
+
+async function saveTitle() {
+  if (!editingTitle.value) return
+  
+  const newTitle = titleEdit.value.trim()
+  if (!newTitle || newTitle === submission.value?.title) {
+    cancelEditTitle()
+    return
+  }
+  
+  try {
+    await submissionsAPI.update(submissionId, { title: newTitle })
+    
+    if (submission.value) {
+      submission.value.title = newTitle
+    }
+    editingTitle.value = false
+  } catch (err) {
+    console.error('Failed to save title:', err)
+    cancelEditTitle()
+  }
+}
+
+function cancelEditTitle() {
+  editingTitle.value = false
+  titleEdit.value = ''
+}
 
 function startEditDescription() {
   descriptionEdit.value = submission.value?.metadata.description || ''

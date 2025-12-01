@@ -291,6 +291,11 @@ export function createSubmissionRoutes(context: AppContext): Router {
 
       const oldTags = submission.metadata.tags || [];
       
+      // Update title
+      if (req.body.title !== undefined) {
+        submission.title = req.body.title;
+      }
+      
       // Update metadata
       if (req.body.description !== undefined) {
         submission.metadata.description = req.body.description;
