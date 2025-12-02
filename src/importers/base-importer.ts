@@ -30,8 +30,8 @@ export interface ImportedConversation {
 }
 
 export interface ImporterConfig {
-  apiUrl: string;
-  apiToken?: string;
+  apiUrl: string | undefined;
+  apiToken?: string | undefined;
   [key: string]: any;
 }
 
@@ -39,6 +39,9 @@ export abstract class BaseImporter {
   protected config: ImporterConfig;
 
   constructor(config: ImporterConfig) {
+    if (!config.apiUrl) {
+      throw new Error('API URL is required for importer');
+    }
     this.config = config;
   }
 

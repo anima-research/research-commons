@@ -21,8 +21,8 @@
                 :class="{ 'cursor-pointer hover:text-indigo-300 transition-colors': canEditSubmission }"
                 @click="canEditSubmission && startEditTitle()"
               >
-                {{ submission?.title || 'Loading...' }}
-              </h1>
+              {{ submission?.title || 'Loading...' }}
+            </h1>
               <button
                 v-if="canEditSubmission"
                 @click.stop="startEditTitle"

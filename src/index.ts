@@ -28,9 +28,9 @@ const DATABASE_PATH = process.env.DATABASE_PATH || './data/research.db';
 const SUBMISSIONS_PATH = process.env.SUBMISSIONS_PATH || './data/submissions';
 const DATA_PATH = process.env.DATA_PATH || './data';
 
-// Discord import configuration (server-side)
-const DISCORD_API_URL = process.env.DISCORD_API_URL || 'http://borgs.tesserae.cc:3305';
-const DISCORD_API_TOKEN = process.env.DISCORD_API_TOKEN || '8aaa4d29defc9de6fd4ac4971b32b8d5b8c3265eeed584017829979534da8696';
+// Discord import configuration (server-side) - must be set via environment variables
+const DISCORD_API_URL = process.env.DISCORD_API_URL;
+const DISCORD_API_TOKEN = process.env.DISCORD_API_TOKEN;
 
 export interface AppContext {
   submissionStore: SubmissionStore;
@@ -42,8 +42,8 @@ export interface AppContext {
   modelStore: ModelStore;
   participantMappingStore: ParticipantMappingStore;
   discordConfig: {
-    apiUrl: string;
-    apiToken: string;
+    apiUrl: string | undefined;
+    apiToken: string | undefined;
   };
 }
 
@@ -254,6 +254,9 @@ async function main() {
     console.log(`✅ Research Commons running on port ${PORT}`);
     if (process.env.NODE_ENV === 'production') {
       console.log(`📦 Serving frontend from /frontend/dist`);
+    }
+    if (!DISCORD_API_URL || !DISCORD_API_TOKEN) {
+      console.warn(`⚠️  Discord import disabled: DISCORD_API_URL and DISCORD_API_TOKEN must be set`);
     }
   });
 

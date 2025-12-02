@@ -116,16 +116,16 @@
             
             <div>
               <label class="block text-sm font-medium text-gray-300 mb-2">
-                Max Messages <span class="text-gray-500">(optional)</span>
+                Max Messages
               </label>
               <input
                 v-model.number="discordMaxMessages"
                 type="number"
                 min="1"
-                placeholder="400"
+                placeholder="50"
                 class="w-full px-3 py-2 border border-gray-700 rounded bg-gray-800 text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
-              <p class="mt-1 text-xs text-gray-500">Maximum number of messages to import</p>
+              <p class="mt-1 text-xs text-gray-500">Maximum number of messages to import (default: 50)</p>
             </div>
           </div>
 
@@ -429,13 +429,50 @@
             </div>
           </div>
 
+          <!-- Discord Fetch Statistics -->
+          <div v-if="fetchStats && sourceType === 'discord'" class="mb-6 p-4 rounded border transition-colors"
+            :class="{
+              'bg-green-900/20 border-green-700/50': fetchStats.firstMessageReached,
+              'bg-amber-900/20 border-amber-700/50': !fetchStats.firstMessageReached
+            }">
+            <div class="flex items-center gap-3 mb-2">
+              <div class="text-lg font-semibold" :class="fetchStats.firstMessageReached ? 'text-green-300' : 'text-amber-300'">
+                {{ fetchStats.messageCount }} messages fetched
+              </div>
+              <div v-if="fetchStats.firstMessageReached" class="flex items-center gap-1 text-sm text-green-400">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                {{ fetchStats.requestedFirstUrl ? 'First message reached' : 'Complete fetch' }}
+              </div>
+              <div v-else class="flex items-center gap-1 text-sm text-amber-400">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                {{ fetchStats.requestedFirstUrl ? 'First message NOT reached' : 'Truncated (more messages exist)' }}
+              </div>
+            </div>
+            <div class="text-xs text-gray-400">
+              <span v-if="fetchStats.requestedFirstUrl">
+                Requested range: first message URL was {{ fetchStats.firstMessageReached ? 'found' : 'not reached (may need more messages)' }}
+              </span>
+              <span v-else-if="fetchStats.truncated">
+                Only the most recent {{ fetchStats.messageCount }} messages were fetched. Set a "First Message URL" or increase "Max Messages" to get more.
+              </span>
+              <span v-else>
+                All available messages in range were fetched.
+              </span>
+            </div>
+          </div>
+
           <div v-if="previewMessages.length > 0" class="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
             <div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               📝 Preview: {{ previewMessages.length }} messages
             </div>
             <div class="space-y-2 text-xs text-gray-400">
-              <div v-for="(msg, idx) in previewMessages.slice(0, 5)" :key="idx" class="flex items-start gap-2">
-                <!-- Avatar -->
+              <!-- Head: First 3 messages -->
+              <div class="text-[10px] uppercase tracking-wide text-gray-500 mb-1">← First (oldest)</div>
+              <div v-for="(msg, idx) in previewMessages.slice(0, 3)" :key="'head-' + idx" class="flex items-start gap-2">
                 <div class="shrink-0">
                   <img
                     v-if="msg.metadata?.avatar_url"
@@ -453,8 +490,32 @@
                   {{ truncate(getMessageText(msg), 50) }}
                 </span>
               </div>
-              <div v-if="previewMessages.length > 5" class="text-gray-500 mt-2">
-                ... and {{ previewMessages.length - 5 }} more
+              
+              <!-- Middle indicator -->
+              <div v-if="previewMessages.length > 6" class="text-center text-gray-500 py-2 border-y border-gray-700/50 my-2">
+                ⋮ {{ previewMessages.length - 6 }} messages ⋮
+              </div>
+              
+              <!-- Tail: Last 3 messages -->
+              <div v-if="previewMessages.length > 3" class="text-[10px] uppercase tracking-wide text-gray-500 mb-1 mt-3">Last (newest) →</div>
+              <div v-for="(msg, idx) in previewMessages.slice(-3)" :key="'tail-' + idx" class="flex items-start gap-2"
+                   v-show="previewMessages.length > 3 && !previewMessages.slice(0, 3).includes(msg)">
+                <div class="shrink-0">
+                  <img
+                    v-if="msg.metadata?.avatar_url"
+                    :src="msg.metadata.avatar_url"
+                    class="w-6 h-6 rounded-full"
+                    :alt="msg.participant_name"
+                  />
+                  <div v-else-if="participantMapping[msg.participant_name] && participantMapping[msg.participant_name] !== 'human'" class="text-lg">
+                    {{ getModelAvatar(participantMapping[msg.participant_name]) && !getModelAvatar(participantMapping[msg.participant_name]).startsWith('http') ? getModelAvatar(participantMapping[msg.participant_name]) : '🤖' }}
+                  </div>
+                  <span v-else>👤</span>
+                </div>
+                <span class="flex-1 min-w-0">
+                  <span class="font-medium text-gray-100">{{ msg.participant_name }}</span>: 
+                  {{ truncate(getMessageText(msg), 50) }}
+                </span>
               </div>
             </div>
           </div>
@@ -632,6 +693,7 @@ function resetToUpload() {
   previewMessages.value = []
   participantNames.value = []
   error.value = ''
+  fetchStats.value = null
 }
 
 const title = ref('')
@@ -651,7 +713,7 @@ const step = ref<'upload' | 'configure'>('upload')
 // Discord import fields
 const discordLastMessageUrl = ref('')
 const discordFirstMessageUrl = ref('')
-const discordMaxMessages = ref<number | undefined>(undefined)
+const discordMaxMessages = ref<number>(50)
 const discordUrlValidated = ref(false) // Track if URL has been validated
 const discordUrlValidating = ref(false) // Track validation in progress
 const discordUrlError = ref('') // Track validation error
@@ -662,9 +724,15 @@ const discordParticipantsWithIds = ref<Array<{
   display_name: string;
   is_bot: boolean;
   avatar_url?: string;
-}>>([]
+}>>([])
 
-)
+// Fetch statistics
+const fetchStats = ref<{
+  messageCount: number;
+  truncated: boolean;
+  firstMessageReached: boolean;
+  requestedFirstUrl: string | undefined;
+} | null>(null)
 
 // Message selector modal
 const showMessageSelector = ref(false)
@@ -809,6 +877,11 @@ function isValidDiscordUrl(url: string): boolean {
   // Discord message URL format: https://discord.com/channels/GUILD_ID/CHANNEL_ID/MESSAGE_ID
   const pattern = /^https:\/\/discord\.com\/channels\/\d+\/\d+\/\d+$/
   return pattern.test(url)
+}
+
+function extractMessageId(url: string): string | null {
+  const match = url.match(/\/channels\/\d+\/\d+\/(\d+)$/)
+  return match ? match[1] : null
 }
 
 async function validateDiscordUrl() {
@@ -1222,13 +1295,36 @@ async function fetchDiscordMessages() {
     const response = await importsAPI.fetchDiscordMessages({
       lastMessageUrl: discordLastMessageUrl.value,
       firstMessageUrl: discordFirstMessageUrl.value || undefined,
-      maxMessages: discordMaxMessages.value || undefined  // Don't send empty string
+      maxMessages: discordMaxMessages.value
     })
     
     console.log('[Discord Import] Fetched messages:', response.data)
     
+    // Store fetch statistics
+    const metadata = response.data.metadata
+    const requestedFirst = discordFirstMessageUrl.value || undefined
+    
+    // Determine if first message was reached:
+    // - If we specified a first URL and got it, we reached it
+    // - If we didn't specify a first URL and not truncated, we got everything
+    // - If truncated, we didn't reach the beginning
+    let firstMessageReached = !metadata.truncated
+    if (requestedFirst && response.data.messages.length > 0) {
+      const firstMsgId = response.data.messages[0]?.metadata?.discord_message_id
+      firstMessageReached = firstMsgId === extractMessageId(requestedFirst)
+    }
+    
+    fetchStats.value = {
+      messageCount: metadata.message_count || response.data.messages.length,
+      truncated: metadata.truncated || false,
+      firstMessageReached,
+      requestedFirstUrl: requestedFirst
+    }
+    
+    console.log('[Discord Import] Fetch stats:', fetchStats.value)
+    
     // Store participant info with Discord IDs
-    discordParticipantsWithIds.value = response.data.metadata.participants_with_ids || []
+    discordParticipantsWithIds.value = metadata.participants_with_ids || []
     
     // Convert to preview format
     previewMessages.value = response.data.messages

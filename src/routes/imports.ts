@@ -24,6 +24,15 @@ export function createImportRoutes(context: AppContext): Router {
    */
   router.post('/discord/fetch', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      // Check if Discord config is available
+      if (!context.discordConfig.apiUrl || !context.discordConfig.apiToken) {
+        res.status(503).json({ 
+          error: 'Discord import not configured', 
+          message: 'DISCORD_API_URL and DISCORD_API_TOKEN environment variables must be set' 
+        });
+        return;
+      }
+
       const data = ImportRequestSchema.parse(req.body);
 
       if (data.source_type !== 'discord') {
@@ -92,6 +101,15 @@ export function createImportRoutes(context: AppContext): Router {
    */
   router.post('/discord', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      // Check if Discord config is available
+      if (!context.discordConfig.apiUrl || !context.discordConfig.apiToken) {
+        res.status(503).json({ 
+          error: 'Discord import not configured', 
+          message: 'DISCORD_API_URL and DISCORD_API_TOKEN environment variables must be set' 
+        });
+        return;
+      }
+
       const data = ImportRequestSchema.parse(req.body);
 
       if (data.source_type !== 'discord') {
