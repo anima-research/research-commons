@@ -67,19 +67,39 @@ const router = createRouter({
       name: 'profile',
       component: () => import('@/views/ProfileView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/screening',
+      name: 'screening',
+      component: () => import('@/views/ScreeningView.vue'),
+      meta: { requiresAuth: true, requiresRole: ['researcher', 'admin'] }
     }
   ]
 })
 
-// Auth guard
+// Auth and role guard
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
   
+  // Check auth requirement
   if (to.meta.requiresAuth && !authStore.isAuthenticated()) {
     next({ name: 'login', query: { redirect: to.fullPath } })
-  } else {
-    next()
+    return
   }
+  
+  // Check role requirement (if specified)
+  const requiredRoles = to.meta.requiresRole as string[] | undefined
+  if (requiredRoles && requiredRoles.length > 0) {
+    const hasRequiredRole = requiredRoles.some(role => authStore.hasRole(role as any))
+    if (!hasRequiredRole) {
+      // Redirect to browse if authenticated but unauthorized
+      console.warn('[Router] User lacks required role for', to.path, '- required:', requiredRoles)
+      next({ name: 'browse' })
+      return
+    }
+  }
+  
+  next()
 })
 
 export default router

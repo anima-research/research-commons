@@ -48,6 +48,35 @@
             <span class="text-xs text-gray-400 opacity-60">by {{ submitterName }}</span>
             <span class="text-xs text-gray-500 opacity-50">•</span>
             <span class="text-xs text-gray-400 opacity-60">{{ formatDate(submission?.submitted_at) }}</span>
+            
+            <!-- Visibility badge + editor -->
+            <template v-if="submission?.visibility && submission.visibility !== 'public'">
+              <span class="text-xs text-gray-500 opacity-50">•</span>
+              <div class="flex items-center gap-2">
+                <VisibilityBadge 
+                  :visibility="submission.visibility" 
+                  :show-label="true"
+                />
+                <button
+                  v-if="canEditVisibility"
+                  @click="showVisibilityEditor = true"
+                  class="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                  title="Change visibility"
+                >
+                  ✏️
+                </button>
+              </div>
+            </template>
+            
+            <!-- Edit visibility for public submissions (admin/researcher only) -->
+            <button
+              v-else-if="canEditVisibility"
+              @click="showVisibilityEditor = true"
+              class="text-xs text-gray-500 hover:text-gray-300 px-2 py-0.5 border border-gray-700/50 rounded transition-colors"
+              title="Change visibility"
+            >
+              🌐 Public ✏️
+            </button>
           </div>
           
           <!-- Topic tags inline -->
@@ -380,6 +409,37 @@
       @cancel="showCommentInput = false"
     />
 
+    <!-- Visibility Editor Modal -->
+    <div
+      v-if="showVisibilityEditor"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      @click.self="showVisibilityEditor = false"
+    >
+      <div class="bg-gray-900 border border-gray-700 rounded-lg shadow-xl max-w-md w-full p-6">
+        <h3 class="text-lg font-semibold text-gray-100 mb-4">Change Visibility</h3>
+        <p class="text-sm text-gray-400 mb-4">
+          Control who can see this submission.
+        </p>
+        
+        <VisibilitySelector
+          :model-value="submission?.visibility || 'public'"
+          :exclude-pending="true"
+          :show-label="false"
+          :show-description="true"
+          @update:model-value="handleVisibilityChange"
+        />
+        
+        <div class="flex gap-3 mt-6">
+          <button
+            @click="showVisibilityEditor = false"
+            class="flex-1 px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Text Selection Context Menu -->
     <div
       v-if="showTextSelectionMenu && authStore.isAuthenticated()"
@@ -422,7 +482,9 @@ import TagPopover from '@/components/TagPopover.vue'
 import CommentInput from '@/components/CommentInput.vue'
 import TopicSelector from '@/components/TopicSelector.vue'
 import RatingForm from '@/components/RatingForm.vue'
-import type { Message, Selection, Comment, Rating, Topic } from '@/types'
+import VisibilityBadge from '@/components/VisibilityBadge.vue'
+import VisibilitySelector from '@/components/VisibilitySelector.vue'
+import type { Message, Selection, Comment, Rating, Topic, VisibilityLevel } from '@/types'
 import type { MarginAnnotation, VerticalBar } from '@/utils/layout-manager'
 import { ontologiesAPI, submissionsAPI, annotationsAPI, researchAPI, rankingsAPI, authAPI } from '@/services/api'
 import { renderMarkdown } from '@/utils/markdown'
@@ -475,12 +537,20 @@ const editingTitle = ref(false)
 const titleEdit = ref('')
 const titleInput = ref<HTMLInputElement>()
 const showTopicSelector = ref(false)
+const showVisibilityEditor = ref(false)
 const availableTopics = ref<Topic[]>([])
 
 const canEditSubmission = computed(() => {
   if (!authStore.user || !submission.value) return false
   return submission.value.submitter_id === authStore.user.id || 
          authStore.user.roles.includes('researcher') ||
+         authStore.user.roles.includes('admin')
+})
+
+// Only researchers and admins can change visibility (not regular submitters)
+const canEditVisibility = computed(() => {
+  if (!authStore.user || !submission.value) return false
+  return authStore.user.roles.includes('researcher') ||
          authStore.user.roles.includes('admin')
 })
 
@@ -1714,6 +1784,20 @@ async function applyTopics(topicNames: string[]) {
   } catch (err) {
     console.error('Failed to save topics:', err)
     showTopicSelector.value = false
+  }
+}
+
+async function handleVisibilityChange(newVisibility: VisibilityLevel) {
+  try {
+    await submissionsAPI.update(submissionId, { visibility: newVisibility })
+    
+    if (submission.value) {
+      submission.value.visibility = newVisibility
+    }
+    showVisibilityEditor.value = false
+    console.log('[Visibility] Updated to:', newVisibility)
+  } catch (err) {
+    console.error('Failed to update visibility:', err)
   }
 }
 

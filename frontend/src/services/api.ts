@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { User, Submission, Message, Selection, Comment, Rating, Topic, Criterion } from '@/types'
+import type { User, Submission, Message, Selection, Comment, Rating, Topic, Criterion, VisibilityLevel } from '@/types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -114,8 +114,14 @@ export const authAPI = {
 }
 
 export const submissionsAPI = {
-  list: () =>
-    api.get<{ submissions: Submission[] }>('/submissions'),
+  list: (filters?: { visibility?: VisibilityLevel[] }) => {
+    const params = new URLSearchParams()
+    if (filters?.visibility) {
+      filters.visibility.forEach(v => params.append('visibility', v))
+    }
+    const queryString = params.toString()
+    return api.get<{ submissions: Submission[] }>(`/submissions${queryString ? `?${queryString}` : ''}`)
+  },
   
   create: (data: any) =>
     api.post<Submission>('/submissions', data),
@@ -123,7 +129,7 @@ export const submissionsAPI = {
   get: (id: string) =>
     api.get<Submission>(`/submissions/${id}`),
   
-  update: (id: string, updates: { title?: string; description?: string; tags?: string[] }) =>
+  update: (id: string, updates: { title?: string; description?: string; tags?: string[]; visibility?: VisibilityLevel }) =>
     api.patch<Submission>(`/submissions/${id}`, updates),
   
   delete: (id: string) =>
@@ -278,6 +284,25 @@ export const modelsAPI = {
   
   delete: (id: string) =>
     api.delete<{ success: boolean }>(`/models/${id}`)
+}
+
+// Screening queue API (admin/researcher only)
+export const screeningAPI = {
+  // Get pending submissions awaiting review
+  getPending: () =>
+    api.get<{ submissions: Submission[] }>('/screening/pending'),
+  
+  // Approve a submission with a target visibility
+  approve: (id: string, visibility: VisibilityLevel) =>
+    api.post<{ submission: Submission }>(`/screening/${id}/approve`, { visibility }),
+  
+  // Reject a submission (soft delete with reason)
+  reject: (id: string, reason?: string) =>
+    api.post<{ success: boolean }>(`/screening/${id}/reject`, { reason }),
+  
+  // Get stats for UI badges
+  getStats: () =>
+    api.get<{ pending_count: number; approved_today: number; rejected_today: number }>('/screening/stats')
 }
 
 export default api

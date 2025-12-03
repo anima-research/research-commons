@@ -22,7 +22,13 @@
         :d="iconPath" 
       />
     </svg>
-    <span class="text-sm">{{ label }}</span>
+    <span class="text-sm flex-1">{{ label }}</span>
+    <span 
+      v-if="badge !== undefined && badge > 0" 
+      class="ml-auto px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30"
+    >
+      {{ badge > 99 ? '99+' : badge }}
+    </span>
   </button>
 </template>
 
@@ -33,11 +39,13 @@ interface Props {
   route: string
   active?: boolean
   highlight?: boolean
+  badge?: number
 }
 
 withDefaults(defineProps<Props>(), {
   active: false,
-  highlight: false
+  highlight: false,
+  badge: undefined
 })
 
 defineEmits<{

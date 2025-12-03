@@ -2,6 +2,18 @@
 export * from './ontology'
 export * from './ranking'
 
+// Visibility levels for submission screening
+export type VisibilityLevel = 'pending' | 'admin-only' | 'researcher' | 'public'
+
+// Screening metadata
+export interface ScreeningMetadata {
+  auto_imported?: boolean
+  import_source?: string
+  reviewed_at?: string
+  reviewed_by?: string
+  rejection_reason?: string
+}
+
 export interface User {
   id: string
   email: string
@@ -42,6 +54,7 @@ export interface Submission {
   title: string
   submitter_id: string
   source_type: 'arc-certified' | 'json-upload' | 'discord' | 'other'
+  visibility?: VisibilityLevel  // Screening visibility state (default: 'public')
   certification_data?: {
     arc_conversation_id?: string
     signature_hash?: string
@@ -52,6 +65,7 @@ export interface Submission {
     participants_summary?: string[]
     model_summary?: string[]
     tags?: string[]
+    screening?: ScreeningMetadata  // Screening workflow metadata
   }
   submitted_at: string
 }

@@ -2,16 +2,50 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import jwt from 'jsonwebtoken';
 import { AppContext } from '../index.js';
-import { authenticateToken, AuthRequest, JWT_SECRET } from '../middleware/auth.js';
-import { CreateSubmissionRequestSchema, Message } from '../types/submission.js';
+import { authenticateToken, AuthRequest, JWT_SECRET, optionalAuth } from '../middleware/auth.js';
+import { CreateSubmissionRequestSchema, Message, VisibilityLevel } from '../types/submission.js';
 
 export function createSubmissionRoutes(context: AppContext): Router {
   const router = Router();
 
-  // List submissions
-  router.get('/', async (req, res) => {
+  // List submissions (with visibility filtering based on user role)
+  router.get('/', optionalAuth, async (req: AuthRequest, res) => {
     try {
-      const submissions = await context.submissionStore.listSubmissions();
+      // Determine user's role for visibility filtering
+      const userRoles = req.user?.roles || [];
+      const isAdmin = userRoles.includes('admin');
+      const isResearcher = userRoles.includes('researcher');
+      
+      // Parse query params for explicit filtering
+      const visibilityParam = req.query.visibility as string | string[] | undefined;
+      let requestedVisibility: VisibilityLevel[] | undefined;
+      
+      if (visibilityParam) {
+        // Convert to array if single value
+        requestedVisibility = (Array.isArray(visibilityParam) ? visibilityParam : [visibilityParam]) as VisibilityLevel[];
+      }
+      
+      // Determine allowed visibility levels based on role
+      let allowedVisibility: VisibilityLevel[];
+      if (isAdmin) {
+        // Admins see everything (unless explicitly filtered)
+        allowedVisibility = requestedVisibility || ['pending', 'admin-only', 'researcher', 'public'];
+      } else if (isResearcher) {
+        // Researchers see public + researcher + admin-only (not pending)
+        allowedVisibility = ['public', 'researcher', 'admin-only'];
+        // If explicitly filtered, intersect with allowed
+        if (requestedVisibility) {
+          allowedVisibility = requestedVisibility.filter(v => allowedVisibility.includes(v));
+        }
+      } else {
+        // Anonymous/viewers see only public
+        allowedVisibility = ['public'];
+      }
+      
+      // Fetch filtered submissions
+      const submissions = await context.submissionStore.listSubmissions({
+        visibility: allowedVisibility
+      });
       
       // Enhance each submission with stats and submitter name
       const submissionsWithStats = await Promise.all(submissions.map(async sub => {
@@ -74,6 +108,26 @@ export function createSubmissionRoutes(context: AppContext): Router {
       const data = CreateSubmissionRequestSchema.parse(req.body);
       console.log('[Submissions POST] Validation passed');
       
+      // Determine initial visibility based on submitter's role
+      const submitter = await context.userStore.getUserById(req.userId!);
+      let visibility: VisibilityLevel = 'pending'; // Default for contributors
+      
+      if (submitter) {
+        const isAdmin = submitter.roles.includes('admin');
+        const isResearcher = submitter.roles.includes('researcher');
+        const isAgent = submitter.roles.includes('agent');
+        
+        if (isAdmin || isResearcher) {
+          // Trusted users bypass screening
+          visibility = 'public';
+        } else if (isAgent) {
+          // Crawler bots go to admin-only (visible but needs approval for public)
+          visibility = 'admin-only';
+        }
+        // Contributors and others stay at 'pending'
+      }
+      console.log('[Submissions POST] Assigned visibility:', visibility);
+      
       const tempSubmissionId = uuidv4();
       
       // Convert request messages to full Message objects
@@ -84,17 +138,28 @@ export function createSubmissionRoutes(context: AppContext): Router {
         timestamp: msg.timestamp || new Date()
       }));
 
-      // Create submission
+      // Prepare metadata with screening info
+      const isAutoImported = data.source_type === 'discord' && (data.metadata as any)?.auto_imported === true;
+      const metadata = {
+        ...(data.metadata || {}),
+        screening: {
+          auto_imported: isAutoImported,
+          import_source: isAutoImported ? 'discord-crawler' : 'manual'
+        }
+      };
+
+      // Create submission with visibility
       const submission = await context.submissionStore.createSubmission(
         req.userId!,
         data.title,
         data.source_type,
         messages,
-        data.metadata as any,
+        metadata as any,
         data.arc_conversation_id ? {
           arc_conversation_id: data.arc_conversation_id
           // TODO: Fetch certification from ARC API
-        } : undefined
+        } : undefined,
+        visibility
       );
 
       // Don't attach anything at creation - will be dynamically looked up from topics
@@ -164,11 +229,33 @@ export function createSubmissionRoutes(context: AppContext): Router {
   });
 
   // Get submission
-  router.get('/:submissionId', async (req, res) => {
+  router.get('/:submissionId', optionalAuth, async (req: AuthRequest, res) => {
     try {
       const submission = await context.submissionStore.getSubmission(req.params.submissionId);
       
       if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+      
+      // Check visibility based on user role
+      const userRoles = req.user?.roles || [];
+      const isAdmin = userRoles.includes('admin');
+      const isResearcher = userRoles.includes('researcher');
+      const visibility = submission.visibility || 'public';
+      
+      // Determine if user can see this submission
+      let canSee = false;
+      if (visibility === 'public' || !submission.visibility) {
+        canSee = true; // Public or legacy (no visibility) - everyone can see
+      } else if (isAdmin) {
+        canSee = true; // Admins see everything
+      } else if (isResearcher && ['researcher', 'admin-only'].includes(visibility)) {
+        canSee = true; // Researchers see researcher + admin-only
+      }
+      // Pending submissions: only admins can see via direct fetch
+      
+      if (!canSee) {
         res.status(404).json({ error: 'Submission not found' });
         return;
       }
@@ -302,6 +389,24 @@ export function createSubmissionRoutes(context: AppContext): Router {
       }
       if (req.body.tags !== undefined) {
         submission.metadata.tags = req.body.tags;
+      }
+      
+      // Update visibility (researcher/admin only)
+      if (req.body.visibility !== undefined) {
+        const canChangeVisibility = user?.roles.includes('researcher') || user?.roles.includes('admin');
+        if (!canChangeVisibility) {
+          res.status(403).json({ error: 'Only researchers and admins can change visibility' });
+          return;
+        }
+        
+        const validVisibilities = ['pending', 'admin-only', 'researcher', 'public'];
+        if (!validVisibilities.includes(req.body.visibility)) {
+          res.status(400).json({ error: 'Invalid visibility level', valid: validVisibilities });
+          return;
+        }
+        
+        submission.visibility = req.body.visibility;
+        console.log(`[Submissions] Visibility changed to ${req.body.visibility} by ${req.userId}`);
       }
 
       await context.submissionStore.updateSubmission(req.params.submissionId, submission);

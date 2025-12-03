@@ -1,7 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
 import { ShardedEventStore, EventStore, Event } from './event-store.js';
-import { Submission, Message } from '../types/submission.js';
+import { Submission, Message, VisibilityLevel } from '../types/submission.js';
 import { Rating } from '../types/annotation.js';
+
+/**
+ * Filter options for listing submissions
+ */
+export interface ListSubmissionsFilter {
+  visibility?: VisibilityLevel[];  // Only include these visibility levels
+  includeDeleted?: boolean;        // Include soft-deleted submissions (default: false)
+}
 
 /**
  * Manages submission data stored as events
@@ -51,13 +59,15 @@ export class SubmissionStore {
     sourceType: Submission['source_type'],
     messages: Message[],
     metadata?: Submission['metadata'],
-    certificationData?: Submission['certification_data']
+    certificationData?: Submission['certification_data'],
+    visibility: VisibilityLevel = 'public'
   ): Promise<Submission> {
     const submission: Submission = {
       id: uuidv4(),
       title,
       submitter_id: submitterId,
       source_type: sourceType,
+      visibility, // Screening visibility state
       certification_data: certificationData,
       metadata: metadata || {},
       submitted_at: new Date()
@@ -273,16 +283,31 @@ export class SubmissionStore {
   }
 
   /**
-   * List all submissions (loads metadata only, excludes deleted)
+   * List submissions with optional filtering
+   * @param filter Optional filters for visibility and deleted status
    */
-  async listSubmissions(): Promise<Submission[]> {
+  async listSubmissions(filter?: ListSubmissionsFilter): Promise<Submission[]> {
     const submissions: Submission[] = [];
     
     for (const submissionId of this.submissionIndex) {
       const submission = await this.getSubmission(submissionId);
-      if (submission && !submission.deleted) {
-        submissions.push(submission);
+      if (!submission) continue;
+      
+      // Filter by deleted status (default: exclude deleted)
+      if (!filter?.includeDeleted && submission.deleted) {
+        continue;
       }
+      
+      // Filter by visibility (if specified)
+      // Backward compat: treat missing visibility as 'public'
+      if (filter?.visibility && filter.visibility.length > 0) {
+        const subVisibility = submission.visibility || 'public';
+        if (!filter.visibility.includes(subVisibility)) {
+          continue;
+        }
+      }
+      
+      submissions.push(submission);
     }
     
     // Sort by submitted_at, newest first
@@ -291,6 +316,13 @@ export class SubmissionStore {
     );
     
     return submissions;
+  }
+
+  /**
+   * List pending submissions (convenience method for screening queue)
+   */
+  async listPendingSubmissions(): Promise<Submission[]> {
+    return this.listSubmissions({ visibility: ['pending'] });
   }
 
   async close(): Promise<void> {

@@ -1,5 +1,19 @@
 import { z } from 'zod';
 
+// Visibility levels for submission screening
+export const VisibilityLevelSchema = z.enum(['pending', 'admin-only', 'researcher', 'public']);
+export type VisibilityLevel = z.infer<typeof VisibilityLevelSchema>;
+
+// Screening metadata for tracking approval workflow
+export const ScreeningMetadataSchema = z.object({
+  auto_imported: z.boolean().optional(),
+  import_source: z.string().optional(), // e.g., 'discord-crawler', 'manual'
+  reviewed_at: z.string().optional(), // ISO date string
+  reviewed_by: z.string().uuid().optional(),
+  rejection_reason: z.string().optional()
+});
+export type ScreeningMetadata = z.infer<typeof ScreeningMetadataSchema>;
+
 // Content blocks for multimodal messages
 export const TextContentBlockSchema = z.object({
   type: z.literal('text'),
@@ -90,13 +104,15 @@ export const SubmissionSchema = z.object({
   title: z.string(),
   submitter_id: z.string().uuid(),
   source_type: z.enum(['arc-certified', 'json-upload', 'discord', 'other']),
+  visibility: VisibilityLevelSchema.default('public'), // Screening visibility state
   certification_data: CertificationDataSchema.optional(),
   metadata: z.object({
     original_date: z.date().optional(),
     participants_summary: z.array(z.string()).optional(),
     model_summary: z.array(z.string()).optional(),
     tags: z.array(z.string()).optional(),
-    pinned_message_id: z.string().uuid().optional()
+    pinned_message_id: z.string().uuid().optional(),
+    screening: ScreeningMetadataSchema.optional() // Screening workflow metadata
   }).passthrough(), // Allow additional fields
   submitted_at: z.date(),
   deleted: z.boolean().optional(),

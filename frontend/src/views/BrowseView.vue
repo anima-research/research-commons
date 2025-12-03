@@ -45,6 +45,24 @@
       <!-- Filters & Search -->
       <div class="px-6 py-4">
         <div class="flex gap-2">
+          <!-- Visibility filter (admin/researcher only) -->
+          <div v-if="canFilterByVisibility" class="relative">
+            <select
+              v-model="selectedVisibility"
+              @change="loadSubmissions"
+              class="px-3 py-2 pr-8 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer"
+            >
+              <option value="">All Visible</option>
+              <option value="public">Public Only</option>
+              <option value="researcher">Researcher+</option>
+              <option v-if="authStore.hasRole('admin')" value="pending">Pending Review</option>
+              <option v-if="authStore.hasRole('admin')" value="admin-only">Admin Only</option>
+            </select>
+            <svg class="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+
           <!-- Topic filter -->
           <div class="relative">
             <select
@@ -77,7 +95,7 @@
           </div>
           
           <button 
-            v-if="searchQuery || selectedTopic"
+            v-if="searchQuery || selectedTopic || selectedVisibility"
             @click="clearFilters"
             class="px-3 py-2 border border-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-800/50 hover:text-gray-200 transition-all flex items-center gap-1.5"
           >
@@ -184,6 +202,12 @@
                 {{ (submission as any).stats.comment_count }}
               </div>
               
+              <!-- Visibility badge (shown to admin/researcher) -->
+              <VisibilityBadge 
+                v-if="canFilterByVisibility && submission.visibility && submission.visibility !== 'public'"
+                :visibility="submission.visibility"
+              />
+              
               <!-- ARC badge -->
               <span 
                 v-if="submission.source_type === 'arc-certified'"
@@ -229,18 +253,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { submissionsAPI } from '@/services/api'
-import type { Submission } from '@/types'
+import type { Submission, VisibilityLevel } from '@/types'
 import LeftSidebar from '@/components/LeftSidebar.vue'
+import VisibilityBadge from '@/components/VisibilityBadge.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const showMobileSidebar = ref(false)
 const isMobile = ref(window.innerWidth < 1024)
+
+// Check if user can filter by visibility (admin or researcher)
+const canFilterByVisibility = computed(() => {
+  return authStore.hasRole('admin') || authStore.hasRole('researcher')
+})
 
 onMounted(() => {
   window.addEventListener('resize', checkMobile)
@@ -256,6 +286,7 @@ function handleNavigate(route: string) {
 
 const searchQuery = ref('')
 const selectedTopic = ref('')
+const selectedVisibility = ref<VisibilityLevel | ''>('')
 const submissions = ref<Submission[]>([])
 const allSubmissions = ref<Submission[]>([])
 const availableTopics = ref<string[]>([])
@@ -268,7 +299,12 @@ onMounted(async () => {
 async function loadSubmissions() {
   loading.value = true
   try {
-    const response = await submissionsAPI.list()
+    // Build visibility filter based on selection
+    const visibilityFilter = selectedVisibility.value 
+      ? [selectedVisibility.value as VisibilityLevel]
+      : undefined
+    
+    const response = await submissionsAPI.list({ visibility: visibilityFilter })
     allSubmissions.value = response.data.submissions
     submissions.value = response.data.submissions
     
@@ -278,6 +314,9 @@ async function loadSubmissions() {
       sub.metadata.tags?.forEach(tag => topicsSet.add(tag))
     })
     availableTopics.value = Array.from(topicsSet).sort()
+    
+    // Re-apply local filters after loading
+    filterConversations()
     
     console.log('Loaded conversations:', response.data.submissions.length)
   } catch (error) {
@@ -317,7 +356,8 @@ function filterConversations() {
 function clearFilters() {
   searchQuery.value = ''
   selectedTopic.value = ''
-  submissions.value = allSubmissions.value
+  selectedVisibility.value = ''
+  loadSubmissions() // Reload to clear visibility filter too
 }
 
 function formatDate(date: string) {

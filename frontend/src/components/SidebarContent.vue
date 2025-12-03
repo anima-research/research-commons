@@ -64,6 +64,19 @@
         />
       </div>
 
+      <!-- Review (admin/researcher only) -->
+      <div v-if="canAccessScreening" class="mb-6">
+        <div class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2">Review</div>
+        <NavItem 
+          icon-path="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" 
+          label="Screening Queue" 
+          route="/screening" 
+          :active="isActive('/screening')"
+          :badge="pendingCount > 0 ? pendingCount : undefined"
+          @click="$emit('navigate', '/screening')"
+        />
+      </div>
+
       <!-- Actions -->
       <div>
         <div class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2">Actions</div>
@@ -124,8 +137,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { screeningAPI } from '@/services/api'
 import NavItem from '@/components/NavItem.vue'
 
 const route = useRoute()
@@ -134,6 +149,36 @@ const authStore = useAuthStore()
 const emit = defineEmits<{
   'navigate': [route: string]
 }>()
+
+// Screening access check
+const canAccessScreening = computed(() => {
+  return authStore.hasRole('admin') || authStore.hasRole('researcher')
+})
+
+// Pending count for badge
+const pendingCount = ref(0)
+
+// Load pending count when user can access screening
+async function loadPendingCount() {
+  if (!canAccessScreening.value) return
+  
+  try {
+    const response = await screeningAPI.getStats()
+    pendingCount.value = response.data.pending_count
+  } catch (err) {
+    // Silently fail - badge just won't show
+    console.error('[Sidebar] Failed to load pending count:', err)
+  }
+}
+
+onMounted(() => {
+  loadPendingCount()
+})
+
+// Reload when auth state changes
+watch(() => authStore.user, () => {
+  loadPendingCount()
+})
 
 function isActive(path: string): boolean {
   if (path === '/') {
