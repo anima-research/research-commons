@@ -1,7 +1,14 @@
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { EventStore } from '../storage/event-store.js';
 import { User } from '../types/research.js';
+
+interface PasswordResetToken {
+  userId: string;
+  email: string;
+  expiresAt: Date;
+}
 
 /**
  * Manages user data (event-sourced)
@@ -12,6 +19,7 @@ export class UserStore {
   private usersByEmail: Map<string, string> = new Map();
   private usersByName: Map<string, string> = new Map(); // Track names for uniqueness
   private passwordHashes: Map<string, string> = new Map();
+  private passwordResetTokens: Map<string, PasswordResetToken> = new Map(); // token -> info
 
   constructor(dataPath: string) {
     this.usersFile = new EventStore(`${dataPath}/users.jsonl`);
@@ -269,6 +277,65 @@ export class UserStore {
 
   async close(): Promise<void> {
     await this.usersFile.close();
+  }
+
+  // Password reset token methods
+
+  async createPasswordResetToken(email: string): Promise<{ token: string; user: User } | null> {
+    const userId = this.usersByEmail.get(email);
+    if (!userId) return null;
+    
+    const user = this.users.get(userId);
+    if (!user) return null;
+
+    // Generate a secure random token
+    const token = crypto.randomBytes(32).toString('hex');
+    
+    // Token expires in 24 hours
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    // Store token (in memory only - not persisted, so tokens are cleared on restart)
+    this.passwordResetTokens.set(token, {
+      userId,
+      email,
+      expiresAt
+    });
+
+    // Clean up any expired tokens
+    this.cleanupExpiredTokens();
+
+    return { token, user };
+  }
+
+  async validatePasswordResetToken(token: string): Promise<{ userId: string; email: string } | null> {
+    const tokenInfo = this.passwordResetTokens.get(token);
+    if (!tokenInfo) return null;
+
+    // Check if expired
+    if (new Date() > tokenInfo.expiresAt) {
+      this.passwordResetTokens.delete(token);
+      return null;
+    }
+
+    return { userId: tokenInfo.userId, email: tokenInfo.email };
+  }
+
+  async consumePasswordResetToken(token: string): Promise<{ userId: string; email: string } | null> {
+    const result = await this.validatePasswordResetToken(token);
+    if (result) {
+      // Invalidate the token after use
+      this.passwordResetTokens.delete(token);
+    }
+    return result;
+  }
+
+  private cleanupExpiredTokens(): void {
+    const now = new Date();
+    for (const [token, info] of this.passwordResetTokens.entries()) {
+      if (now > info.expiresAt) {
+        this.passwordResetTokens.delete(token);
+      }
+    }
   }
 }
 

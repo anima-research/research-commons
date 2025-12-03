@@ -1,7 +1,17 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { AppContext } from '../index.js';
 import { generateToken, authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { RegisterUserRequestSchema, LoginRequestSchema, UpdateProfileRequestSchema, UpdatePasswordRequestSchema } from '../types/research.js';
+
+const ForgotPasswordRequestSchema = z.object({
+  email: z.string().email('Invalid email address')
+});
+
+const ResetPasswordRequestSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters')
+});
 
 export function createAuthRoutes(context: AppContext): Router {
   const router = Router();
@@ -305,6 +315,101 @@ export function createAuthRoutes(context: AppContext): Router {
       } else {
         res.status(500).json({ error: 'Internal server error' });
       }
+    }
+  });
+
+  // Request password reset (sends email)
+  router.post('/forgot-password', async (req, res) => {
+    try {
+      const { email } = ForgotPasswordRequestSchema.parse(req.body);
+
+      // Check if email service is configured
+      if (!context.emailService) {
+        res.status(503).json({ 
+          error: 'Email service not configured. Contact an administrator for password reset.' 
+        });
+        return;
+      }
+
+      // Generate reset token (returns null if email doesn't exist)
+      const result = await context.userStore.createPasswordResetToken(email);
+      
+      // Always return success to prevent email enumeration
+      // But only send email if user exists
+      if (result) {
+        const sent = await context.emailService.sendPasswordResetEmail(
+          email, 
+          result.token, 
+          result.user.name
+        );
+        
+        if (!sent) {
+          console.error('[Auth] Failed to send password reset email to:', email);
+        }
+      } else {
+        console.log('[Auth] Password reset requested for non-existent email:', email);
+      }
+
+      // Always return same response to prevent email enumeration
+      res.json({ 
+        message: 'If an account with that email exists, a password reset link has been sent.' 
+      });
+    } catch (error: any) {
+      console.error('Forgot password error:', error);
+      
+      if (error.name === 'ZodError') {
+        const firstError = error.errors?.[0]?.message || 'Invalid request';
+        res.status(400).json({ error: firstError, details: error.errors });
+      } else {
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    }
+  });
+
+  // Reset password with token
+  router.post('/reset-password', async (req, res) => {
+    try {
+      const { token, newPassword } = ResetPasswordRequestSchema.parse(req.body);
+
+      // Validate and consume token
+      const tokenInfo = await context.userStore.consumePasswordResetToken(token);
+      
+      if (!tokenInfo) {
+        res.status(400).json({ error: 'Invalid or expired reset token' });
+        return;
+      }
+
+      // Update password
+      await context.userStore.updateUserPassword(tokenInfo.userId, newPassword);
+
+      res.json({ message: 'Password reset successfully. You can now log in with your new password.' });
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      
+      if (error.name === 'ZodError') {
+        const firstError = error.errors?.[0]?.message || 'Invalid request';
+        res.status(400).json({ error: firstError, details: error.errors });
+      } else {
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    }
+  });
+
+  // Validate reset token (for frontend to check before showing form)
+  router.get('/validate-reset-token/:token', async (req, res) => {
+    try {
+      const { token } = req.params;
+      const tokenInfo = await context.userStore.validatePasswordResetToken(token);
+      
+      if (!tokenInfo) {
+        res.status(400).json({ valid: false, error: 'Invalid or expired reset token' });
+        return;
+      }
+
+      res.json({ valid: true });
+    } catch (error) {
+      console.error('Validate reset token error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 

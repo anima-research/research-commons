@@ -20,6 +20,7 @@ import { createModelRoutes } from './routes/models.js';
 import { createAdminRoutes } from './routes/admin.js';
 import { createImportRoutes } from './routes/imports.js';
 import { createDiscordPreviewRoutes } from './routes/discord-preview.js';
+import { EmailService } from './services/email-service.js';
 
 dotenv.config();
 
@@ -31,6 +32,11 @@ const DATA_PATH = process.env.DATA_PATH || './data';
 // Discord import configuration (server-side) - must be set via environment variables
 const DISCORD_API_URL = process.env.DISCORD_API_URL;
 const DISCORD_API_TOKEN = process.env.DISCORD_API_TOKEN;
+
+// Email configuration
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@resend.dev'; // resend.dev for testing
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
 export interface AppContext {
   submissionStore: SubmissionStore;
@@ -45,6 +51,7 @@ export interface AppContext {
     apiUrl: string | undefined;
     apiToken: string | undefined;
   };
+  emailService: EmailService | null;
 }
 
 async function initializeDefaults(
@@ -200,6 +207,14 @@ async function main() {
   // Auto-create defaults if needed
   await initializeDefaults(ontologyStore, rankingStore, modelStore, researchStore);
 
+  // Initialize email service if configured
+  const emailService = RESEND_API_KEY ? new EmailService({
+    apiKey: RESEND_API_KEY,
+    fromEmail: FROM_EMAIL,
+    appName: 'Research Commons',
+    appUrl: APP_URL
+  }) : null;
+
   const context: AppContext = {
     submissionStore,
     annotationDb,
@@ -212,7 +227,8 @@ async function main() {
     discordConfig: {
       apiUrl: DISCORD_API_URL,
       apiToken: DISCORD_API_TOKEN
-    }
+    },
+    emailService
   };
 
   // Routes
@@ -257,6 +273,11 @@ async function main() {
     }
     if (!DISCORD_API_URL || !DISCORD_API_TOKEN) {
       console.warn(`⚠️  Discord import disabled: DISCORD_API_URL and DISCORD_API_TOKEN must be set`);
+    }
+    if (!RESEND_API_KEY) {
+      console.warn(`⚠️  Email disabled: RESEND_API_KEY must be set for password reset`);
+    } else {
+      console.log(`📧 Email service enabled (from: ${FROM_EMAIL})`);
     }
   });
 

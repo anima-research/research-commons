@@ -90,7 +90,7 @@
             />
           </div>
 
-          <div class="mb-6">
+          <div class="mb-4">
             <label class="block text-sm font-medium text-gray-300 mb-1">Password</label>
             <input
               v-model="password"
@@ -100,6 +100,16 @@
               class="w-full px-3 py-2 border border-gray-700 rounded bg-gray-800 text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
+
+          <div v-if="isLogin" class="mb-6 text-right">
+            <router-link 
+              to="/forgot-password" 
+              class="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Forgot password?
+            </router-link>
+          </div>
+          <div v-else class="mb-6"></div>
 
           <div v-if="authStore.error" class="mb-4 p-3 bg-red-900/20 border border-red-800 rounded text-red-400 text-sm">
             {{ authStore.error }}

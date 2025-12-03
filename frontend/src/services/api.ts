@@ -110,7 +110,16 @@ export const authAPI = {
     api.patch<{ user: User; token: string; message: string }>('/auth/profile', updates),
   
   updatePassword: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
-    api.put<{ message: string }>('/auth/password', data)
+    api.put<{ message: string }>('/auth/password', data),
+  
+  forgotPassword: (email: string) =>
+    api.post<{ message: string }>('/auth/forgot-password', { email }),
+  
+  validateResetToken: (token: string) =>
+    api.get<{ valid: boolean }>(`/auth/validate-reset-token/${token}`),
+  
+  resetPassword: (token: string, newPassword: string) =>
+    api.post<{ message: string }>('/auth/reset-password', { token, newPassword })
 }
 
 export const submissionsAPI = {
