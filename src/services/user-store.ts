@@ -126,7 +126,7 @@ export class UserStore {
       id: uuidv4(),
       email,
       name,
-      roles: ['contributor'], // Default role
+      roles: ['member'], // Default role - untrusted, submissions go to screening
       created_at: new Date()
     };
 

@@ -18,7 +18,7 @@ export interface User {
   id: string
   email: string
   name: string
-  roles: ('viewer' | 'contributor' | 'rater' | 'expert' | 'researcher' | 'agent' | 'admin')[]
+  roles: ('member' | 'viewer' | 'contributor' | 'rater' | 'expert' | 'researcher' | 'agent' | 'admin')[]
 }
 
 export interface ContentBlock {

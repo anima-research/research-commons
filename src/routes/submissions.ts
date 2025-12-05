@@ -110,21 +110,22 @@ export function createSubmissionRoutes(context: AppContext): Router {
       
       // Determine initial visibility based on submitter's role
       const submitter = await context.userStore.getUserById(req.userId!);
-      let visibility: VisibilityLevel = 'pending'; // Default for contributors
+      let visibility: VisibilityLevel = 'pending'; // Default for members (untrusted)
       
       if (submitter) {
         const isAdmin = submitter.roles.includes('admin');
         const isResearcher = submitter.roles.includes('researcher');
+        const isContributor = submitter.roles.includes('contributor');
         const isAgent = submitter.roles.includes('agent');
         
-        if (isAdmin || isResearcher) {
+        if (isAdmin || isResearcher || isContributor) {
           // Trusted users bypass screening
           visibility = 'public';
         } else if (isAgent) {
           // Crawler bots go to admin-only (visible but needs approval for public)
           visibility = 'admin-only';
         }
-        // Contributors and others stay at 'pending'
+        // Members and others stay at 'pending'
       }
       console.log('[Submissions POST] Assigned visibility:', visibility);
       

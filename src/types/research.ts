@@ -21,7 +21,7 @@ export const UserSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
   name: z.string(),
-  roles: z.array(z.enum(['viewer', 'contributor', 'rater', 'expert', 'researcher', 'agent', 'admin'])),
+  roles: z.array(z.enum(['member', 'viewer', 'contributor', 'rater', 'expert', 'researcher', 'agent', 'admin'])),
   created_at: z.date(),
   updated_at: z.date().optional()
 });
