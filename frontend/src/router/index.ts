@@ -73,6 +73,12 @@ const router = createRouter({
       name: 'screening',
       component: () => import('@/views/ScreeningView.vue'),
       meta: { requiresAuth: true, requiresRole: ['researcher', 'admin'] }
+    },
+    {
+      path: '/admin/users',
+      name: 'admin-users',
+      component: () => import('@/views/UsersManagementView.vue'),
+      meta: { requiresAuth: true, requiresRole: ['admin'] }
     }
   ]
 })

@@ -286,6 +286,17 @@ export const modelsAPI = {
     api.delete<{ success: boolean }>(`/models/${id}`)
 }
 
+// Admin API (admin only)
+export const adminAPI = {
+  // Get all users
+  getUsers: () =>
+    api.get<{ users: User[] }>('/admin/users'),
+  
+  // Update user roles
+  updateRoles: (userId: string, roles: string[]) =>
+    api.patch<{ user: User }>(`/admin/users/${userId}/roles`, { roles })
+}
+
 // Screening queue API (admin/researcher only)
 export const screeningAPI = {
   // Get pending submissions awaiting review

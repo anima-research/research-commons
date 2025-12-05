@@ -77,6 +77,18 @@
         />
       </div>
 
+      <!-- Admin (admin only) -->
+      <div v-if="isAdmin" class="mb-6">
+        <div class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2">Admin</div>
+        <NavItem 
+          icon-path="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" 
+          label="User Management" 
+          route="/admin/users" 
+          :active="isActive('/admin/users')"
+          @click="$emit('navigate', '/admin/users')"
+        />
+      </div>
+
       <!-- Actions -->
       <div>
         <div class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2">Actions</div>
@@ -153,6 +165,11 @@ const emit = defineEmits<{
 // Screening access check
 const canAccessScreening = computed(() => {
   return authStore.hasRole('admin') || authStore.hasRole('researcher')
+})
+
+// Admin check
+const isAdmin = computed(() => {
+  return authStore.hasRole('admin')
 })
 
 // Pending count for badge

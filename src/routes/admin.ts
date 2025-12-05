@@ -89,6 +89,52 @@ export function createAdminRoutes(context: AppContext): Router {
     }
   });
 
+  // Update user roles (admin-only)
+  const VALID_ROLES = ['member', 'viewer', 'contributor', 'rater', 'expert', 'researcher', 'agent', 'admin'];
+  
+  router.patch('/users/:userId/roles', authenticateToken, requireRole('admin'), async (req: AuthRequest, res) => {
+    try {
+      const targetUserId = req.params.userId;
+      const { roles } = req.body;
+
+      // Validate roles array
+      if (!Array.isArray(roles)) {
+        res.status(400).json({ error: 'roles must be an array' });
+        return;
+      }
+
+      // Validate each role
+      const invalidRoles = roles.filter(r => !VALID_ROLES.includes(r));
+      if (invalidRoles.length > 0) {
+        res.status(400).json({ error: `Invalid roles: ${invalidRoles.join(', ')}` });
+        return;
+      }
+
+      // Get target user
+      const user = await context.userStore.getUserById(targetUserId);
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      // Safety: Prevent admin from removing their own admin role
+      if (targetUserId === req.userId && user.roles.includes('admin') && !roles.includes('admin')) {
+        res.status(400).json({ error: 'Cannot remove your own admin role' });
+        return;
+      }
+
+      // Update roles
+      const updatedUser = await context.userStore.updateUserRoles(targetUserId, roles);
+      
+      console.log(`[Admin] User ${req.userId} updated roles for ${targetUserId}: ${roles.join(', ')}`);
+      
+      res.json({ user: updatedUser });
+    } catch (error) {
+      console.error('Update user roles error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   return router;
 }
 
