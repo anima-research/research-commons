@@ -248,15 +248,33 @@ export class SubmissionStore {
 
     // Load from disk
     const events = await this.store.loadEvents(submissionId, 'messages.jsonl');
-    const messages = events
-      .filter(e => e.type === 'message_added')
-      .map(e => e.data as Message);
+    
+    // Build message map by replaying events
+    const messageMap = new Map<string, Message>();
+    
+    for (const event of events) {
+      if (event.type === 'message_added') {
+        const msg = event.data as Message;
+        messageMap.set(msg.id, msg);
+      } else if (event.type === 'message_order_updated') {
+        const { messageId, newOrder } = event.data;
+        const msg = messageMap.get(messageId);
+        if (msg) {
+          msg.order = newOrder;
+        }
+      } else if (event.type === 'message_parent_updated') {
+        const { messageId, newParentId } = event.data;
+        const msg = messageMap.get(messageId);
+        if (msg) {
+          msg.parent_message_id = newParentId;
+        }
+      }
+    }
 
-    const messageMap = new Map(messages.map(m => [m.id, m]));
     this.messages.set(submissionId, messageMap);
     this.lastAccessed.set(submissionId, new Date());
 
-    return messages;
+    return Array.from(messageMap.values());
   }
 
   // Note: Ratings no longer stored in event store - moved to SQLite
@@ -323,6 +341,109 @@ export class SubmissionStore {
    */
   async listPendingSubmissions(): Promise<Submission[]> {
     return this.listSubmissions({ visibility: ['pending'] });
+  }
+
+  /**
+   * Extend a conversation by prepending or appending messages
+   * @param submissionId The submission to extend
+   * @param newMessages New messages to add (already formatted)
+   * @param direction 'earlier' to prepend, 'later' to append
+   * @returns Updated message count
+   */
+  async extendConversation(
+    submissionId: string,
+    newMessages: Message[],
+    direction: 'earlier' | 'later'
+  ): Promise<{ addedCount: number; totalCount: number }> {
+    if (newMessages.length === 0) {
+      const existing = await this.getMessages(submissionId);
+      return { addedCount: 0, totalCount: existing.length };
+    }
+
+    // Load existing messages
+    const existingMessages = await this.getMessages(submissionId);
+    existingMessages.sort((a, b) => a.order - b.order);
+
+    if (direction === 'earlier') {
+      // PREPENDING: New messages go at the beginning
+      const shiftAmount = newMessages.length;
+      
+      // Find current root message (order 0, parent_message_id = null)
+      const currentRoot = existingMessages.find(m => m.parent_message_id === null);
+      if (!currentRoot) {
+        throw new Error('Cannot find root message in existing conversation');
+      }
+
+      // Shift all existing message orders by the number of new messages
+      for (const msg of existingMessages) {
+        msg.order += shiftAmount;
+        // Store the order update event
+        await this.store.appendEvent(submissionId, 'messages.jsonl', {
+          timestamp: new Date(),
+          type: 'message_order_updated',
+          data: { messageId: msg.id, newOrder: msg.order }
+        });
+      }
+
+      // Update current root to point to the last new message as parent
+      const lastNewMessage = newMessages[newMessages.length - 1];
+      currentRoot.parent_message_id = lastNewMessage.id;
+      await this.store.appendEvent(submissionId, 'messages.jsonl', {
+        timestamp: new Date(),
+        type: 'message_parent_updated',
+        data: { messageId: currentRoot.id, newParentId: lastNewMessage.id }
+      });
+
+      // Add new messages with correct order (0 to N-1)
+      for (let i = 0; i < newMessages.length; i++) {
+        const msg = newMessages[i];
+        msg.order = i;
+        msg.submission_id = submissionId;
+        
+        await this.store.appendEvent(submissionId, 'messages.jsonl', {
+          timestamp: new Date(),
+          type: 'message_added',
+          data: msg
+        });
+      }
+
+    } else {
+      // APPENDING: New messages go at the end
+      const currentMaxOrder = existingMessages.length > 0 
+        ? Math.max(...existingMessages.map(m => m.order))
+        : -1;
+      
+      // Find current last message (highest order)
+      const currentLast = existingMessages.find(m => m.order === currentMaxOrder);
+
+      // Add new messages with correct order and parent chain
+      for (let i = 0; i < newMessages.length; i++) {
+        const msg = newMessages[i];
+        msg.order = currentMaxOrder + 1 + i;
+        msg.submission_id = submissionId;
+        
+        // First new message points to current last message
+        if (i === 0 && currentLast) {
+          msg.parent_message_id = currentLast.id;
+        }
+        
+        await this.store.appendEvent(submissionId, 'messages.jsonl', {
+          timestamp: new Date(),
+          type: 'message_added',
+          data: msg
+        });
+      }
+    }
+
+    // Clear message cache to force reload
+    this.messages.delete(submissionId);
+    
+    // Reload and return updated count
+    const updatedMessages = await this.getMessages(submissionId);
+    return { 
+      addedCount: newMessages.length, 
+      totalCount: updatedMessages.length 
+    };
   }
 
   async close(): Promise<void> {

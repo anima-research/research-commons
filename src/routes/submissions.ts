@@ -1,9 +1,20 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import { AppContext } from '../index.js';
 import { authenticateToken, AuthRequest, JWT_SECRET, optionalAuth } from '../middleware/auth.js';
 import { CreateSubmissionRequestSchema, Message, VisibilityLevel } from '../types/submission.js';
+import { DiscordImporter, DiscordImportParams } from '../importers/discord-importer.js';
+import { ImportSource } from '../importers/base-importer.js';
+
+// Schema for extend request
+const ExtendRequestSchema = z.object({
+  direction: z.enum(['earlier', 'later']),
+  messageUrl: z.string().optional(), // Target message URL for extension boundary
+  limit: z.number().optional().default(50),
+  participantMapping: z.record(z.string()).optional() // participantName -> modelId or 'human'
+});
 
 export function createSubmissionRoutes(context: AppContext): Router {
   const router = Router();
@@ -777,6 +788,396 @@ export function createSubmissionRoutes(context: AppContext): Router {
     } catch (error) {
       console.error('Delete submission error:', error);
       res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Extend Discord conversation (add earlier or later messages)
+  router.post('/:submissionId/extend', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Check if this is a Discord submission
+      if (submission.source_type !== 'discord') {
+        res.status(400).json({ error: 'Extension is only available for Discord submissions' });
+        return;
+      }
+
+      // Check permissions (same as edit)
+      const user = await context.userStore.getUserById(req.userId!);
+      const canEdit = submission.submitter_id === req.userId! || 
+                      user?.roles.includes('researcher') ||
+                      user?.roles.includes('admin');
+      
+      if (!canEdit) {
+        res.status(403).json({ error: 'Not authorized to extend this submission' });
+        return;
+      }
+
+      // Check if Discord is configured
+      if (!context.discordConfig.apiUrl || !context.discordConfig.apiToken) {
+        res.status(503).json({ 
+          error: 'Discord import not configured', 
+          message: 'DISCORD_API_URL and DISCORD_API_TOKEN environment variables must be set' 
+        });
+        return;
+      }
+
+      const data = ExtendRequestSchema.parse(req.body);
+      
+      // Get existing messages to find boundary
+      const existingMessages = await context.submissionStore.getMessages(req.params.submissionId);
+      existingMessages.sort((a, b) => a.order - b.order);
+
+      if (existingMessages.length === 0) {
+        res.status(400).json({ error: 'No existing messages to extend from' });
+        return;
+      }
+
+      // Get Discord metadata from submission, or extract from user-provided messageUrl
+      let channelId = (submission.metadata as any).channel_id;
+      let guildId = (submission.metadata as any).guild_id;
+      
+      // If metadata is missing, try to extract from the user-provided messageUrl
+      if ((!channelId || !guildId) && data.messageUrl) {
+        const urlMatch = data.messageUrl.match(/discord\.com\/channels\/(\d+)\/(\d+)\/\d+/);
+        if (urlMatch) {
+          guildId = guildId || urlMatch[1];
+          channelId = channelId || urlMatch[2];
+          console.log(`[Extend] Extracted guild/channel from messageUrl: guild=${guildId}, channel=${channelId}`);
+        }
+      }
+      
+      if (!channelId || !guildId) {
+        res.status(400).json({ 
+          error: 'Missing Discord channel/guild metadata',
+          hint: 'For older Discord imports, please provide a target message URL to extract channel info'
+        });
+        return;
+      }
+
+      // Determine boundary message for fetching
+      let boundaryMessage: Message;
+      let boundaryDiscordId: string;
+      
+      if (data.direction === 'earlier') {
+        // Get first message (oldest)
+        boundaryMessage = existingMessages[0];
+        boundaryDiscordId = (boundaryMessage.metadata as any)?.discord_message_id;
+      } else {
+        // Get last message (newest)
+        boundaryMessage = existingMessages[existingMessages.length - 1];
+        boundaryDiscordId = (boundaryMessage.metadata as any)?.discord_message_id;
+      }
+
+      if (!boundaryDiscordId) {
+        res.status(400).json({ error: 'Missing Discord message ID in boundary message' });
+        return;
+      }
+
+      // Build the boundary URL
+      const boundaryUrl = `https://discord.com/channels/${guildId}/${channelId}/${boundaryDiscordId}`;
+      
+      // Build import params based on direction
+      let importParams: DiscordImportParams;
+      
+      if (data.direction === 'earlier') {
+        // Fetch messages BEFORE the first message
+        // The lastMessageUrl is the boundary (exclusive), we fetch backwards from it
+        importParams = {
+          lastMessageUrl: boundaryUrl,
+          firstMessageUrl: data.messageUrl, // Optional target for how far back to go
+          maxMessages: data.limit
+        };
+      } else {
+        // Fetch messages AFTER the last message
+        // Use the target URL as last, boundary as first (reversed logic)
+        if (data.messageUrl) {
+          importParams = {
+            lastMessageUrl: data.messageUrl, // Target end
+            firstMessageUrl: boundaryUrl,    // Current end (exclusive start)
+            maxMessages: data.limit
+          };
+        } else {
+          // No target - just fetch the next N messages after boundary
+          // This needs a different approach - fetch recent and filter
+          res.status(400).json({ error: 'For "later" extension, please provide a target messageUrl' });
+          return;
+        }
+      }
+
+      console.log(`[Extend] Direction: ${data.direction}, params:`, importParams);
+
+      // Create importer and fetch
+      const importer = new DiscordImporter(context.discordConfig);
+      const source: ImportSource = {
+        type: 'discord',
+        identifier: JSON.stringify(importParams)
+      };
+
+      const imported = await importer.importConversation(source);
+
+      // Filter out messages that already exist (by discord_message_id)
+      const existingDiscordIds = new Set(
+        existingMessages
+          .map(m => (m.metadata as any)?.discord_message_id)
+          .filter(Boolean)
+      );
+
+      let newMessages = imported.messages.filter(msg => {
+        const discordId = (msg.metadata as any)?.discord_message_id;
+        return discordId && !existingDiscordIds.has(discordId);
+      });
+
+      if (newMessages.length === 0) {
+        res.json({ 
+          success: true, 
+          addedCount: 0, 
+          totalCount: existingMessages.length,
+          message: 'No new messages to add'
+        });
+        return;
+      }
+
+      // Sort new messages by timestamp to ensure proper order
+      newMessages.sort((a, b) => 
+        new Date(a.timestamp!).getTime() - new Date(b.timestamp!).getTime()
+      );
+
+      // Apply participant mappings if provided
+      if (data.participantMapping) {
+        const models = await context.modelStore.getAllModels();
+        const modelMap = new Map(models.map(m => [m.id, m]));
+
+        for (const msg of newMessages) {
+          const mapping = data.participantMapping[msg.participant_name];
+          if (mapping) {
+            if (mapping === 'human') {
+              msg.participant_type = 'human';
+              msg.model_info = undefined;
+            } else {
+              const modelData = modelMap.get(mapping);
+              if (modelData) {
+                msg.participant_type = 'model';
+                msg.model_info = {
+                  model_id: modelData.model_id,
+                  provider: modelData.provider,
+                  reasoning_enabled: false
+                };
+              }
+            }
+          }
+        }
+      }
+
+      // Extend the conversation
+      const result = await context.submissionStore.extendConversation(
+        req.params.submissionId,
+        newMessages,
+        data.direction
+      );
+
+      // Update message_count in metadata
+      const updatedSubmission = await context.submissionStore.getSubmission(req.params.submissionId);
+      if (updatedSubmission) {
+        (updatedSubmission.metadata as any).message_count = result.totalCount;
+        await context.submissionStore.updateSubmission(req.params.submissionId, updatedSubmission);
+      }
+
+      console.log(`[Extend] Added ${result.addedCount} messages to submission ${req.params.submissionId}`);
+
+      // Return new participants info for mapping
+      const newParticipantsWithIds = (imported.metadata as any).participants_with_ids || [];
+
+      res.json({
+        success: true,
+        addedCount: result.addedCount,
+        totalCount: result.totalCount,
+        newParticipants: newParticipantsWithIds
+      });
+
+    } catch (error: any) {
+      console.error('Extend submission error:', error);
+      
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Invalid request', details: error.errors });
+      } else {
+        res.status(500).json({ error: 'Extension failed', message: error.message });
+      }
+    }
+  });
+
+  // Preview messages for extension (doesn't modify submission)
+  router.post('/:submissionId/extend/preview', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Check if this is a Discord submission
+      if (submission.source_type !== 'discord') {
+        res.status(400).json({ error: 'Extension is only available for Discord submissions' });
+        return;
+      }
+
+      // Check permissions
+      const user = await context.userStore.getUserById(req.userId!);
+      const canEdit = submission.submitter_id === req.userId! || 
+                      user?.roles.includes('researcher') ||
+                      user?.roles.includes('admin');
+      
+      if (!canEdit) {
+        res.status(403).json({ error: 'Not authorized to extend this submission' });
+        return;
+      }
+
+      // Check if Discord is configured
+      if (!context.discordConfig.apiUrl || !context.discordConfig.apiToken) {
+        res.status(503).json({ 
+          error: 'Discord import not configured', 
+          message: 'DISCORD_API_URL and DISCORD_API_TOKEN environment variables must be set' 
+        });
+        return;
+      }
+
+      const data = ExtendRequestSchema.parse(req.body);
+      
+      // Get existing messages to find boundary
+      const existingMessages = await context.submissionStore.getMessages(req.params.submissionId);
+      existingMessages.sort((a, b) => a.order - b.order);
+
+      if (existingMessages.length === 0) {
+        res.status(400).json({ error: 'No existing messages to extend from' });
+        return;
+      }
+
+      // Get Discord metadata from submission, or extract from user-provided messageUrl
+      let channelId = (submission.metadata as any).channel_id;
+      let guildId = (submission.metadata as any).guild_id;
+      
+      // If metadata is missing, try to extract from the user-provided messageUrl
+      if ((!channelId || !guildId) && data.messageUrl) {
+        const urlMatch = data.messageUrl.match(/discord\.com\/channels\/(\d+)\/(\d+)\/\d+/);
+        if (urlMatch) {
+          guildId = guildId || urlMatch[1];
+          channelId = channelId || urlMatch[2];
+          console.log(`[Extend Preview] Extracted guild/channel from messageUrl: guild=${guildId}, channel=${channelId}`);
+        }
+      }
+      
+      if (!channelId || !guildId) {
+        res.status(400).json({ 
+          error: 'Missing Discord channel/guild metadata',
+          hint: 'For older Discord imports, please provide a target message URL to extract channel info'
+        });
+        return;
+      }
+
+      // Determine boundary
+      let boundaryMessage: Message;
+      let boundaryDiscordId: string;
+      
+      if (data.direction === 'earlier') {
+        boundaryMessage = existingMessages[0];
+        boundaryDiscordId = (boundaryMessage.metadata as any)?.discord_message_id;
+      } else {
+        boundaryMessage = existingMessages[existingMessages.length - 1];
+        boundaryDiscordId = (boundaryMessage.metadata as any)?.discord_message_id;
+      }
+
+      if (!boundaryDiscordId) {
+        res.status(400).json({ error: 'Missing Discord message ID in boundary message' });
+        return;
+      }
+
+      const boundaryUrl = `https://discord.com/channels/${guildId}/${channelId}/${boundaryDiscordId}`;
+      
+      // Build import params
+      let importParams: DiscordImportParams;
+      
+      if (data.direction === 'earlier') {
+        importParams = {
+          lastMessageUrl: boundaryUrl,
+          firstMessageUrl: data.messageUrl,
+          maxMessages: data.limit
+        };
+      } else {
+        if (data.messageUrl) {
+          importParams = {
+            lastMessageUrl: data.messageUrl,
+            firstMessageUrl: boundaryUrl,
+            maxMessages: data.limit
+          };
+        } else {
+          res.status(400).json({ error: 'For "later" extension, please provide a target messageUrl' });
+          return;
+        }
+      }
+
+      // Fetch preview
+      const importer = new DiscordImporter(context.discordConfig);
+      const source: ImportSource = {
+        type: 'discord',
+        identifier: JSON.stringify(importParams)
+      };
+
+      const imported = await importer.importConversation(source);
+
+      // Filter out existing messages
+      const existingDiscordIds = new Set(
+        existingMessages
+          .map(m => (m.metadata as any)?.discord_message_id)
+          .filter(Boolean)
+      );
+
+      const newMessages = imported.messages.filter(msg => {
+        const discordId = (msg.metadata as any)?.discord_message_id;
+        return discordId && !existingDiscordIds.has(discordId);
+      });
+
+      // Sort by timestamp
+      newMessages.sort((a, b) => 
+        new Date(a.timestamp!).getTime() - new Date(b.timestamp!).getTime()
+      );
+
+      // Get participant info including existing mappings
+      const participantsWithIds = (imported.metadata as any).participants_with_ids || [];
+      const existingMappingsByUserId: any = {};
+      
+      for (const participant of participantsWithIds) {
+        const mapping = context.participantMappingStore.getMapping('discord', participant.discord_user_id);
+        if (mapping) {
+          existingMappingsByUserId[participant.discord_user_id] = {
+            model_id: mapping.model_id,
+            is_human: mapping.is_human,
+            avatar_url: mapping.avatar_url
+          };
+        }
+      }
+
+      res.json({
+        messages: newMessages,
+        metadata: imported.metadata,
+        existingMappings: existingMappingsByUserId,
+        truncated: (imported.metadata as any).truncated || false,
+        messageCount: newMessages.length
+      });
+
+    } catch (error: any) {
+      console.error('Extend preview error:', error);
+      
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Invalid request', details: error.errors });
+      } else {
+        res.status(500).json({ error: 'Preview failed', message: error.message });
+      }
     }
   });
 

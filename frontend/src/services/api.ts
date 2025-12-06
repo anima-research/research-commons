@@ -166,7 +166,34 @@ export const submissionsAPI = {
     api.post<{ success: boolean; hidden_count: number; message_ids: string[] }>(`/submissions/${submissionId}/messages/${messageId}/hide-previous`, { reason }),
   
   getHiddenMessages: (submissionId: string) =>
-    api.get<{ hidden_message_ids: string[] }>(`/submissions/${submissionId}/hidden-messages`)
+    api.get<{ hidden_message_ids: string[] }>(`/submissions/${submissionId}/hidden-messages`),
+  
+  // Extension API for Discord conversations
+  extendPreview: (submissionId: string, params: { 
+    direction: 'earlier' | 'later'; 
+    messageUrl?: string; 
+    limit?: number 
+  }) =>
+    api.post<{ 
+      messages: Message[]; 
+      metadata: any; 
+      existingMappings: Record<string, { model_id?: string; is_human: boolean; avatar_url?: string }>;
+      truncated: boolean;
+      messageCount: number;
+    }>(`/submissions/${submissionId}/extend/preview`, params),
+  
+  extend: (submissionId: string, params: { 
+    direction: 'earlier' | 'later'; 
+    messageUrl?: string; 
+    limit?: number;
+    participantMapping?: Record<string, string>;
+  }) =>
+    api.post<{ 
+      success: boolean; 
+      addedCount: number; 
+      totalCount: number; 
+      newParticipants: Array<{ name: string; discord_user_id: string; username: string; is_bot: boolean; avatar_url?: string }>;
+    }>(`/submissions/${submissionId}/extend`, params)
 }
 
 export const annotationsAPI = {

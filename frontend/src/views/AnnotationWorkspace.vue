@@ -136,6 +136,19 @@
             Login to Rate
           </router-link>
           
+          <!-- Extend button (Discord only) -->
+          <button
+            v-if="canExtendConversation"
+            @click="showExtendModal = true"
+            class="px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-300 text-xs rounded font-medium transition-all flex items-center gap-1"
+            title="Extend Discord conversation"
+          >
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            Extend
+          </button>
+          
           <button
             v-if="canDeleteSubmission"
             @click="handleDeleteSubmission"
@@ -440,6 +453,16 @@
       </div>
     </div>
 
+    <!-- Extend Conversation Modal (Discord only) -->
+    <ExtendConversationModal
+      :show="showExtendModal"
+      :submission-id="submissionId"
+      :allow-create-model="authStore.user?.roles.includes('admin') || authStore.user?.roles.includes('researcher')"
+      @cancel="showExtendModal = false"
+      @extended="handleConversationExtended"
+      @create-model="handleCreateModelFromExtend"
+    />
+
     <!-- Text Selection Context Menu -->
     <div
       v-if="showTextSelectionMenu && authStore.isAuthenticated()"
@@ -484,6 +507,7 @@ import TopicSelector from '@/components/TopicSelector.vue'
 import RatingForm from '@/components/RatingForm.vue'
 import VisibilityBadge from '@/components/VisibilityBadge.vue'
 import VisibilitySelector from '@/components/VisibilitySelector.vue'
+import ExtendConversationModal from '@/components/ExtendConversationModal.vue'
 import type { Message, Selection, Comment, Rating, Topic, VisibilityLevel } from '@/types'
 import type { MarginAnnotation, VerticalBar } from '@/utils/layout-manager'
 import { ontologiesAPI, submissionsAPI, annotationsAPI, researchAPI, rankingsAPI, authAPI } from '@/services/api'
@@ -538,6 +562,7 @@ const titleEdit = ref('')
 const titleInput = ref<HTMLInputElement>()
 const showTopicSelector = ref(false)
 const showVisibilityEditor = ref(false)
+const showExtendModal = ref(false)
 const availableTopics = ref<Topic[]>([])
 
 const canEditSubmission = computed(() => {
@@ -557,6 +582,17 @@ const canEditVisibility = computed(() => {
 const canDeleteSubmission = computed(() => {
   if (!authStore.user || !submission.value) return false
   return submission.value.submitter_id === authStore.user.id || 
+         authStore.user.roles.includes('admin')
+})
+
+// Permission to extend conversation (Discord only, same as edit permissions)
+const canExtendConversation = computed(() => {
+  if (!authStore.user || !submission.value) return false
+  // Must be a Discord submission
+  if (submission.value.source_type !== 'discord') return false
+  // Same permissions as editing
+  return submission.value.submitter_id === authStore.user.id || 
+         authStore.user.roles.includes('researcher') ||
          authStore.user.roles.includes('admin')
 })
 
@@ -1799,6 +1835,30 @@ async function handleVisibilityChange(newVisibility: VisibilityLevel) {
   } catch (err) {
     console.error('Failed to update visibility:', err)
   }
+}
+
+async function handleConversationExtended(data: { addedCount: number; totalCount: number }) {
+  console.log('[Extend] Conversation extended:', data)
+  showExtendModal.value = false
+  
+  // Reload messages to show the new ones
+  try {
+    const messagesData = await submissionsStore.fetchMessages(submissionId)
+    messages.value = messagesData
+    
+    // Update submission metadata (message_count may have changed)
+    submission.value = await submissionsStore.fetchSubmission(submissionId)
+    
+    console.log('[Extend] Reloaded', messagesData.length, 'messages')
+  } catch (err) {
+    console.error('[Extend] Failed to reload messages:', err)
+  }
+}
+
+function handleCreateModelFromExtend(participantName: string) {
+  // For now, just log - the modal handles model creation internally
+  // If we need to support inline model creation, we can add it here
+  console.log('[Extend] Create model requested for:', participantName)
 }
 
 function handleAddTag(selectionId: string) {
