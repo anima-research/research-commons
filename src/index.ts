@@ -273,6 +273,8 @@ async function main() {
     }
     if (!DISCORD_API_URL || !DISCORD_API_TOKEN) {
       console.warn(`⚠️  Discord import disabled: DISCORD_API_URL and DISCORD_API_TOKEN must be set`);
+    } else {
+      console.log(`🎮 Discord import enabled (API: ${DISCORD_API_URL})`);
     }
     if (!RESEND_API_KEY) {
       console.warn(`⚠️  Email disabled: RESEND_API_KEY must be set for password reset`);
