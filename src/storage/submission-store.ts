@@ -238,15 +238,45 @@ export class SubmissionStore {
 
     // Load from disk
     const events = await this.store.loadEvents(submissionId, 'messages.jsonl');
-    const messages = events
-      .filter(e => e.type === 'message_added')
-      .map(e => e.data as Message);
+    
+    // First pass: build message map from message_added events
+    const messageMap = new Map<string, Message>();
+    for (const event of events) {
+      if (event.type === 'message_added') {
+        messageMap.set(event.data.id, event.data as Message);
+      } else if (event.type === 'message_updated') {
+        // Apply updates to existing message
+        const existing = messageMap.get(event.data.messageId);
+        if (existing) {
+          messageMap.set(event.data.messageId, { ...existing, ...event.data.updates });
+        }
+      }
+    }
 
-    const messageMap = new Map(messages.map(m => [m.id, m]));
     this.messages.set(submissionId, messageMap);
     this.lastAccessed.set(submissionId, new Date());
 
-    return messages;
+    return Array.from(messageMap.values());
+  }
+
+  /**
+   * Update a message's fields
+   */
+  async updateMessage(submissionId: string, messageId: string, updates: Partial<Message>): Promise<void> {
+    await this.store.appendEvent(submissionId, 'messages.jsonl', {
+      timestamp: new Date(),
+      type: 'message_updated',
+      data: { messageId, updates }
+    });
+
+    // Update in-memory cache
+    if (this.messages.has(submissionId)) {
+      const messageMap = this.messages.get(submissionId)!;
+      const existing = messageMap.get(messageId);
+      if (existing) {
+        messageMap.set(messageId, { ...existing, ...updates });
+      }
+    }
   }
 
   // Note: Ratings no longer stored in event store - moved to SQLite

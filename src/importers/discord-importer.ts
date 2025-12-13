@@ -213,6 +213,18 @@ export class DiscordImporter extends BaseImporter {
         }
       }
       
+      // Detect if message should be hidden from models
+      // - Starts with a dot (.)
+      // - Matches pattern <reply:@username> .message
+      // - Has :dotted_face: reaction (checked via reactions array if available)
+      const content = msg.content || '';
+      const hiddenFromModels = 
+        content.startsWith('.') ||
+        /^<reply:@[^>]+>\s*\./.test(content) ||
+        (msg.reactions && msg.reactions.some((r: any) => 
+          r.emoji?.name === 'dotted_face' || r.emoji?.name === '🫥'
+        ));
+
       messages.push({
         id: messageId,
         submission_id: '', // Will be filled by submission store
@@ -232,7 +244,8 @@ export class DiscordImporter extends BaseImporter {
           discord_user_id: msg.author.id,
           discord_username: participantData?.username || msg.author.username,
           avatar_url: participantData?.avatarUrl
-        }
+        },
+        hidden_from_models: hiddenFromModels || undefined
       });
       
       previousMessageId = messageId;

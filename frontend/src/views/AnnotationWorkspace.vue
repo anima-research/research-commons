@@ -191,6 +191,7 @@
             :current-user-id="authStore.user?.id"
             :can-moderate="canHideMessages"
             :can-view-hidden="canViewHiddenMessages"
+            :can-toggle-hidden-from-models="canToggleHiddenFromModels"
             :can-pin="canPin"
             :pinned-message-id="pinnedMessageId"
             :hidden-message-ids="hiddenMessageIds"
@@ -201,6 +202,7 @@
             @copy-message="handleCopyMessage"
             @toggle-pin="handleTogglePin"
             @toggle-hide="handleToggleHide"
+            @toggle-hidden-from-models="handleToggleHiddenFromModels"
             @hide-all-previous="handleHideAllPrevious"
             @toggle-reaction="handleToggleReaction"
             @text-selected="handleTextSelected"
@@ -410,6 +412,17 @@
         Add Comment
       </button>
     </div>
+
+    <!-- Highlight Navigator -->
+    <HighlightNavigator
+      :messages="messages"
+      :pinned-message-id="pinnedMessageId"
+      :message-reactions="messageReactions"
+      :messages-with-comments="messagesWithComments"
+      :messages-with-tags="messagesWithTags"
+      :header-height="headerHeight"
+      @navigate-to="scrollToMessage"
+    />
   </div>
 </template>
 
@@ -422,6 +435,7 @@ import MessageList from '@/components/MessageList.vue'
 import AnnotationMargin from '@/components/AnnotationMargin.vue'
 import CommentForm from '@/components/CommentForm.vue'
 import TagPicker from '@/components/TagPicker.vue'
+import HighlightNavigator from '@/components/HighlightNavigator.vue'
 import TagPopover from '@/components/TagPopover.vue'
 import CommentInput from '@/components/CommentInput.vue'
 import TopicSelector from '@/components/TopicSelector.vue'
@@ -512,6 +526,13 @@ const canViewHiddenMessages = computed(() => {
   const isAdmin = authStore.user.roles.includes('admin')
   
   return isOwner || isResearcher || isAdmin
+})
+
+// Permission to toggle hidden_from_models (admins and submission owners only)
+const canToggleHiddenFromModels = computed(() => {
+  if (!authStore.user || !submission.value) return false
+  return submission.value.submitter_id === authStore.user.id ||
+         authStore.user.roles.includes('admin')
 })
 
 const canPin = computed(() => {
@@ -955,6 +976,46 @@ async function handleHideAllPrevious(messageId: string) {
   }
 }
 
+async function handleToggleHiddenFromModels(messageId: string) {
+  try {
+    const message = messages.value.find(m => m.id === messageId)
+    if (!message) return
+    
+    const newValue = !message.hidden_from_models
+    await submissionsAPI.setHiddenFromModels(submissionId, messageId, newValue)
+    
+    // Update local state
+    message.hidden_from_models = newValue
+  } catch (err) {
+    console.error('Failed to toggle hidden from models:', err)
+  }
+}
+
+// Generic scroll to message function
+function scrollToMessage(messageId: string, highlightColor: string = 'ring-indigo-400') {
+  const messageEl = document.querySelector(`[data-message-id="${messageId}"]`) as HTMLElement
+  if (!messageEl) {
+    console.warn('[Scroll] Message element not found:', messageId)
+    return
+  }
+  
+  // Calculate position accounting for fixed header
+  const messageRect = messageEl.getBoundingClientRect()
+  const scrollOffset = window.scrollY + messageRect.top - headerHeight.value - 20 // 20px extra padding
+  
+  // Smooth scroll to calculated position
+  window.scrollTo({
+    top: scrollOffset,
+    behavior: 'smooth'
+  })
+  
+  // Briefly highlight the message
+  messageEl.classList.add('ring-2', highlightColor)
+  setTimeout(() => {
+    messageEl.classList.remove('ring-2', highlightColor)
+  }, 1500)
+}
+
 function scrollToPinnedMessage() {
   if (!pinnedMessageId.value) {
     console.log('[Pinned] No pinned message ID')
@@ -991,21 +1052,8 @@ function scrollToPinnedMessage() {
       // Clear loading overlay immediately - we found the element!
       loadingPinnedMessage.value = false
       
-      // Calculate position accounting for fixed header
-      const messageRect = messageEl.getBoundingClientRect()
-      const scrollOffset = window.scrollY + messageRect.top - headerHeight.value - 20 // 20px extra padding
-      
-      // Smooth scroll to calculated position
-      window.scrollTo({
-        top: scrollOffset,
-        behavior: 'smooth'
-      })
-      
-      // Briefly highlight the pinned message
-      messageEl.classList.add('ring-2', 'ring-amber-400')
-      setTimeout(() => {
-        messageEl.classList.remove('ring-2', 'ring-amber-400')
-      }, 2000)
+      // Use the generic scroll function with amber highlight for pinned
+      scrollToMessage(pinnedMessageId.value!, 'ring-amber-400')
     } else if (attempts < maxAttempts) {
       // Element not ready yet, try again
       attempts++
@@ -1357,6 +1405,29 @@ const totalCommentCount = computed(() => {
     count += data.comments.length
   }
   return count
+})
+
+// Messages that have comments (for highlight navigator)
+const messagesWithComments = computed(() => {
+  const ids = new Set<string>()
+  for (const sel of selections.value) {
+    const data = selectionData.value.get(sel.id)
+    if (data && data.comments.length > 0) {
+      ids.add(sel.start_message_id)
+    }
+  }
+  return ids
+})
+
+// Messages that have tags (for highlight navigator)
+const messagesWithTags = computed(() => {
+  const ids = new Set<string>()
+  for (const sel of selections.value) {
+    if (sel.annotation_tags && sel.annotation_tags.length > 0) {
+      ids.add(sel.start_message_id)
+    }
+  }
+  return ids
 })
 
 // Per-system rating averages

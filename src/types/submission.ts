@@ -70,7 +70,8 @@ export const MessageSchema = z.object({
   content_blocks: z.array(ContentBlockSchema),
   model_info: ModelInfoSchema.optional(),
   timestamp: z.date().optional(),
-  metadata: z.record(z.unknown()).optional() // Store Discord message ID, avatar URL, etc.
+  metadata: z.record(z.unknown()).optional(), // Store Discord message ID, avatar URL, etc.
+  hidden_from_models: z.boolean().optional() // Messages hidden from AI model context (e.g., dot-prefixed Discord messages)
 });
 
 export type Message = z.infer<typeof MessageSchema>;

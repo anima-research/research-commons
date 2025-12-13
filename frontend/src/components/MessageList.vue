@@ -10,7 +10,9 @@
           :has-annotation="hasAnnotation(item.message.id)"
           :is-pinned="pinnedMessageId === item.message.id"
           :is-hidden="hiddenMessageIds.has(item.message.id)"
+          :is-hidden-from-models="item.message.hidden_from_models"
           :can-hide-message="canModerate"
+          :can-toggle-hidden-from-models="canToggleHiddenFromModels"
           :can-pin="canPin"
           :reactions="messageReactions.get(item.message.id)"
           :current-user-id="currentUserId"
@@ -21,6 +23,7 @@
           @copy-message="onCopyMessage"
           @toggle-pin="onTogglePin"
           @toggle-hide="onToggleHide"
+          @toggle-hidden-from-models="onToggleHiddenFromModels"
           @hide-all-previous="onHideAllPrevious"
           @toggle-reaction="onToggleReaction"
         />
@@ -58,6 +61,7 @@ interface Props {
   currentUserId?: string
   canModerate?: boolean
   canViewHidden?: boolean
+  canToggleHiddenFromModels?: boolean
   canPin?: boolean
   pinnedMessageId?: string | null
   hiddenMessageIds?: Set<string>
@@ -70,6 +74,7 @@ const props = withDefaults(defineProps<Props>(), {
   userNames: () => new Map(),
   canModerate: false,
   canViewHidden: false,
+  canToggleHiddenFromModels: false,
   canPin: false,
   pinnedMessageId: null,
   hiddenMessageIds: () => new Set(),
@@ -83,6 +88,7 @@ const emit = defineEmits<{
   'copy-message': [messageId: string]
   'toggle-pin': [messageId: string]
   'toggle-hide': [messageId: string]
+  'toggle-hidden-from-models': [messageId: string]
   'hide-all-previous': [messageId: string]
   'toggle-reaction': [messageId: string, reactionType: 'star' | 'laugh' | 'sparkles']
   'text-selected': [messageId: string, text: string, start: number, end: number]
@@ -218,6 +224,10 @@ function onTogglePin(messageId: string) {
 
 function onToggleHide(messageId: string) {
   emit('toggle-hide', messageId)
+}
+
+function onToggleHiddenFromModels(messageId: string) {
+  emit('toggle-hidden-from-models', messageId)
 }
 
 function onHideAllPrevious(messageId: string) {

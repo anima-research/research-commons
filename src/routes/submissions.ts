@@ -674,6 +674,43 @@ export function createSubmissionRoutes(context: AppContext): Router {
     }
   });
 
+  // Toggle hidden_from_models flag on a message (admin or owner only)
+  router.post('/:submissionId/messages/:messageId/hidden-from-models', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { submissionId, messageId } = req.params;
+      const { hidden } = req.body; // boolean
+      
+      const submission = await context.submissionStore.getSubmission(submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Check if user is admin or submission owner
+      const user = await context.userStore.getUserById(req.userId!);
+      const isAdmin = user?.roles.includes('admin');
+      const isOwner = submission.submitter_id === req.userId;
+      
+      if (!isAdmin && !isOwner) {
+        res.status(403).json({ error: 'Only admins and submission owners can change message visibility' });
+        return;
+      }
+
+      // Update the message
+      await context.submissionStore.updateMessage(submissionId, messageId, {
+        hidden_from_models: hidden === true ? true : undefined
+      });
+      
+      console.log(`[POST hidden-from-models] Message ${messageId} hidden_from_models set to ${hidden}`);
+      
+      res.json({ success: true, hidden_from_models: hidden });
+    } catch (error) {
+      console.error('Toggle hidden_from_models error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // Get all selections for submission (with their tags, comments, ratings)
   router.get('/:submissionId/selections', async (req, res) => {
     try {

@@ -35,6 +35,7 @@ export interface Message {
   model_info?: ModelInfo
   timestamp?: string
   metadata?: Record<string, any> // Discord message ID, avatar URL, etc.
+  hidden_from_models?: boolean // Message excluded from AI model context
 }
 
 export interface Submission {

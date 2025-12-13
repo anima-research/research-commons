@@ -13,12 +13,13 @@
     <div 
       class="message-card group relative transition-all"
       :class="{
-        'bg-indigo-500/10 border-indigo-500/20': isUser && !hasReactions && !isHidden,
-        'bg-indigo-500/15 border-indigo-400 border-2': isUser && hasReactions && !isHidden,
-        'bg-gray-800/40 border-gray-700/40': !isUser && !hasReactions && !isHidden,
-        'bg-gray-800/60 border-gray-500 border-2': !isUser && hasReactions && !isHidden,
+        'bg-indigo-500/10 border-indigo-500/20': isUser && !hasReactions && !isHidden && !isHiddenFromModels,
+        'bg-indigo-500/15 border-indigo-400 border-2': isUser && hasReactions && !isHidden && !isHiddenFromModels,
+        'bg-gray-800/40 border-gray-700/40': !isUser && !hasReactions && !isHidden && !isHiddenFromModels,
+        'bg-gray-800/60 border-gray-500 border-2': !isUser && hasReactions && !isHidden && !isHiddenFromModels,
         'bg-red-900/20 border-red-600/50 border-2': isHidden,
-        'ring-2 ring-indigo-400/50': hasAnnotation && !isHidden
+        'bg-amber-900/10 border-amber-600/30 border-dashed border-2': isHiddenFromModels && !isHidden,
+        'ring-2 ring-indigo-400/50': hasAnnotation && !isHidden && !isHiddenFromModels
       }"
       :style="{ maxWidth: isUser ? (isMobile ? '95%' : '80%') : '100%' }"
     >
@@ -28,6 +29,12 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
         </svg>
         Hidden
+      </div>
+      
+      <!-- Hidden from models badge -->
+      <div v-if="isHiddenFromModels && !isHidden" class="absolute -top-2 -left-2 bg-amber-600/80 text-white text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1" title="This message is excluded from AI model context">
+        <span class="text-[9px]">🫥</span>
+        Hidden from models
       </div>
       <!-- Participant header -->
       <div class="flex items-center gap-2 mb-2">
@@ -216,6 +223,16 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 11l7-7 7 7M5 19l7-7 7 7" />
               </svg>
             </button>
+            <div v-if="canToggleHiddenFromModels" class="w-px h-4 bg-gray-700" />
+            <button 
+              v-if="canToggleHiddenFromModels"
+              @click="toggleHiddenFromModels"
+              class="px-2 py-1 text-xs transition-colors flex items-center gap-1"
+              :class="isHiddenFromModels ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-400'"
+              :title="isHiddenFromModels ? 'Include in model context' : 'Exclude from model context (hidden from AI)'"
+            >
+              <span class="text-[10px]">🫥</span>
+            </button>
           </div>
           
           <!-- Row 2: Reactions -->
@@ -254,7 +271,9 @@ interface Props {
   isSelected?: boolean
   isPinned?: boolean
   isHidden?: boolean
+  isHiddenFromModels?: boolean
   canHideMessage?: boolean
+  canToggleHiddenFromModels?: boolean
   canPin?: boolean
   reactions?: Array<{ user_id: string; reaction_type: string }>
   currentUserId?: string
@@ -267,7 +286,9 @@ const props = withDefaults(defineProps<Props>(), {
   branchIndex: 0,
   isPinned: false,
   isHidden: false,
+  isHiddenFromModels: false,
   canHideMessage: false,
+  canToggleHiddenFromModels: false,
   canPin: false,
   branchCount: 1,
   selectionMode: false,
@@ -305,6 +326,7 @@ const emit = defineEmits<{
   'copy-message': [messageId: string]
   'toggle-pin': [messageId: string]
   'toggle-hide': [messageId: string]
+  'toggle-hidden-from-models': [messageId: string]
   'hide-all-previous': [messageId: string]
   'toggle-reaction': [messageId: string, reactionType: 'star' | 'laugh' | 'sparkles']
   'prev-branch': []
@@ -478,6 +500,11 @@ function togglePin() {
 function toggleHide() {
   actionsExpanded.value = false
   emit('toggle-hide', props.message.id)
+}
+
+function toggleHiddenFromModels() {
+  actionsExpanded.value = false
+  emit('toggle-hidden-from-models', props.message.id)
 }
 
 function hideAllPrevious() {
