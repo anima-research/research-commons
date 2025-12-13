@@ -250,6 +250,35 @@ export function createAnnotationRoutes(context: AppContext): Router {
     }
   });
 
+  // Update comment (author only)
+  router.patch('/comments/:commentId', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const comment = context.annotationDb.getComment(req.params.commentId);
+      if (!comment) {
+        res.status(404).json({ error: 'Comment not found' });
+        return;
+      }
+
+      // Only the author can edit their comment
+      if (comment.author_id !== req.userId!) {
+        res.status(403).json({ error: 'Only the author can edit this comment' });
+        return;
+      }
+
+      const { content } = req.body;
+      if (!content || typeof content !== 'string' || !content.trim()) {
+        res.status(400).json({ error: 'Content is required' });
+        return;
+      }
+
+      const updatedComment = context.annotationDb.updateComment(req.params.commentId, content.trim());
+      res.json(updatedComment);
+    } catch (error) {
+      console.error('Update comment error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // Delete rating (deletes all ratings by this rater for this criterion)
   router.delete('/ratings/:ratingId', authenticateToken, async (req: AuthRequest, res) => {
     try {

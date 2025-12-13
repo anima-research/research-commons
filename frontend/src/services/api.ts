@@ -197,6 +197,9 @@ export const annotationsAPI = {
   deleteComment: (commentId: string) =>
     api.delete<{ success: boolean }>(`/annotations/comments/${commentId}`),
   
+  updateComment: (commentId: string, content: string) =>
+    api.patch<Comment>(`/annotations/comments/${commentId}`, { content }),
+  
   createRating: (data: Omit<Rating, 'id' | 'rater_id' | 'created_at'>) =>
     api.post<Rating>('/annotations/ratings', data),
   

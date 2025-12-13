@@ -223,9 +223,10 @@ export class AnnotationDatabase {
     return rows.map(row => this.rowToComment(row));
   }
 
-  updateComment(id: string, content: string): void {
+  updateComment(id: string, content: string): Comment | null {
     this.db.prepare('UPDATE comments SET content = ?, updated_at = ? WHERE id = ?')
       .run(content, new Date().toISOString(), id);
+    return this.getComment(id);
   }
 
   deleteComment(id: string): void {

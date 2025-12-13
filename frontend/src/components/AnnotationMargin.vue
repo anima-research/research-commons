@@ -70,10 +70,12 @@
           :selection="getAnnotation(pos.annotationId)!.data.selection"
           :created-by="getUserName(getAnnotation(pos.annotationId)!.data.comment.author_id)"
           :can-delete="canModerate || getAnnotation(pos.annotationId)!.data.comment.author_id === currentUserId"
+          :can-edit="getAnnotation(pos.annotationId)!.data.comment.author_id === currentUserId"
           :is-reply="getAnnotation(pos.annotationId)!.data.isReply"
           :depth="getAnnotation(pos.annotationId)!.data.depth || 0"
           @resize="handleResize(pos.annotationId, $event)"
           @delete="$emit('delete-comment', getAnnotation(pos.annotationId)!.data.comment.id)"
+          @edit="$emit('edit-comment', getAnnotation(pos.annotationId)!.data.comment.id, $event)"
           @reply="$emit('reply-to-comment', getAnnotation(pos.annotationId)!.data.selectionId, getAnnotation(pos.annotationId)!.data.comment.id)"
         />
 
@@ -133,6 +135,7 @@ const emit = defineEmits<{
   'add-tag-vote': [selectionId: string, tagId: string]
   'remove-tag': [selectionId: string, tagId: string]
   'delete-comment': [commentId: string]
+  'edit-comment': [commentId: string, content: string]
   'reply-to-comment': [selectionId: string, parentCommentId: string]
   'expand-replies': [parentCommentId: string]
   'expand-top-level': [selectionId: string]

@@ -231,6 +231,7 @@
             :can-moderate="canHideMessages"
             @add-tag-vote="handleAddTagVote"
             @delete-comment="handleDeleteComment"
+            @edit-comment="handleEditComment"
             @remove-tag="handleRemoveTag"
             @reply-to-comment="handleReplyToComment"
             @expand-replies="handleExpandReplies"
@@ -2071,6 +2072,24 @@ async function handleDeleteComment(commentId: string) {
     }
   } catch (err) {
     console.error('Failed to delete comment:', err)
+  }
+}
+
+async function handleEditComment(commentId: string, content: string) {
+  try {
+    await annotationsAPI.updateComment(commentId, content)
+    
+    // Update the comment in local state
+    for (const data of selectionData.value.values()) {
+      const comment = data.comments.find(c => c.id === commentId)
+      if (comment) {
+        comment.content = content
+        comment.updated_at = new Date().toISOString()
+        break
+      }
+    }
+  } catch (err) {
+    console.error('Failed to edit comment:', err)
   }
 }
 
