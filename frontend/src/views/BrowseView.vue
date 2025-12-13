@@ -44,43 +44,36 @@
 
       <!-- Filters & Search -->
       <div class="px-6 py-3">
-        <div class="flex gap-2 flex-wrap">
+        <div class="flex gap-2 flex-wrap items-center">
           <!-- Model filter -->
-          <div class="relative">
-            <select
-              v-model="selectedModel"
-              @change="filterConversations"
-              class="px-3 py-1.5 pr-8 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg text-gray-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer"
-            >
-              <option value="">All Models</option>
-              <option v-for="model in availableModels" :key="model" :value="model">
-                {{ model }}
-              </option>
-            </select>
-            <svg class="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
+          <SearchableMultiSelect
+            v-model="selectedModels"
+            :options="availableModels"
+            placeholder="All Models"
+            label="models"
+            @update:model-value="filterConversations"
+          />
 
           <!-- Topic filter -->
-          <div class="relative">
-            <select
-              v-model="selectedTopic"
-              @change="filterConversations"
-              class="px-3 py-1.5 pr-8 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg text-gray-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer"
-            >
-              <option value="">All Topics</option>
-              <option v-for="topic in availableTopics" :key="topic.id" :value="topic.id">
-                {{ topic.name }}
-              </option>
-            </select>
-            <svg class="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
+          <SearchableMultiSelect
+            v-model="selectedTopics"
+            :options="availableTopics"
+            placeholder="All Topics"
+            label="topics"
+            @update:model-value="filterConversations"
+          />
+
+          <!-- User filter -->
+          <SearchableMultiSelect
+            v-model="selectedUsers"
+            :options="availableUsers"
+            placeholder="All Authors"
+            label="authors"
+            @update:model-value="filterConversations"
+          />
 
           <!-- Search -->
-          <div class="flex-1 relative min-w-[200px]">
+          <div class="flex-1 relative min-w-[150px]">
             <svg class="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -94,7 +87,7 @@
           </div>
           
           <button 
-            v-if="searchQuery || selectedTopic || selectedModel"
+            v-if="hasActiveFilters"
             @click="clearFilters"
             class="px-2 py-1.5 border border-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-800/50 hover:text-gray-200 transition-all flex items-center gap-1 text-xs"
           >
@@ -201,7 +194,7 @@
           <svg class="w-16 h-16 mx-auto mb-4 text-gray-600 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <div v-if="searchQuery || selectedTopic" class="text-gray-500">
+          <div v-if="hasActiveFilters" class="text-gray-500">
             <p class="text-sm">No conversations match your filters</p>
             <button @click="clearFilters" class="mt-3 text-indigo-400 hover:text-indigo-300 text-sm">
               Clear filters
@@ -226,12 +219,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { submissionsAPI, researchAPI } from '@/services/api'
 import type { Submission } from '@/types'
 import LeftSidebar from '@/components/LeftSidebar.vue'
+import SearchableMultiSelect from '@/components/SearchableMultiSelect.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -252,12 +246,14 @@ function handleNavigate(route: string) {
 }
 
 const searchQuery = ref('')
-const selectedTopic = ref('')
-const selectedModel = ref('')
+const selectedTopics = ref<string[]>([])
+const selectedModels = ref<string[]>([])
+const selectedUsers = ref<string[]>([])
 const submissions = ref<Submission[]>([])
 const allSubmissions = ref<Submission[]>([])
-const availableTopics = ref<Array<{ id: string; name: string }>>([])
-const availableModels = ref<string[]>([])
+const availableTopics = ref<Array<{ value: string; label: string }>>([])
+const availableModels = ref<Array<{ value: string; label: string; badge?: string }>>([])
+const availableUsers = ref<Array<{ value: string; label: string; badge?: string }>>([])
 const topicMap = ref<Map<string, string>>(new Map()) // id -> name
 const loading = ref(false)
 
@@ -272,7 +268,7 @@ async function loadSubmissions() {
     try {
       const topicsResponse = await researchAPI.getTopics()
       topicMap.value = new Map(topicsResponse.data.topics.map(t => [t.id, t.name]))
-      availableTopics.value = topicsResponse.data.topics.map(t => ({ id: t.id, name: t.name }))
+      availableTopics.value = topicsResponse.data.topics.map(t => ({ value: t.id, label: t.name }))
     } catch (e) {
       console.error('Failed to load topics:', e)
     }
@@ -281,12 +277,37 @@ async function loadSubmissions() {
     allSubmissions.value = response.data.submissions
     submissions.value = response.data.submissions
     
-    // Extract unique models
-    const modelsSet = new Set<string>()
+    // Extract unique models with counts
+    const modelCounts = new Map<string, number>()
+    const userCounts = new Map<string, { name: string; count: number }>()
+    
     response.data.submissions.forEach(sub => {
-      sub.metadata.model_summary?.forEach(model => modelsSet.add(model))
+      // Count models
+      sub.metadata.model_summary?.forEach(model => {
+        modelCounts.set(model, (modelCounts.get(model) || 0) + 1)
+      })
+      
+      // Count users
+      const userId = sub.submitter_id
+      const userName = (sub as any).submitter_name || 'Unknown'
+      const existing = userCounts.get(userId)
+      if (existing) {
+        existing.count++
+      } else {
+        userCounts.set(userId, { name: userName, count: 1 })
+      }
     })
-    availableModels.value = Array.from(modelsSet).sort()
+    
+    // Build model options sorted by count
+    availableModels.value = [...modelCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([model, count]) => ({ value: model, label: model, badge: String(count) }))
+    
+    // Build user options sorted by count (up to 15)
+    availableUsers.value = [...userCounts.entries()]
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 15)
+      .map(([id, data]) => ({ value: id, label: data.name, badge: String(data.count) }))
     
     console.log('Loaded conversations:', response.data.submissions.length)
   } catch (error) {
@@ -296,20 +317,31 @@ async function loadSubmissions() {
   }
 }
 
+const hasActiveFilters = computed(() => 
+  searchQuery.value || selectedTopics.value.length > 0 || selectedModels.value.length > 0 || selectedUsers.value.length > 0
+)
+
 function filterConversations() {
   let filtered = allSubmissions.value
   
-  // Filter by model
-  if (selectedModel.value) {
+  // Filter by models (any match)
+  if (selectedModels.value.length > 0) {
     filtered = filtered.filter(sub => 
-      sub.metadata.model_summary?.includes(selectedModel.value)
+      sub.metadata.model_summary?.some(m => selectedModels.value.includes(m))
     )
   }
   
-  // Filter by topic
-  if (selectedTopic.value) {
+  // Filter by topics (any match)
+  if (selectedTopics.value.length > 0) {
     filtered = filtered.filter(sub => 
-      sub.metadata.tags?.includes(selectedTopic.value)
+      sub.metadata.tags?.some(t => selectedTopics.value.includes(t))
+    )
+  }
+  
+  // Filter by users (any match)
+  if (selectedUsers.value.length > 0) {
+    filtered = filtered.filter(sub => 
+      selectedUsers.value.includes(sub.submitter_id)
     )
   }
   
@@ -326,6 +358,9 @@ function filterConversations() {
       // Search in models
       if (sub.metadata.model_summary?.some(m => m.toLowerCase().includes(query))) return true
       
+      // Search in author name
+      if ((sub as any).submitter_name?.toLowerCase().includes(query)) return true
+      
       return false
     })
   }
@@ -335,18 +370,23 @@ function filterConversations() {
 
 function clearFilters() {
   searchQuery.value = ''
-  selectedTopic.value = ''
-  selectedModel.value = ''
+  selectedTopics.value = []
+  selectedModels.value = []
+  selectedUsers.value = []
   submissions.value = allSubmissions.value
 }
 
 function filterByModel(model: string) {
-  selectedModel.value = model
+  if (!selectedModels.value.includes(model)) {
+    selectedModels.value = [...selectedModels.value, model]
+  }
   filterConversations()
 }
 
-function filterByTopic(topic: string) {
-  selectedTopic.value = topic
+function filterByTopic(topicId: string) {
+  if (!selectedTopics.value.includes(topicId)) {
+    selectedTopics.value = [...selectedTopics.value, topicId]
+  }
   filterConversations()
 }
 
