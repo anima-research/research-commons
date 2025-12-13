@@ -2,8 +2,89 @@
   <div class="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 transition-colors">
     <!-- Compact Header -->
     <div class="fixed top-0 left-0 right-0 bg-gray-900/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-700/50 dark:border-gray-800/50 z-30 transition-all" ref="headerEl">
-      <div class="px-6 py-3">
-        <div class="flex items-center gap-4">
+      <div class="px-4 md:px-6 py-2 md:py-3">
+        <!-- Mobile layout: stacked rows -->
+        <div class="flex flex-col gap-1.5 md:hidden">
+          <!-- Row 1: Back + Title -->
+          <div class="flex items-center gap-2">
+            <button 
+              @click="router.push('/browse')" 
+              class="text-gray-400 hover:text-white transition-colors text-sm shrink-0"
+            >
+              ←
+            </button>
+            <div v-if="!editingTitle" class="flex items-center gap-1 min-w-0 flex-1">
+              <h1 
+                class="text-base font-medium text-white truncate"
+                :class="{ 'cursor-pointer': canEditSubmission }"
+                @click="canEditSubmission && startEditTitle()"
+              >
+                {{ submission?.title || 'Loading...' }}
+              </h1>
+              <button
+                v-if="canEditSubmission"
+                @click.stop="startEditTitle"
+                class="text-xs text-gray-500 shrink-0"
+              >
+                ✏️
+              </button>
+            </div>
+            <div v-else class="flex-1 min-w-0">
+              <input
+                v-model="titleEdit"
+                ref="titleInput"
+                type="text"
+                @keyup.enter="saveTitle"
+                @keyup.esc="cancelEditTitle"
+                @blur="saveTitle"
+                class="w-full px-2 py-1 text-base bg-gray-800/50 border border-gray-600/50 text-white rounded"
+                placeholder="Title..."
+              />
+            </div>
+            <!-- Mobile actions -->
+            <div class="flex items-center gap-1 shrink-0">
+              <button
+                v-if="authStore.isAuthenticated()"
+                @click="showRatingForm = true"
+                class="px-2 py-1 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] rounded"
+              >
+                Rate
+              </button>
+              <button
+                v-if="canDeleteSubmission"
+                @click="confirmDelete"
+                class="p-1 text-gray-500 hover:text-red-400"
+              >
+                🗑️
+              </button>
+            </div>
+          </div>
+          <!-- Row 2: Meta + Stats -->
+          <div class="flex items-center gap-2 text-[10px] flex-wrap">
+            <span class="text-gray-500">{{ submitterName }}</span>
+            <span class="text-gray-600">•</span>
+            <span class="text-gray-500">{{ formatDate(submission?.submitted_at) }}</span>
+            <template v-if="displayTags.length > 0">
+              <span class="text-gray-600">•</span>
+              <button
+                v-for="tag in displayTags.slice(0, 1)"
+                :key="tag"
+                @click="router.push(`/topics?tag=${tag}`)"
+                class="px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 rounded"
+              >
+                #{{ tag }}
+              </button>
+              <span v-if="displayTags.length > 1" class="text-gray-500">+{{ displayTags.length - 1 }}</span>
+            </template>
+            <template v-if="totalCommentCount > 0">
+              <span class="text-gray-600">•</span>
+              <span class="text-blue-400">💬{{ totalCommentCount }}</span>
+            </template>
+          </div>
+        </div>
+
+        <!-- Desktop layout: single row -->
+        <div class="hidden md:flex items-center gap-4">
           <!-- Back button -->
           <button 
             @click="router.push('/browse')" 
@@ -51,9 +132,9 @@
           </div>
           
           <!-- Topic tags inline -->
-          <div class="flex gap-1.5" v-if="submission?.metadata.tags?.length > 0">
+          <div class="flex gap-1.5" v-if="displayTags.length > 0">
             <button
-              v-for="tag in submission?.metadata.tags"
+              v-for="tag in displayTags"
               :key="tag"
               @click="router.push(`/topics?tag=${tag}`)"
               class="px-2 py-0.5 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 text-xs rounded transition-all"
@@ -538,6 +619,33 @@ const titleEdit = ref('')
 const titleInput = ref<HTMLInputElement>()
 const showTopicSelector = ref(false)
 const availableTopics = ref<Topic[]>([])
+
+// Resolve tag IDs to names, filter out raw UUIDs that can't be resolved, deduplicate
+const displayTags = computed(() => {
+  const tags = submission.value?.metadata.tags || []
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  
+  const resolved = tags
+    .map(tag => {
+      // If it's a UUID, try to find the topic name
+      if (uuidPattern.test(tag)) {
+        const topic = availableTopics.value.find(t => t.id === tag)
+        return topic?.name || null // Return null if we can't resolve
+      }
+      // Otherwise return as-is (it's already a name)
+      return tag
+    })
+    .filter((tag): tag is string => tag !== null) // Filter out unresolved UUIDs
+  
+  // Deduplicate (case-insensitive)
+  const seen = new Set<string>()
+  return resolved.filter(tag => {
+    const lower = tag.toLowerCase()
+    if (seen.has(lower)) return false
+    seen.add(lower)
+    return true
+  })
+})
 
 const canEditSubmission = computed(() => {
   if (!authStore.user || !submission.value) return false
