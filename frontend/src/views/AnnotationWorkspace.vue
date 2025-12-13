@@ -229,6 +229,9 @@
             @add-tag-vote="handleAddTagVote"
             @delete-comment="handleDeleteComment"
             @remove-tag="handleRemoveTag"
+            @reply-to-comment="handleReplyToComment"
+            @expand-replies="handleExpandReplies"
+            @expand-top-level="handleExpandTopLevel"
           />
         </div>
       </div>
@@ -266,8 +269,9 @@
     <CommentForm
       :show="showCommentForm"
       :selected-text="commentContext?.text"
+      :is-reply="!!replyToCommentId"
       @submit="submitComment"
-      @cancel="showCommentForm = false"
+      @cancel="cancelCommentForm"
     />
 
     <!-- Stats Detail Modal -->
@@ -1321,7 +1325,11 @@ const showTagPicker = ref(false)
 const showRatingForm = ref(false)
 const showStatsDetail = ref(false)
 const activeSelectionId = ref<string | null>(null)
+const replyToCommentId = ref<string | null>(null)
 const commentContext = ref<{ messageId: string; text?: string; selectionId?: string } | null>(null)
+// Track expanded comment threads (by parent comment id)
+const expandedReplies = ref<Set<string>>(new Set())
+const expandedTopLevel = ref<Set<string>>(new Set()) // Track which selections show all top-level comments
 const conversationContainerEl = ref<HTMLElement | null>(null)
 const showSelectionToolbar = ref(false)
 
@@ -1570,18 +1578,102 @@ const marginAnnotations = computed<MarginAnnotation[]>(() => {
       })
     }
     
-    // Create one annotation per comment
-    for (const comment of data.comments) {
+    // Create one annotation per comment (with replies grouped after parents)
+    // Collapsing rules:
+    // - Show max 2 top-level comments unless expanded
+    // - Show max 1 level of replies unless expanded
+    const rootComments = data.comments.filter(c => !c.parent_id)
+    const showAllTopLevel = expandedTopLevel.value.has(sel.id)
+    const visibleRootComments = showAllTopLevel ? rootComments : rootComments.slice(0, 2)
+    const hiddenTopLevelCount = rootComments.length - visibleRootComments.length
+    
+    // Recursively add a comment and its replies
+    function addCommentWithReplies(comment: Comment, depth: number, parentId?: string) {
       annotations.push({
         id: `comment-${comment.id}`,
         type: 'comment-card',
         anchorMessageId: sel.start_message_id,
-        priority: 4,
-        minHeight: 80,
+        priority: 4 + depth,
+        minHeight: depth === 0 ? 80 : 60,
         data: {
           selectionId: sel.id,
           selection: sel,
-          comment
+          comment,
+          isReply: depth > 0,
+          depth
+        }
+      })
+      
+      // Find direct replies to this comment
+      const directReplies = data.comments.filter(c => c.parent_id === comment.id)
+      if (directReplies.length === 0) return
+      
+      // For depth 0 (root comments): show 1 reply, collapse rest
+      // For depth 1+: only show if parent is expanded
+      const isExpanded = expandedReplies.value.has(comment.id)
+      
+      if (depth === 0) {
+        // Show first reply always
+        const visibleReplies = isExpanded ? directReplies : directReplies.slice(0, 1)
+        const hiddenCount = directReplies.length - visibleReplies.length
+        
+        for (const reply of visibleReplies) {
+          addCommentWithReplies(reply, depth + 1, comment.id)
+        }
+        
+        // Add "show more" indicator if there are hidden replies
+        if (hiddenCount > 0) {
+          annotations.push({
+            id: `expand-replies-${comment.id}`,
+            type: 'expand-replies',
+            anchorMessageId: sel.start_message_id,
+            priority: 5,
+            minHeight: 24,
+            data: {
+              parentCommentId: comment.id,
+              hiddenCount,
+              depth: 1
+            }
+          })
+        }
+      } else if (isExpanded) {
+        // Deeper levels: only show if explicitly expanded
+        for (const reply of directReplies) {
+          addCommentWithReplies(reply, depth + 1, comment.id)
+        }
+      } else if (directReplies.length > 0) {
+        // Show "N more replies" indicator
+        annotations.push({
+          id: `expand-replies-${comment.id}`,
+          type: 'expand-replies',
+          anchorMessageId: sel.start_message_id,
+          priority: 5 + depth,
+          minHeight: 24,
+          data: {
+            parentCommentId: comment.id,
+            hiddenCount: directReplies.length,
+            depth: depth + 1
+          }
+        })
+      }
+    }
+    
+    // Start with visible root comments
+    for (const comment of visibleRootComments) {
+      addCommentWithReplies(comment, 0)
+    }
+    
+    // Add "show more comments" if there are hidden top-level comments
+    if (hiddenTopLevelCount > 0) {
+      annotations.push({
+        id: `expand-top-${sel.id}`,
+        type: 'expand-top-level',
+        anchorMessageId: sel.start_message_id,
+        priority: 10,
+        minHeight: 24,
+        data: {
+          selectionId: sel.id,
+          hiddenCount: hiddenTopLevelCount
         }
       })
     }
@@ -1594,6 +1686,13 @@ const marginAnnotations = computed<MarginAnnotation[]>(() => {
 // Removed inlineAnnotations - now using margin annotations on all screen sizes
 
 // Annotations are now created directly, no form needed
+
+function cancelCommentForm() {
+  showCommentForm.value = false
+  commentContext.value = null
+  activeSelectionId.value = null
+  replyToCommentId.value = null
+}
 
 async function submitComment(text: string) {
   try {
@@ -1622,11 +1721,17 @@ async function submitComment(text: string) {
       return
     }
     
-    // Create comment
-    const comment = await submissionsStore.createComment({
+    // Create comment (with parent_id if this is a reply)
+    const commentData: { selection_id: string; content: string; parent_id?: string } = {
       selection_id: targetSelectionId,
       content: text
-    })
+    }
+    
+    if (replyToCommentId.value) {
+      commentData.parent_id = replyToCommentId.value
+    }
+    
+    const comment = await submissionsStore.createComment(commentData)
     
     // Update just this selection's comments
     const data = selectionData.value.get(targetSelectionId)
@@ -1637,11 +1742,13 @@ async function submitComment(text: string) {
     showCommentForm.value = false
     commentContext.value = null
     activeSelectionId.value = null
+    replyToCommentId.value = null
   } catch (err) {
     console.error('Failed to create comment:', err)
     showCommentForm.value = false
     commentContext.value = null
     activeSelectionId.value = null
+    replyToCommentId.value = null
   }
 }
 
@@ -1818,13 +1925,50 @@ async function handleDeleteComment(commentId: string) {
   try {
     await annotationsAPI.deleteComment(commentId)
     
-    // Remove from all selections' comments
+    // Remove from all selections' comments (including replies to this comment)
     for (const data of selectionData.value.values()) {
-      data.comments = data.comments.filter(c => c.id !== commentId)
+      data.comments = data.comments.filter(c => c.id !== commentId && c.parent_id !== commentId)
     }
   } catch (err) {
     console.error('Failed to delete comment:', err)
   }
+}
+
+function handleReplyToComment(selectionId: string, parentCommentId: string) {
+  // Open comment form for reply
+  activeSelectionId.value = selectionId
+  replyToCommentId.value = parentCommentId
+  
+  // Find the parent comment to show context
+  const data = selectionData.value.get(selectionId)
+  const parentComment = data?.comments.find(c => c.id === parentCommentId)
+  
+  commentContext.value = {
+    messageId: '',
+    text: parentComment?.content ? `Replying to: "${parentComment.content.substring(0, 100)}..."` : undefined,
+    selectionId
+  }
+  showCommentForm.value = true
+}
+
+function handleExpandReplies(parentCommentId: string) {
+  if (expandedReplies.value.has(parentCommentId)) {
+    expandedReplies.value.delete(parentCommentId)
+  } else {
+    expandedReplies.value.add(parentCommentId)
+  }
+  // Trigger reactivity
+  expandedReplies.value = new Set(expandedReplies.value)
+}
+
+function handleExpandTopLevel(selectionId: string) {
+  if (expandedTopLevel.value.has(selectionId)) {
+    expandedTopLevel.value.delete(selectionId)
+  } else {
+    expandedTopLevel.value.add(selectionId)
+  }
+  // Trigger reactivity
+  expandedTopLevel.value = new Set(expandedTopLevel.value)
 }
 
 async function handleRemoveTag(selectionId: string, tagId: string) {

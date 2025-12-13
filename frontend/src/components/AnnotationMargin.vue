@@ -70,9 +70,37 @@
           :selection="getAnnotation(pos.annotationId)!.data.selection"
           :created-by="getUserName(getAnnotation(pos.annotationId)!.data.comment.author_id)"
           :can-delete="canModerate || getAnnotation(pos.annotationId)!.data.comment.author_id === currentUserId"
+          :is-reply="getAnnotation(pos.annotationId)!.data.isReply"
+          :depth="getAnnotation(pos.annotationId)!.data.depth || 0"
           @resize="handleResize(pos.annotationId, $event)"
           @delete="$emit('delete-comment', getAnnotation(pos.annotationId)!.data.comment.id)"
+          @reply="$emit('reply-to-comment', getAnnotation(pos.annotationId)!.data.selectionId, getAnnotation(pos.annotationId)!.data.comment.id)"
         />
+
+        <!-- Expand replies button -->
+        <button
+          v-else-if="getAnnotation(pos.annotationId)?.type === 'expand-replies'"
+          @click="$emit('expand-replies', getAnnotation(pos.annotationId)!.data.parentCommentId)"
+          class="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 py-1"
+          :style="{ marginLeft: (getAnnotation(pos.annotationId)!.data.depth || 1) * 12 + 'px' }"
+        >
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+          {{ getAnnotation(pos.annotationId)!.data.hiddenCount }} more {{ getAnnotation(pos.annotationId)!.data.hiddenCount === 1 ? 'reply' : 'replies' }}
+        </button>
+
+        <!-- Expand top-level comments button -->
+        <button
+          v-else-if="getAnnotation(pos.annotationId)?.type === 'expand-top-level'"
+          @click="$emit('expand-top-level', getAnnotation(pos.annotationId)!.data.selectionId)"
+          class="text-xs text-gray-400 hover:text-gray-300 transition-colors flex items-center gap-1 py-1"
+        >
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+          {{ getAnnotation(pos.annotationId)!.data.hiddenCount }} more {{ getAnnotation(pos.annotationId)!.data.hiddenCount === 1 ? 'comment' : 'comments' }}
+        </button>
       </div>
     </div>
   </div>
@@ -105,6 +133,9 @@ const emit = defineEmits<{
   'add-tag-vote': [selectionId: string, tagId: string]
   'remove-tag': [selectionId: string, tagId: string]
   'delete-comment': [commentId: string]
+  'reply-to-comment': [selectionId: string, parentCommentId: string]
+  'expand-replies': [parentCommentId: string]
+  'expand-top-level': [selectionId: string]
 }>()
 
 const layoutManager = new AnnotationLayoutManager()

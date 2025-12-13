@@ -6,7 +6,7 @@
       @click.self="$emit('cancel')"
     >
       <div class="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full p-6 transition-colors">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">💬 Add Comment</h3>
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{{ isReply ? '↩️ Reply' : '💬 Add Comment' }}</h3>
 
         <!-- Context preview -->
         <div v-if="selectedText" class="bg-gray-50 dark:bg-gray-800 p-3 rounded mb-4 text-sm border border-gray-200 dark:border-gray-700 transition-colors">
@@ -48,7 +48,7 @@
             :disabled="!commentText.trim()"
             class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            Post Comment
+            {{ isReply ? 'Post Reply' : 'Post Comment' }}
           </button>
         </div>
       </div>
@@ -62,9 +62,12 @@ import { ref, watch, nextTick } from 'vue'
 interface Props {
   show: boolean
   selectedText?: string
+  isReply?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  isReply: false
+})
 
 const emit = defineEmits<{
   'submit': [text: string]

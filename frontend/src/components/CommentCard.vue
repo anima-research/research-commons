@@ -2,6 +2,8 @@
   <div 
     ref="rootEl"
     class="comment-card bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-lg p-3 transition-all"
+    :class="nestingClass"
+    :style="nestingStyle"
   >
     <!-- Header -->
     <div class="flex items-center justify-between mb-2">
@@ -12,15 +14,26 @@
         <span class="text-xs text-gray-400">{{ createdBy }}</span>
       </div>
       
-      <button
-        v-if="canDelete"
-        @click="$emit('delete')"
-        class="text-xs text-red-400/70 hover:text-red-400 transition-colors"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          @click="$emit('reply')"
+          class="text-xs text-gray-400 hover:text-blue-400 transition-colors"
+          title="Reply"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+          </svg>
+        </button>
+        <button
+          v-if="canDelete"
+          @click="$emit('delete')"
+          class="text-xs text-red-400/70 hover:text-red-400 transition-colors"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
     </div>
     
     <!-- Comment content -->
@@ -34,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { renderMarkdown } from '@/utils/markdown'
 
 interface Props {
@@ -42,19 +55,38 @@ interface Props {
     id: string
     content: string
     author_id: string
+    parent_id?: string
     created_at: string
   }
   selection?: any
   createdBy: string
   canDelete?: boolean
+  isReply?: boolean
+  depth?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  canDelete: false
+  canDelete: false,
+  isReply: false,
+  depth: 0
+})
+
+// Computed nesting styles based on depth
+const nestingClass = computed(() => {
+  if (props.depth === 0) return ''
+  return 'border-l-2 border-l-blue-500/30'
+})
+
+const nestingStyle = computed(() => {
+  if (props.depth === 0) return {}
+  // Cap the visual indent at 3 levels to prevent excessive nesting
+  const indent = Math.min(props.depth, 3) * 12
+  return { marginLeft: `${indent}px` }
 })
 
 const emit = defineEmits<{
   'delete': []
+  'reply': []
   'resize': [height: number]
 }>()
 
