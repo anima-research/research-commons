@@ -1,7 +1,7 @@
 <template>
   <div class="message-list-container">
     <!-- Messages -->
-    <div class="messages-container space-y-4">
+    <div class="messages-container">
       <template v-for="(item, index) in processedMessages" :key="item.type === 'message' ? item.message.id : `hidden-group-${index}`">
         <!-- Regular message -->
         <Message
@@ -31,7 +31,7 @@
         <!-- Hidden messages group placeholder -->
         <div
           v-else-if="item.type === 'hidden-group'"
-          class="hidden-group-placeholder mb-6 px-6 py-4 bg-red-900/20 border-2 border-red-600/50 rounded-xl text-center"
+          class="hidden-group-placeholder mb-3 px-4 py-2 bg-red-900/20 border-2 border-red-600/50 rounded-lg text-center"
         >
           <div class="flex items-center justify-center gap-3">
             <div class="flex items-center justify-center w-8 h-8 rounded-full bg-red-600/30">

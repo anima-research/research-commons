@@ -1,6 +1,6 @@
 <template>
   <div 
-    class="message-wrapper mb-6 flex"
+    class="message-wrapper mb-3 flex"
     :class="{ 
       'justify-end': isUser,
       'justify-start': !isUser 
@@ -37,7 +37,7 @@
         Hidden from models
       </div>
       <!-- Participant header -->
-      <div class="flex items-center gap-2 mb-2">
+      <div class="flex items-center gap-2 mb-1">
         
         <!-- Avatar -->
         <img 
@@ -567,11 +567,11 @@ function formatTime(timestamp?: string) {
 
 <style scoped>
 .message-card {
-  @apply px-4 py-3 rounded-xl border;
+  @apply px-3 py-2 rounded-lg border;
 }
 
 .prose :deep(p) {
-  @apply my-2;
+  @apply my-1;
 }
 
 .prose :deep(code) {
