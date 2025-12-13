@@ -166,11 +166,16 @@
             <span class="text-[10px] text-gray-500 shrink-0 hidden sm:inline">{{ formatDate(submission.submitted_at) }}</span>
           </div>
           
-          <!-- Row 2: Description + Tags -->
-          <div v-if="(submission as any).description || submission.metadata.tags?.length" class="flex items-center gap-2 mt-1">
+          <!-- Row 2: Author + Description + Tags -->
+          <div class="flex items-center gap-2 mt-1">
+            <!-- Author -->
+            <span class="text-[10px] text-gray-500 shrink-0">
+              by {{ (submission as any).submitter_name || 'Unknown' }}
+            </span>
+            
             <!-- Description preview -->
-            <p v-if="(submission as any).description" class="text-[11px] text-gray-500 truncate flex-1 min-w-0">
-              {{ truncateDescription((submission as any).description) }}
+            <p v-if="(submission.metadata as any).description" class="text-[11px] text-gray-500 truncate flex-1 min-w-0">
+              — {{ truncateDescription((submission.metadata as any).description) }}
             </p>
             <div v-else class="flex-1"></div>
             
@@ -316,7 +321,7 @@ function filterConversations() {
       if (sub.title.toLowerCase().includes(query)) return true
       
       // Search in description
-      if ((sub as any).description?.toLowerCase().includes(query)) return true
+      if ((sub.metadata as any).description?.toLowerCase().includes(query)) return true
       
       // Search in models
       if (sub.metadata.model_summary?.some(m => m.toLowerCase().includes(query))) return true
