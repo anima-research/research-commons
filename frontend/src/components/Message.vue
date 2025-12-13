@@ -116,6 +116,7 @@
       <div 
         class="message-text text-gray-200 leading-relaxed relative"
         @mouseup="onTextSelect"
+        @click="onContentClick"
         ref="contentEl"
       >
         <template v-for="(block, idx) in processedContentBlocks" :key="idx">
@@ -134,7 +135,7 @@
               </div>
             </div>
           </div>
-          <div v-else-if="block.type === 'text'" v-html="renderMarkdown(block.text || '')" class="prose prose-invert prose-sm max-w-none" />
+          <div v-else-if="block.type === 'text'" v-html="renderTextWithHighlights(block.text || '', idx)" class="prose prose-invert prose-sm max-w-none" />
           <div v-else-if="block.type === 'image'" class="mt-2">
             <img 
               :src="'data:' + block.mime_type + ';base64,' + block.data" 
@@ -279,6 +280,34 @@
           </div>
         </div>
     </div>
+
+    <!-- Highlight action popup -->
+    <Teleport to="body">
+      <div
+        v-if="activeHighlightId"
+        class="fixed z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1"
+        :style="{ left: highlightPopupPosition.x + 'px', top: highlightPopupPosition.y + 'px' }"
+      >
+        <button
+          @click="deleteHighlight"
+          class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700 transition-colors"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Delete Highlight
+        </button>
+        <button
+          @click="closeHighlightPopup"
+          class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-gray-400 hover:bg-gray-700 transition-colors"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Cancel
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -286,6 +315,15 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import type { Message } from '@/types'
 import { renderMarkdown } from '@/utils/markdown'
+
+interface SelectionHighlight {
+  id: string
+  start_offset: number
+  end_offset: number
+  label?: string
+  hasComments?: boolean
+  hasTags?: boolean
+}
 
 interface Props {
   message: Message
@@ -304,6 +342,7 @@ interface Props {
   reactions?: Array<{ user_id: string; reaction_type: string }>
   currentUserId?: string
   participantAvatars?: Map<string, string>
+  selections?: SelectionHighlight[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -321,7 +360,8 @@ const props = withDefaults(defineProps<Props>(), {
   isSelected: false,
   reactions: () => [],
   currentUserId: '',
-  participantAvatars: () => new Map()
+  participantAvatars: () => new Map(),
+  selections: () => []
 })
 
 // Get avatar URL for this message's participant
@@ -355,6 +395,7 @@ const emit = defineEmits<{
   'toggle-hidden-from-models': [messageId: string]
   'hide-all-previous': [messageId: string]
   'toggle-reaction': [messageId: string, reactionType: 'star' | 'laugh' | 'sparkles']
+  'delete-selection': [selectionId: string]
   'prev-branch': []
   'next-branch': []
 }>()
@@ -366,6 +407,10 @@ const actionsExpanded = ref(false)
 const isMobile = ref(false)
 const isActionsBarSticky = ref(false)
 const actionsBarLeft = ref('0px') // Left position when sticky (captured from screen)
+
+// Highlight popup state
+const activeHighlightId = ref<string | null>(null)
+const highlightPopupPosition = ref({ x: 0, y: 0 })
 const isMouseOverMessage = ref(false)
 const isMouseOverBar = ref(false)
 
@@ -542,6 +587,38 @@ function onTextSelect(event: MouseEvent) {
   }
 }
 
+function onContentClick(event: MouseEvent) {
+  const target = event.target as HTMLElement
+  
+  // Check if clicked on a highlight
+  const highlightEl = target.closest('.selection-highlight') as HTMLElement
+  if (highlightEl) {
+    const selectionId = highlightEl.getAttribute('data-selection-id')
+    if (selectionId) {
+      event.stopPropagation()
+      activeHighlightId.value = selectionId
+      highlightPopupPosition.value = {
+        x: event.clientX,
+        y: event.clientY
+      }
+    }
+  } else {
+    // Clicked elsewhere, close popup
+    activeHighlightId.value = null
+  }
+}
+
+function deleteHighlight() {
+  if (activeHighlightId.value) {
+    emit('delete-selection', activeHighlightId.value)
+    activeHighlightId.value = null
+  }
+}
+
+function closeHighlightPopup() {
+  activeHighlightId.value = null
+}
+
 function addTag() {
   actionsExpanded.value = false
   emit('add-tag-to-message', props.message.id)
@@ -630,6 +707,55 @@ function toggleReaction(reactionType: 'star' | 'laugh' | 'sparkles') {
   emit('toggle-reaction', props.message.id, reactionType)
 }
 
+// Apply highlights to rendered HTML by finding the label text
+function applyHighlightsToHtml(html: string): string {
+  if (!props.selections || props.selections.length === 0) return html
+  
+  let result = html
+  
+  // Process each selection - use the label to find matches
+  for (const sel of props.selections) {
+    if (!sel.label) continue
+    
+    const searchText = sel.label
+    const hasAnnotations = sel.hasComments || sel.hasTags
+    const className = hasAnnotations ? 'selection-highlight annotated' : 'selection-highlight'
+    
+    // Escape special regex characters in the search text
+    const escapedText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    
+    // Find the text outside of HTML tags
+    // Strategy: split by tags, apply highlight to text parts only
+    const tagPattern = /(<[^>]+>)/g
+    const parts = result.split(tagPattern)
+    let found = false
+    
+    for (let i = 0; i < parts.length && !found; i++) {
+      // Skip tag parts (odd indices after split, or parts that start with <)
+      if (parts[i].startsWith('<')) continue
+      
+      // Try to find and replace in this text part
+      const textRegex = new RegExp(`(${escapedText})`)
+      if (textRegex.test(parts[i])) {
+        parts[i] = parts[i].replace(textRegex, `<mark class="${className}" data-selection-id="${sel.id}">$1</mark>`)
+        found = true
+      }
+    }
+    
+    if (found) {
+      result = parts.join('')
+    }
+  }
+  
+  return result
+}
+
+// Render text with highlighting applied
+function renderTextWithHighlights(text: string, _blockIndex: number): string {
+  const renderedMarkdown = renderMarkdown(text)
+  return applyHighlightsToHtml(renderedMarkdown)
+}
+
 // Get thinking content from various formats
 function getThinkingContent(block: any): string {
   // Handle nested object format: { thinking: { content: "..." } }
@@ -707,6 +833,26 @@ function formatTime(timestamp?: string) {
 
 .thinking-content :deep(pre) {
   @apply bg-amber-900/20 p-2 rounded text-[10px];
+}
+
+/* Selection highlights */
+.prose :deep(.selection-highlight) {
+  @apply bg-yellow-500/25 border-b-2 border-yellow-400/60 rounded-sm px-0.5 -mx-0.5;
+  color: inherit;
+  transition: background-color 0.2s ease;
+}
+
+.prose :deep(.selection-highlight:hover) {
+  @apply bg-yellow-500/40;
+}
+
+.prose :deep(.selection-highlight.annotated) {
+  @apply bg-blue-500/25 border-blue-400/60;
+  color: inherit;
+}
+
+.prose :deep(.selection-highlight.annotated:hover) {
+  @apply bg-blue-500/40;
 }
 
 .prose :deep(ul), .prose :deep(ol) {

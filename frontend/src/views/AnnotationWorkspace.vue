@@ -197,6 +197,7 @@
             :hidden-message-ids="hiddenMessageIds"
             :message-reactions="messageReactions"
             :participant-avatars="participantAvatars"
+            :message-selections="messageSelections"
             @add-tag-to-message="handleAddTagToMessage"
             @add-comment-to-message="handleAddCommentToMessage"
             @copy-message="handleCopyMessage"
@@ -396,8 +397,17 @@
       @click.stop
     >
       <button
+        @click="handleHighlightSelection"
+        class="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 transition-colors rounded-t-lg"
+      >
+        <svg class="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10 3.5l1.526 4.694h4.934l-3.993 2.902 1.526 4.694L10 12.888l-3.993 2.902 1.526-4.694L3.54 8.194h4.934L10 3.5z" />
+        </svg>
+        Highlight
+      </button>
+      <button
         @click="handleAddTagToSelection"
-        class="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors rounded-t-lg"
+        class="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -475,6 +485,38 @@ const participantAvatars = computed(() => {
   console.log('[AnnotationWorkspace] Participant avatars map:', Array.from(avatars.entries()))
   return avatars
 })
+
+// Build selection highlights map for each message
+const messageSelections = computed(() => {
+  const selectionsMap = new Map<string, Array<{
+    id: string
+    start_offset: number
+    end_offset: number
+    label?: string
+    hasComments: boolean
+    hasTags: boolean
+  }>>()
+  
+  for (const sel of selections.value) {
+    const messageId = sel.start_message_id
+    if (!selectionsMap.has(messageId)) {
+      selectionsMap.set(messageId, [])
+    }
+    
+    const data = selectionData.value.get(sel.id)
+    selectionsMap.get(messageId)!.push({
+      id: sel.id,
+      start_offset: sel.start_offset ?? 0,
+      end_offset: sel.end_offset ?? 0,
+      label: sel.label,
+      hasComments: (data?.comments?.length ?? 0) > 0,
+      hasTags: (data?.tags?.length ?? 0) > 0
+    })
+  }
+  
+  return selectionsMap
+})
+
 const selectionData = ref<Map<string, {
   comments: Comment[]
   tags: any[]
@@ -1128,6 +1170,34 @@ function handleTextSelected(messageId: string, text: string, start: number, end:
   }
   
   showTextSelectionMenu.value = true
+}
+
+async function handleHighlightSelection() {
+  if (!pendingTextSelection.value) return
+  
+  // Create a highlight-only selection (no tags, no comments)
+  try {
+    const selection = await submissionsStore.createSelection({
+      submission_id: submissionId,
+      start_message_id: pendingTextSelection.value.messageId,
+      end_message_id: pendingTextSelection.value.messageId,
+      start_offset: pendingTextSelection.value.start,
+      end_offset: pendingTextSelection.value.end,
+      label: pendingTextSelection.value.text.substring(0, 100),
+      annotation_tags: []
+    })
+    
+    selections.value.push(selection)
+    selectionData.value.set(selection.id, { comments: [], tags: [], tagAttributions: [] })
+    
+    showTextSelectionMenu.value = false
+    pendingTextSelection.value = null
+    
+    // Clear browser selection
+    window.getSelection()?.removeAllRanges()
+  } catch (err) {
+    console.error('Failed to create highlight:', err)
+  }
 }
 
 async function handleAddTagToSelection() {

@@ -17,6 +17,7 @@
             :reactions="messageReactions.get(item.message.id)"
             :current-user-id="currentUserId"
             :participant-avatars="participantAvatars"
+            :selections="messageSelections.get(item.message.id) || []"
             @text-selected="onTextSelected"
             @add-tag-to-message="onAddTagToMessage"
             @add-comment-to-message="onAddCommentToMessage"
@@ -26,6 +27,7 @@
             @toggle-hidden-from-models="onToggleHiddenFromModels"
             @hide-all-previous="onHideAllPrevious"
             @toggle-reaction="onToggleReaction"
+            @delete-selection="onDeleteSelection"
           />
           
           <!-- Inline comments (mobile only) -->
@@ -133,11 +135,21 @@ interface InlineComment {
   replies?: InlineComment[]
 }
 
+interface SelectionHighlight {
+  id: string
+  start_offset: number
+  end_offset: number
+  label?: string
+  hasComments?: boolean
+  hasTags?: boolean
+}
+
 interface Props {
   messages: MessageType[]
   annotatedMessageIds?: Set<string>
   userNames?: Map<string, string>
   inlineComments?: Map<string, InlineComment[]> // messageId -> comments
+  messageSelections?: Map<string, SelectionHighlight[]> // messageId -> selections for highlighting
   currentUserId?: string
   canModerate?: boolean
   canViewHidden?: boolean
@@ -153,6 +165,7 @@ const props = withDefaults(defineProps<Props>(), {
   annotatedMessageIds: () => new Set(),
   userNames: () => new Map(),
   inlineComments: () => new Map(),
+  messageSelections: () => new Map(),
   canModerate: false,
   canViewHidden: false,
   canToggleHiddenFromModels: false,
@@ -376,6 +389,10 @@ function onHideAllPrevious(messageId: string) {
 
 function onToggleReaction(messageId: string, reactionType: 'star' | 'laugh' | 'sparkles') {
   emit('toggle-reaction', messageId, reactionType)
+}
+
+function onDeleteSelection(selectionId: string) {
+  emit('delete-selection', selectionId)
 }
 </script>
 
