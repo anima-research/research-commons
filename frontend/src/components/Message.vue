@@ -160,7 +160,7 @@
                 </div>
               </summary>
               <div class="p-3 bg-amber-950/15 border border-amber-900/20 border-t-0 rounded-b-lg -mt-1">
-                <div class="text-[11px] text-amber-100/70 leading-relaxed thinking-content" v-html="renderMarkdown(getThinkingContent(block))" />
+                <div class="text-[11px] text-amber-100/70 leading-relaxed thinking-content" v-html="renderTextWithHighlights(getThinkingContent(block), idx)" />
               </div>
             </details>
           </div>
@@ -853,6 +853,25 @@ function formatTime(timestamp?: string) {
 
 .prose :deep(.selection-highlight.annotated:hover) {
   @apply bg-blue-500/40;
+}
+
+/* Highlights in thinking blocks */
+.thinking-content :deep(.selection-highlight) {
+  @apply bg-yellow-500/30 border-b border-yellow-400/60 rounded-sm px-0.5 -mx-0.5;
+  color: inherit;
+}
+
+.thinking-content :deep(.selection-highlight:hover) {
+  @apply bg-yellow-500/50;
+}
+
+.thinking-content :deep(.selection-highlight.annotated) {
+  @apply bg-blue-500/30 border-blue-400/60;
+  color: inherit;
+}
+
+.thinking-content :deep(.selection-highlight.annotated:hover) {
+  @apply bg-blue-500/50;
 }
 
 .prose :deep(ul), .prose :deep(ol) {
