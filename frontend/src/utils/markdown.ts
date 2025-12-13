@@ -25,18 +25,25 @@ function escapeNonHtmlTags(text: string): string {
 
 /**
  * Convert Discord-style mentions to styled badges
- * Handles: <@username>, <@user name>, @username, reply:@username
+ * Handles: <@username>, <@user name>, @username, reply:@username, <reply:@user name>
  */
 function styleMentions(html: string): string {
-  // Handle <@username> or <@user name> patterns
-  html = html.replace(/&lt;@([^&]+)&gt;/g, '<span class="mention">@$1</span>')
+  // Handle <reply:@username> or <reply:@user name> patterns first (with angle brackets, can have spaces)
+  html = html.replace(/&lt;reply:@([^&]+)&gt;/gi, '%%REPLYMENTION%%$1%%ENDMENTION%%')
   
-  // Handle reply:@username patterns (from Discord replies)
-  html = html.replace(/(?:&lt;)?reply:@([^&\s>]+)(?:&gt;)?/gi, '<span class="reply-mention">↩ @$1</span>')
+  // Handle reply:@username patterns without angle brackets (no spaces allowed)
+  html = html.replace(/reply:@([^\s&<]+)/gi, '%%REPLYMENTION%%$1%%ENDMENTION%%')
   
-  // Handle standalone @mentions (but not in code blocks or emails)
+  // Handle <@username> or <@user name> patterns (use a placeholder to avoid double-matching)
+  html = html.replace(/&lt;@([^&]+)&gt;/g, '%%MENTION%%$1%%ENDMENTION%%')
+  
+  // Handle standalone @mentions (but not in code blocks, emails, or already-processed mentions)
   // Only match @word patterns not preceded by letters/numbers (to avoid emails)
-  html = html.replace(/(?<![a-zA-Z0-9])@([a-zA-Z][a-zA-Z0-9_]{1,30})(?![a-zA-Z0-9@])/g, '<span class="mention">@$1</span>')
+  html = html.replace(/(?<![a-zA-Z0-9%])@([a-zA-Z][a-zA-Z0-9_]{1,30})(?![a-zA-Z0-9@%])/g, '%%MENTION%%$1%%ENDMENTION%%')
+  
+  // Now convert placeholders to actual spans
+  html = html.replace(/%%MENTION%%([^%]+)%%ENDMENTION%%/g, '<span class="mention">@$1</span>')
+  html = html.replace(/%%REPLYMENTION%%([^%]+)%%ENDMENTION%%/g, '<span class="reply-mention">↩ @$1</span>')
   
   return html
 }
