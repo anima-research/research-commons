@@ -4,29 +4,98 @@
     <div class="messages-container">
       <template v-for="(item, index) in processedMessages" :key="item.type === 'message' ? item.message.id : `hidden-group-${index}`">
         <!-- Regular message -->
-        <Message
-          v-if="item.type === 'message'"
-          :message="item.message"
-          :has-annotation="hasAnnotation(item.message.id)"
-          :is-pinned="pinnedMessageId === item.message.id"
-          :is-hidden="hiddenMessageIds.has(item.message.id)"
-          :is-hidden-from-models="item.message.hidden_from_models"
-          :can-hide-message="canModerate"
-          :can-toggle-hidden-from-models="canToggleHiddenFromModels"
-          :can-pin="canPin"
-          :reactions="messageReactions.get(item.message.id)"
-          :current-user-id="currentUserId"
-          :participant-avatars="participantAvatars"
-          @text-selected="onTextSelected"
-          @add-tag-to-message="onAddTagToMessage"
-          @add-comment-to-message="onAddCommentToMessage"
-          @copy-message="onCopyMessage"
-          @toggle-pin="onTogglePin"
-          @toggle-hide="onToggleHide"
-          @toggle-hidden-from-models="onToggleHiddenFromModels"
-          @hide-all-previous="onHideAllPrevious"
-          @toggle-reaction="onToggleReaction"
-        />
+        <div v-if="item.type === 'message'">
+          <Message
+            :message="item.message"
+            :has-annotation="hasAnnotation(item.message.id)"
+            :is-pinned="pinnedMessageId === item.message.id"
+            :is-hidden="hiddenMessageIds.has(item.message.id)"
+            :is-hidden-from-models="item.message.hidden_from_models"
+            :can-hide-message="canModerate"
+            :can-toggle-hidden-from-models="canToggleHiddenFromModels"
+            :can-pin="canPin"
+            :reactions="messageReactions.get(item.message.id)"
+            :current-user-id="currentUserId"
+            :participant-avatars="participantAvatars"
+            @text-selected="onTextSelected"
+            @add-tag-to-message="onAddTagToMessage"
+            @add-comment-to-message="onAddCommentToMessage"
+            @copy-message="onCopyMessage"
+            @toggle-pin="onTogglePin"
+            @toggle-hide="onToggleHide"
+            @toggle-hidden-from-models="onToggleHiddenFromModels"
+            @hide-all-previous="onHideAllPrevious"
+            @toggle-reaction="onToggleReaction"
+          />
+          
+          <!-- Inline comments (mobile only) -->
+          <div 
+            v-if="getVisibleComments(item.message.id).length" 
+            class="lg:hidden ml-4 mt-1 mb-3 space-y-1"
+          >
+            <!-- Top-level comments (limited to 2, with expand option) -->
+            <template v-for="(comment, cIdx) in getVisibleComments(item.message.id)" :key="comment.id">
+              <div class="bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-sm">
+                <div class="flex items-center justify-between mb-1">
+                  <div class="flex items-center gap-2">
+                    <svg class="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-xs text-gray-400">{{ getUserName(comment.author_id) }}</span>
+                    <span v-if="comment.selection_text" class="text-xs text-gray-500 truncate max-w-[100px]">
+                      on "{{ comment.selection_text }}"
+                    </span>
+                  </div>
+                  <button 
+                    @click="emit('reply-to-comment', comment.id)"
+                    class="text-xs text-blue-400/70 hover:text-blue-400 flex items-center gap-1"
+                  >
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l3 3m-3-3l3-3" />
+                    </svg>
+                    Reply
+                  </button>
+                </div>
+                <div class="text-gray-200">{{ comment.content }}</div>
+                
+                <!-- Nested replies (show first one, collapse rest) -->
+                <div v-if="comment.replies?.length" class="mt-2 ml-3 border-l-2 border-gray-700 pl-2 space-y-1">
+                  <div 
+                    v-for="(reply, rIdx) in getVisibleReplies(item.message.id, comment.id)" 
+                    :key="reply.id"
+                    class="text-sm"
+                  >
+                    <div class="flex items-center gap-1 text-xs text-gray-500">
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l3 3m-3-3l3-3" />
+                      </svg>
+                      {{ getUserName(reply.author_id) }}
+                    </div>
+                    <div class="text-gray-300 text-xs">{{ reply.content }}</div>
+                  </div>
+                  
+                  <!-- Expand more replies button -->
+                  <button 
+                    v-if="getHiddenRepliesCount(item.message.id, comment.id) > 0"
+                    @click="expandReplies(item.message.id, comment.id)"
+                    class="text-xs text-indigo-400 hover:text-indigo-300"
+                  >
+                    + {{ getHiddenRepliesCount(item.message.id, comment.id) }} more replies
+                  </button>
+                </div>
+              </div>
+            </template>
+            
+            <!-- Expand more comments button -->
+            <button 
+              v-if="getHiddenCommentsCount(item.message.id) > 0"
+              @click="expandComments(item.message.id)"
+              class="w-full text-xs text-indigo-400 hover:text-indigo-300 py-1"
+            >
+              + {{ getHiddenCommentsCount(item.message.id) }} more comments
+            </button>
+          </div>
+        </div>
         
         <!-- Hidden messages group placeholder -->
         <div
@@ -50,14 +119,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import Message from './Message.vue'
 import type { Message as MessageType } from '@/types'
+
+interface InlineComment {
+  id: string
+  content: string
+  author_id: string
+  created_at: string
+  selection_text?: string
+  parent_id?: string
+  replies?: InlineComment[]
+}
 
 interface Props {
   messages: MessageType[]
   annotatedMessageIds?: Set<string>
   userNames?: Map<string, string>
+  inlineComments?: Map<string, InlineComment[]> // messageId -> comments
   currentUserId?: string
   canModerate?: boolean
   canViewHidden?: boolean
@@ -72,6 +152,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   annotatedMessageIds: () => new Set(),
   userNames: () => new Map(),
+  inlineComments: () => new Map(),
   canModerate: false,
   canViewHidden: false,
   canToggleHiddenFromModels: false,
@@ -98,7 +179,66 @@ const emit = defineEmits<{
   'delete-selection': [selectionId: string]
   'delete-comment': [commentId: string]
   'remove-tag': [selectionId: string, tagId: string]
+  'reply-to-comment': [commentId: string]
 }>()
+
+// Expanded state for comments and replies
+const expandedComments = ref<Set<string>>(new Set()) // messageId
+const expandedReplies = ref<Set<string>>(new Set()) // messageId:commentId
+
+// Get top-level comments for a message (limited unless expanded)
+function getVisibleComments(messageId: string) {
+  const allComments = props.inlineComments.get(messageId) || []
+  const topLevel = allComments.filter(c => !c.parent_id)
+  
+  if (expandedComments.value.has(messageId)) {
+    return topLevel
+  }
+  return topLevel.slice(0, 2)
+}
+
+function getHiddenCommentsCount(messageId: string) {
+  const allComments = props.inlineComments.get(messageId) || []
+  const topLevel = allComments.filter(c => !c.parent_id)
+  
+  if (expandedComments.value.has(messageId)) {
+    return 0
+  }
+  return Math.max(0, topLevel.length - 2)
+}
+
+function expandComments(messageId: string) {
+  expandedComments.value.add(messageId)
+}
+
+// Get replies for a comment (limited unless expanded)
+function getVisibleReplies(messageId: string, commentId: string) {
+  const allComments = props.inlineComments.get(messageId) || []
+  const comment = allComments.find(c => c.id === commentId)
+  const replies = comment?.replies || []
+  
+  const key = `${messageId}:${commentId}`
+  if (expandedReplies.value.has(key)) {
+    return replies
+  }
+  return replies.slice(0, 1)
+}
+
+function getHiddenRepliesCount(messageId: string, commentId: string) {
+  const allComments = props.inlineComments.get(messageId) || []
+  const comment = allComments.find(c => c.id === commentId)
+  const replies = comment?.replies || []
+  
+  const key = `${messageId}:${commentId}`
+  if (expandedReplies.value.has(key)) {
+    return 0
+  }
+  return Math.max(0, replies.length - 1)
+}
+
+function expandReplies(messageId: string, commentId: string) {
+  expandedReplies.value.add(`${messageId}:${commentId}`)
+}
 
 // Check if user is a researcher or admin (can see individual hidden messages)
 // If not, we group consecutive hidden messages

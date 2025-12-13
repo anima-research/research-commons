@@ -186,7 +186,7 @@
             v-if="messages.length > 0"
             :messages="messages"
             :annotated-message-ids="annotatedMessageIds"
-            :inline-annotations="new Map()"
+            :inline-comments="inlineComments"
             :user-names="userNames"
             :current-user-id="authStore.user?.id"
             :can-moderate="canHideMessages"
@@ -212,6 +212,7 @@
             @delete-selection="handleDeleteSelection"
             @delete-comment="handleDeleteComment"
             @remove-tag="handleRemoveTag"
+            @reply-to-comment="handleReplyToComment"
           />
           <div v-else class="p-8 text-center text-gray-500 dark:text-gray-400">
             <div v-if="loading">Loading conversation...</div>
@@ -219,7 +220,7 @@
           </div>
         </div>
 
-        <!-- Annotation Margin (hidden on mobile, 40% on desktop) -->
+        <!-- Annotation Margin (desktop only - mobile uses inline comments) -->
         <div class="hidden lg:block lg:w-[40%] relative">
           <AnnotationMargin
             :annotations="marginAnnotations"
@@ -897,9 +898,20 @@ function handleAddCommentToMessage(messageId: string) {
   if (!messageEl) return
   
   const rect = messageEl.getBoundingClientRect()
-  commentInputPosition.value = {
-    x: rect.right + 10,
-    y: rect.top
+  const isMobile = window.innerWidth < 1024 // lg breakpoint
+  
+  if (isMobile) {
+    // On mobile, position below the message
+    commentInputPosition.value = {
+      x: rect.left + 32, // Indented like inline comments
+      y: rect.bottom + 8
+    }
+  } else {
+    // On desktop, position to the right
+    commentInputPosition.value = {
+      x: rect.right + 10,
+      y: rect.top
+    }
   }
   
   activeMessageId.value = messageId
@@ -1428,6 +1440,63 @@ const messagesWithTags = computed(() => {
     }
   }
   return ids
+})
+
+// Inline comments grouped by message ID (for mobile view)
+const inlineComments = computed(() => {
+  interface InlineComment {
+    id: string
+    content: string
+    author_id: string
+    created_at: string
+    selection_text?: string
+    parent_id?: string
+    replies?: InlineComment[]
+  }
+  
+  const map = new Map<string, InlineComment[]>()
+  
+  for (const sel of selections.value) {
+    const data = selectionData.value.get(sel.id)
+    if (!data || data.comments.length === 0) continue
+    
+    const messageId = sel.start_message_id
+    if (!map.has(messageId)) {
+      map.set(messageId, [])
+    }
+    
+    // Build comment tree
+    const commentMap = new Map<string, InlineComment>()
+    const topLevel: InlineComment[] = []
+    
+    // First pass: create all comments
+    for (const comment of data.comments) {
+      const inlineComment: InlineComment = {
+        id: comment.id,
+        content: comment.content,
+        author_id: comment.author_id,
+        created_at: comment.created_at,
+        selection_text: sel.selected_text?.slice(0, 50),
+        parent_id: comment.parent_id,
+        replies: []
+      }
+      commentMap.set(comment.id, inlineComment)
+    }
+    
+    // Second pass: build tree
+    for (const comment of data.comments) {
+      const inlineComment = commentMap.get(comment.id)!
+      if (comment.parent_id && commentMap.has(comment.parent_id)) {
+        commentMap.get(comment.parent_id)!.replies!.push(inlineComment)
+      } else {
+        topLevel.push(inlineComment)
+      }
+    }
+    
+    map.get(messageId)!.push(...topLevel)
+  }
+  
+  return map
 })
 
 // Per-system rating averages
