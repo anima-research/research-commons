@@ -36,6 +36,15 @@
         <span class="text-[9px]">🫥</span>
         Hidden from models
       </div>
+      <!-- Reply indicator (shown above header if this is a reply) -->
+      <div v-if="replyInfo" class="flex items-center gap-1.5 mb-1 text-xs text-gray-500">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+        </svg>
+        <span>Replying to</span>
+        <span class="text-indigo-400 font-medium">@{{ replyInfo.username }}</span>
+      </div>
+      
       <!-- Participant header -->
       <div class="flex items-center gap-2 mb-1">
         
@@ -109,7 +118,7 @@
         @mouseup="onTextSelect"
         ref="contentEl"
       >
-        <template v-for="(block, idx) in message.content_blocks" :key="idx">
+        <template v-for="(block, idx) in processedContentBlocks" :key="idx">
           <!-- Check if this is a redacted message (block characters) -->
           <div v-if="block.type === 'text' && block.text?.includes('▓')" class="relative">
             <div class="text-gray-500 select-none font-mono" style="filter: blur(1.5px); letter-spacing: 0.05em; line-height: 1.6;">
@@ -396,6 +405,47 @@ watch([showActions, actionsExpanded], () => {
 })
 
 const isUser = computed(() => props.message.participant_type === 'human')
+
+// Extract reply mention from message content (for header display)
+const replyInfo = computed(() => {
+  const firstBlock = props.message.content_blocks[0]
+  if (firstBlock?.type !== 'text' || !firstBlock.text) return null
+  
+  const text = firstBlock.text
+  
+  // Match <reply:@username> or reply:@username at the start
+  const bracketMatch = text.match(/^<reply:@([^>]+)>\s*/)
+  if (bracketMatch) {
+    return {
+      username: bracketMatch[1],
+      remainingText: text.slice(bracketMatch[0].length)
+    }
+  }
+  
+  const plainMatch = text.match(/^reply:@(\S+)\s*/)
+  if (plainMatch) {
+    return {
+      username: plainMatch[1],
+      remainingText: text.slice(plainMatch[0].length)
+    }
+  }
+  
+  return null
+})
+
+// Get content blocks with reply prefix stripped from first block
+const processedContentBlocks = computed(() => {
+  if (!replyInfo.value) return props.message.content_blocks
+  
+  const blocks = [...props.message.content_blocks]
+  if (blocks[0]?.type === 'text') {
+    blocks[0] = {
+      ...blocks[0],
+      text: replyInfo.value.remainingText
+    }
+  }
+  return blocks
+})
 
 onMounted(() => {
   checkMobile()

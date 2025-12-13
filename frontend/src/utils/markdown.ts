@@ -25,15 +25,10 @@ function escapeNonHtmlTags(text: string): string {
 
 /**
  * Convert Discord-style mentions to styled badges
- * Handles: <@username>, <@user name>, @username, reply:@username, <reply:@user name>
+ * Handles: <@username>, <@user name>, @username
+ * Note: reply:@username patterns are now handled in Message.vue header, not here
  */
 function styleMentions(html: string): string {
-  // Handle <reply:@username> or <reply:@user name> patterns first (with angle brackets, can have spaces)
-  html = html.replace(/&lt;reply:@([^&]+)&gt;/gi, '%%REPLYMENTION%%$1%%ENDMENTION%%')
-  
-  // Handle reply:@username patterns without angle brackets (no spaces allowed)
-  html = html.replace(/reply:@([^\s&<]+)/gi, '%%REPLYMENTION%%$1%%ENDMENTION%%')
-  
   // Handle <@username> or <@user name> patterns (use a placeholder to avoid double-matching)
   html = html.replace(/&lt;@([^&]+)&gt;/g, '%%MENTION%%$1%%ENDMENTION%%')
   
@@ -43,7 +38,6 @@ function styleMentions(html: string): string {
   
   // Now convert placeholders to actual spans
   html = html.replace(/%%MENTION%%([^%]+)%%ENDMENTION%%/g, '<span class="mention">@$1</span>')
-  html = html.replace(/%%REPLYMENTION%%([^%]+)%%ENDMENTION%%/g, '<span class="reply-mention">↩ @$1</span>')
   
   return html
 }
