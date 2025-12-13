@@ -392,7 +392,7 @@
     <!-- Text Selection Context Menu -->
     <div
       v-if="showTextSelectionMenu && authStore.isAuthenticated()"
-      class="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 transition-colors"
+      class="text-selection-menu fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 transition-colors"
       :style="{ left: textSelectionMenuPosition.x + 'px', top: textSelectionMenuPosition.y + 'px' }"
       @click.stop
     >
@@ -1175,15 +1175,6 @@ function handleTextSelected(messageId: string, text: string, start: number, end:
 async function handleHighlightSelection() {
   if (!pendingTextSelection.value) return
   
-  console.log('[Highlight Create Debug]', {
-    messageId: pendingTextSelection.value.messageId,
-    text: pendingTextSelection.value.text,
-    textCharCodes: [...pendingTextSelection.value.text].map(c => c.charCodeAt(0)),
-    start: pendingTextSelection.value.start,
-    end: pendingTextSelection.value.end,
-    labelWillBe: pendingTextSelection.value.text.substring(0, 100)
-  })
-  
   // Create a highlight-only selection (no tags, no comments)
   try {
     const selection = await submissionsStore.createSelection({
@@ -1421,6 +1412,15 @@ function handleDocumentClick(event: MouseEvent) {
     !target.closest('[data-message-actions]')
   ) {
     closeTagPopover()
+  }
+  
+  // Close text selection menu when clicking outside
+  if (
+    showTextSelectionMenu.value &&
+    !target.closest('.text-selection-menu')
+  ) {
+    showTextSelectionMenu.value = false
+    pendingTextSelection.value = null
   }
 }
 

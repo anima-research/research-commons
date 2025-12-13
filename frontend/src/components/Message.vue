@@ -146,21 +146,21 @@
           <div v-else-if="block.type === 'thinking'" class="mt-2 mb-2">
             <details class="group thinking-block" :open="thinkingOpenByDefault">
               <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
-                <div class="flex items-start gap-2 p-2 rounded-lg bg-amber-950/20 border border-amber-900/30 hover:bg-amber-950/30 transition-colors">
-                  <svg class="w-3 h-3 mt-0.5 text-amber-600/70 transition-transform group-open:rotate-90 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="flex items-start gap-2 p-2 rounded-lg bg-gray-800/40 border border-gray-600/30 hover:bg-gray-800/50 transition-colors">
+                  <svg class="w-3 h-3 mt-0.5 text-gray-500 transition-transform group-open:rotate-90 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                   </svg>
                   <div class="flex-1 min-w-0">
-                    <span class="text-[10px] uppercase tracking-wide font-medium text-amber-600/70">Thinking</span>
+                    <span class="text-[10px] uppercase tracking-wide font-medium text-gray-500">Thinking</span>
                     <!-- Preview: hidden when open -->
-                    <div class="text-[11px] text-amber-200/60 leading-relaxed mt-0.5 line-clamp-4 group-open:hidden">{{ getThinkingPreview(block, 4) }}</div>
+                    <div class="text-[11px] text-gray-400/80 leading-relaxed mt-0.5 line-clamp-4 group-open:hidden">{{ getThinkingPreview(block, 4) }}</div>
                     <!-- Expanded label: shown when open -->
-                    <div class="text-[10px] text-amber-500/50 mt-0.5 hidden group-open:block">Click to collapse</div>
+                    <div class="text-[10px] text-gray-500/60 mt-0.5 hidden group-open:block">Click to collapse</div>
                   </div>
                 </div>
               </summary>
-              <div class="p-3 bg-amber-950/15 border border-amber-900/20 border-t-0 rounded-b-lg -mt-1">
-                <div class="text-[11px] text-amber-100/70 leading-relaxed thinking-content" v-html="renderTextWithHighlights(getThinkingContent(block), idx)" />
+              <div class="p-3 bg-gray-800/30 border border-gray-600/20 border-t-0 rounded-b-lg -mt-1">
+                <div class="text-[11px] text-gray-300/80 leading-relaxed thinking-content" v-html="renderTextWithHighlights(getThinkingContent(block), idx)" />
               </div>
             </details>
           </div>
@@ -582,21 +582,8 @@ function onTextSelect(event: MouseEvent) {
   const startOffset = content.indexOf(text)
   const endOffset = startOffset + text.length
   
-  console.log('[Selection Debug]', {
-    selectedText: text,
-    selectedTextCharCodes: [...text].map(c => c.charCodeAt(0)),
-    contentLength: content.length,
-    startOffset,
-    endOffset,
-    foundInContent: startOffset !== -1
-  })
-  
   if (startOffset !== -1) {
     emit('text-selected', props.message.id, text, startOffset, endOffset)
-  } else {
-    console.log('[Selection Debug] Text not found in content!')
-    console.log('[Selection Debug] Content preview:', content.substring(0, 200))
-    console.log('[Selection Debug] Content char codes (first 100):', [...content.substring(0, 100)].map(c => c.charCodeAt(0)))
   }
 }
 
@@ -729,13 +716,6 @@ function normalizeText(text: string): string {
     .trim()
 }
 
-// Decode HTML entities for comparison
-function decodeHtmlEntities(text: string): string {
-  const textarea = document.createElement('textarea')
-  textarea.innerHTML = text
-  return textarea.value
-}
-
 // Apply highlights to rendered HTML by finding the label text
 function applyHighlightsToHtml(html: string): string {
   if (!props.selections || props.selections.length === 0) return html
@@ -751,13 +731,6 @@ function applyHighlightsToHtml(html: string): string {
     const hasAnnotations = sel.hasComments || sel.hasTags
     const className = hasAnnotations ? 'selection-highlight annotated' : 'selection-highlight'
     
-    console.log('[Highlight Debug]', {
-      selectionId: sel.id,
-      rawLabel: searchText,
-      normalizedLabel: normalizedSearch,
-      labelCharCodes: [...searchText].map(c => c.charCodeAt(0))
-    })
-    
     // Create a flexible regex that matches the text with normalized apostrophes/quotes
     // Replace apostrophes with a pattern that matches any apostrophe variant OR HTML entities
     let escapedText = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -766,8 +739,6 @@ function applyHighlightsToHtml(html: string): string {
     // Match quotes as: " or " or " or &#34; or &quot;
     escapedText = escapedText.replace(/"/g, '(?:["""]|&#34;|&quot;)')
     escapedText = escapedText.replace(/ /g, '\\s+')    // Flexible whitespace
-    
-    console.log('[Highlight Debug] Escaped pattern:', escapedText)
     
     // First try: simple search in text parts (for text within single elements)
     const tagPattern = /(<[^>]+>)/g
@@ -786,16 +757,9 @@ function applyHighlightsToHtml(html: string): string {
       
       // Try flexible match (regex now handles HTML entities)
       const textRegex = new RegExp(`(${escapedText})`, 'i')
-      const testResult = textRegex.test(parts[i])
-      console.log(`[Highlight Debug] Testing part ${i}:`, { 
-        partPreview: parts[i].substring(0, 80), 
-        matches: testResult 
-      })
-      
-      if (testResult) {
+      if (textRegex.test(parts[i])) {
         parts[i] = parts[i].replace(textRegex, `<mark class="${className}" data-selection-id="${sel.id}">$1</mark>`)
         found = true
-        console.log('[Highlight Debug] Found match in part', i)
       }
     }
     
@@ -803,8 +767,6 @@ function applyHighlightsToHtml(html: string): string {
       result = parts.join('')
       continue
     }
-    
-    console.log('[Highlight Debug] Full match failed, trying progressive substrings')
     
     // Second try: progressively shorter substrings until we find a match
     // Start with full text, then try first 80%, 60%, 40%, 20%
@@ -821,8 +783,6 @@ function applyHighlightsToHtml(html: string): string {
       subEscaped = subEscaped.replace(/"/g, '(?:["""]|&#34;|&quot;)')
       subEscaped = subEscaped.replace(/ /g, '\\s+')
       
-      console.log(`[Highlight Debug] Trying ${pct * 100}%:`, substring)
-      
       for (let i = 0; i < parts.length && !found; i++) {
         if (parts[i].startsWith('<')) continue
         
@@ -837,8 +797,6 @@ function applyHighlightsToHtml(html: string): string {
     
     if (found) {
       result = parts.join('')
-    } else {
-      console.log('[Highlight Debug] NO MATCH FOUND for selection', sel.id)
     }
   }
   
@@ -905,7 +863,7 @@ function formatTime(timestamp?: string) {
   @apply bg-gray-900/50 p-3 rounded overflow-x-auto;
 }
 
-/* Thinking block styles */
+/* Thinking block styles - muted gray appearance */
 .thinking-content :deep(p) {
   @apply my-1 text-[11px] leading-relaxed;
 }
@@ -919,54 +877,60 @@ function formatTime(timestamp?: string) {
 }
 
 .thinking-content :deep(strong) {
-  @apply text-amber-200/80;
+  @apply text-gray-300/90;
 }
 
 .thinking-content :deep(code) {
-  @apply bg-amber-900/30 px-1 py-0.5 rounded text-amber-200/70 text-[10px];
+  @apply bg-gray-700/40 px-1 py-0.5 rounded text-gray-300/80 text-[10px];
 }
 
 .thinking-content :deep(pre) {
-  @apply bg-amber-900/20 p-2 rounded text-[10px];
+  @apply bg-gray-700/30 p-2 rounded text-[10px];
 }
 
-/* Selection highlights */
+/* Selection highlights - underline only, background on hover */
 .prose :deep(.selection-highlight) {
-  @apply bg-yellow-500/25 border-b-2 border-yellow-400/60 rounded-sm px-0.5 -mx-0.5;
+  @apply rounded-sm cursor-pointer;
   color: inherit;
-  transition: background-color 0.2s ease;
+  background: transparent;
+  border-bottom: 3px solid rgba(255, 37, 37, 0.85); /* bright red */
+  transition: background-color 0.15s ease;
 }
 
 .prose :deep(.selection-highlight:hover) {
-  @apply bg-yellow-500/40;
+  @apply bg-red-500/20;
 }
 
 .prose :deep(.selection-highlight.annotated) {
-  @apply bg-blue-500/25 border-blue-400/60;
+  border-bottom: 3px solid rgb(96 165 250 / 0.9); /* bright blue for annotated */
   color: inherit;
+  background: transparent;
 }
 
 .prose :deep(.selection-highlight.annotated:hover) {
-  @apply bg-blue-500/40;
+  @apply bg-blue-500/25;
 }
 
 /* Highlights in thinking blocks */
 .thinking-content :deep(.selection-highlight) {
-  @apply bg-yellow-500/30 border-b border-yellow-400/60 rounded-sm px-0.5 -mx-0.5;
+  @apply rounded-sm cursor-pointer;
   color: inherit;
+  background: transparent;
+  border-bottom: 2px solid rgb(239 68 68 / 0.7);
 }
 
 .thinking-content :deep(.selection-highlight:hover) {
-  @apply bg-yellow-500/50;
+  @apply bg-red-500/20;
 }
 
 .thinking-content :deep(.selection-highlight.annotated) {
-  @apply bg-blue-500/30 border-blue-400/60;
+  border-bottom: 2px solid rgb(96 165 250 / 0.8);
   color: inherit;
+  background: transparent;
 }
 
 .thinking-content :deep(.selection-highlight.annotated:hover) {
-  @apply bg-blue-500/50;
+  @apply bg-blue-500/25;
 }
 
 .prose :deep(ul), .prose :deep(ol) {
