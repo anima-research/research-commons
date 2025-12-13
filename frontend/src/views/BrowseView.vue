@@ -70,8 +70,8 @@
               class="px-3 py-1.5 pr-8 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg text-gray-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer"
             >
               <option value="">All Topics</option>
-              <option v-for="topic in availableTopics" :key="topic" :value="topic">
-                {{ topic }}
+              <option v-for="topic in availableTopics" :key="topic.id" :value="topic.id">
+                {{ topic.name }}
               </option>
             </select>
             <svg class="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -177,15 +177,15 @@
             <!-- Topic tags -->
             <div class="flex items-center gap-1 shrink-0">
               <button
-                v-for="tag in submission.metadata.tags?.slice(0, 2)"
-                :key="tag"
-                @click.stop="filterByTopic(tag)"
-                class="px-1 py-0.5 bg-indigo-500/15 text-indigo-300 text-[9px] rounded hover:bg-indigo-500/25 transition-all"
+                v-for="tagId in submission.metadata.tags?.slice(0, 1)"
+                :key="tagId"
+                @click.stop="filterByTopic(tagId)"
+                class="px-1.5 py-0.5 bg-indigo-500/15 text-indigo-300 text-[10px] rounded hover:bg-indigo-500/25 transition-all whitespace-nowrap"
               >
-                #{{ tag }}
+                #{{ getTopicName(tagId) }}
               </button>
-              <span v-if="(submission.metadata.tags?.length || 0) > 2" class="text-[9px] text-gray-600">
-                +{{ (submission.metadata.tags?.length || 0) - 2 }}
+              <span v-if="(submission.metadata.tags?.length || 0) > 1" class="text-[9px] text-gray-500">
+                +{{ (submission.metadata.tags?.length || 0) - 1 }}
               </span>
             </div>
           </div>
@@ -224,7 +224,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { submissionsAPI } from '@/services/api'
+import { submissionsAPI, researchAPI } from '@/services/api'
 import type { Submission } from '@/types'
 import LeftSidebar from '@/components/LeftSidebar.vue'
 
@@ -251,8 +251,9 @@ const selectedTopic = ref('')
 const selectedModel = ref('')
 const submissions = ref<Submission[]>([])
 const allSubmissions = ref<Submission[]>([])
-const availableTopics = ref<string[]>([])
+const availableTopics = ref<Array<{ id: string; name: string }>>([])
 const availableModels = ref<string[]>([])
+const topicMap = ref<Map<string, string>>(new Map()) // id -> name
 const loading = ref(false)
 
 onMounted(async () => {
@@ -262,18 +263,24 @@ onMounted(async () => {
 async function loadSubmissions() {
   loading.value = true
   try {
+    // Load topics first to build the name map
+    try {
+      const topicsResponse = await researchAPI.getTopics()
+      topicMap.value = new Map(topicsResponse.data.topics.map(t => [t.id, t.name]))
+      availableTopics.value = topicsResponse.data.topics.map(t => ({ id: t.id, name: t.name }))
+    } catch (e) {
+      console.error('Failed to load topics:', e)
+    }
+    
     const response = await submissionsAPI.list()
     allSubmissions.value = response.data.submissions
     submissions.value = response.data.submissions
     
-    // Extract unique topics and models
-    const topicsSet = new Set<string>()
+    // Extract unique models
     const modelsSet = new Set<string>()
     response.data.submissions.forEach(sub => {
-      sub.metadata.tags?.forEach(tag => topicsSet.add(tag))
       sub.metadata.model_summary?.forEach(model => modelsSet.add(model))
     })
-    availableTopics.value = Array.from(topicsSet).sort()
     availableModels.value = Array.from(modelsSet).sort()
     
     console.log('Loaded conversations:', response.data.submissions.length)
@@ -338,11 +345,6 @@ function filterByTopic(topic: string) {
   filterConversations()
 }
 
-function getTopModels(submission: Submission): string[] {
-  // Return top 2 models
-  return submission.metadata.model_summary?.slice(0, 2) || []
-}
-
 function getTopModelsWithCounts(submission: Submission): Array<{ model: string; count: number }> {
   // Use model_counts if available (already sorted by count desc), fallback to model_summary
   const modelCounts = (submission.metadata as any).model_counts as Array<{ model: string; count: number }> | undefined
@@ -353,34 +355,25 @@ function getTopModelsWithCounts(submission: Submission): Array<{ model: string; 
   return (submission.metadata.model_summary?.slice(0, 2) || []).map(m => ({ model: m, count: 0 }))
 }
 
-function shortenModel(model: string): string {
-  // Shorten common model names for display
-  if (model.length <= 12) return model
-  
-  // Common patterns
-  const patterns: Record<string, string> = {
-    'claude-3-opus': 'opus',
-    'claude-3-sonnet': 'sonnet',
-    'claude-3-haiku': 'haiku',
-    'claude-3.5-sonnet': 'sonnet-3.5',
-    'claude-3.5-haiku': 'haiku-3.5',
-    'gpt-4-turbo': 'gpt4t',
-    'gpt-4o': 'gpt4o',
-    'gpt-4': 'gpt4',
-    'gpt-3.5-turbo': 'gpt3.5',
-  }
-  
-  for (const [pattern, short] of Object.entries(patterns)) {
-    if (model.toLowerCase().includes(pattern)) return short
-  }
-  
-  // Fallback: first 10 chars
-  return model.substring(0, 10) + '…'
-}
-
 function truncateDescription(desc: string): string {
   if (desc.length <= 80) return desc
   return desc.substring(0, 77) + '...'
+}
+
+function getTopicName(topicIdOrName: string): string {
+  // First try to look up by ID
+  const byId = topicMap.value.get(topicIdOrName)
+  if (byId) return byId
+  
+  // Check if it's already a name (not a UUID pattern)
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!uuidPattern.test(topicIdOrName)) {
+    // It's already a name, return as-is
+    return topicIdOrName
+  }
+  
+  // Unknown UUID, show truncated
+  return topicIdOrName.substring(0, 8) + '...'
 }
 
 function formatDate(date: string) {
