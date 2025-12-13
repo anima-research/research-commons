@@ -146,20 +146,26 @@
           <div v-else-if="block.type === 'thinking'" class="mt-2 mb-2">
             <details class="group thinking-block" :open="thinkingOpenByDefault">
               <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
-                <div class="flex items-start gap-2 p-2 rounded-lg bg-gray-800/40 border border-gray-600/30 hover:bg-gray-800/50 transition-colors">
-                  <svg class="w-3 h-3 mt-0.5 text-gray-500 transition-transform group-open:rotate-90 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- Collapsed state: full preview box -->
+                <div class="group-open:hidden flex items-start gap-2 p-2 rounded-lg bg-gray-800/40 border border-gray-600/30 hover:bg-gray-800/50 transition-colors">
+                  <svg class="w-3 h-3 mt-0.5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                   </svg>
                   <div class="flex-1 min-w-0">
                     <span class="text-[10px] uppercase tracking-wide font-medium text-gray-500">Thinking</span>
-                    <!-- Preview: hidden when open -->
-                    <div class="text-[11px] text-gray-400/80 leading-relaxed mt-0.5 line-clamp-4 group-open:hidden">{{ getThinkingPreview(block, 4) }}</div>
-                    <!-- Expanded label: shown when open -->
-                    <div class="text-[10px] text-gray-500/60 mt-0.5 hidden group-open:block">Click to collapse</div>
+                    <div class="text-[11px] text-gray-400/80 leading-relaxed mt-0.5 line-clamp-4">{{ getThinkingPreview(block, 4) }}</div>
                   </div>
                 </div>
+                <!-- Expanded state: minimal inline header -->
+                <div class="hidden group-open:flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-gray-400 py-0.5">
+                  <svg class="w-2.5 h-2.5 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <span class="uppercase tracking-wide font-medium">Thinking</span>
+                  <span class="text-gray-600">· click to collapse</span>
+                </div>
               </summary>
-              <div class="p-3 bg-gray-800/30 border border-gray-600/20 border-t-0 rounded-b-lg -mt-1">
+              <div class="p-2 bg-gray-800/30 border border-gray-600/20 rounded-lg mt-0.5">
                 <div class="text-[11px] text-gray-300/80 leading-relaxed thinking-content" v-html="renderTextWithHighlights(getThinkingContent(block), idx)" />
               </div>
             </details>
@@ -745,13 +751,6 @@ function applyHighlightsToHtml(html: string): string {
     const parts = result.split(tagPattern)
     let found = false
     
-    // Log all text parts (non-tag parts)
-    const textParts = parts.filter(p => !p.startsWith('<'))
-    console.log('[Highlight Debug] Text parts to search:', textParts.map(p => ({
-      text: p.substring(0, 100),
-      charCodes: [...p.substring(0, 50)].map(c => c.charCodeAt(0))
-    })))
-    
     for (let i = 0; i < parts.length && !found; i++) {
       if (parts[i].startsWith('<')) continue
       
@@ -790,7 +789,6 @@ function applyHighlightsToHtml(html: string): string {
         if (subRegex.test(parts[i])) {
           parts[i] = parts[i].replace(subRegex, `<mark class="${className}" data-selection-id="${sel.id}">$1</mark>`)
           found = true
-          console.log(`[Highlight Debug] Found ${pct * 100}% match in part`, i)
         }
       }
     }
