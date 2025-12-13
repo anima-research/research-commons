@@ -78,5 +78,25 @@
   .checkbox-column {
     animation: slideInLeft 0.2s ease;
   }
+  
+  /* Discord-style mentions */
+  .mention {
+    @apply inline-block px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-medium text-sm;
+    cursor: default;
+  }
+  
+  .mention:hover {
+    @apply bg-indigo-500/30;
+  }
+  
+  /* Reply mentions (for Discord reply context) */
+  .reply-mention {
+    @apply inline-block px-1.5 py-0.5 rounded bg-gray-600/40 text-gray-300 text-sm mr-1;
+    cursor: default;
+  }
+  
+  .reply-mention:hover {
+    @apply bg-gray-600/50 text-gray-200;
+  }
 }
 

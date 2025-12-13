@@ -157,7 +157,7 @@
               v-if="currentUserId"
               @click="addTag" 
               class="px-2 py-1 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded transition-all flex items-center gap-1.5"
-              title="Add tag to message"
+              data-tooltip="Add tag"
             >
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -169,7 +169,7 @@
               v-if="currentUserId"
               @click="addComment" 
               class="px-2 py-1 text-xs text-gray-400 hover:text-gray-300 hover:bg-gray-700/50 rounded transition-all flex items-center gap-1.5"
-              title="Add comment to message"
+              data-tooltip="Add comment"
             >
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
@@ -180,7 +180,7 @@
             <button 
               @click="copyMessage"
               class="px-2 py-1 text-xs text-gray-500 hover:text-gray-400 transition-colors"
-              title="Copy message"
+              data-tooltip="Copy"
             >
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -192,7 +192,7 @@
               @click="togglePin"
               class="px-2 py-1 text-xs transition-colors"
               :class="isPinned ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-400'"
-              :title="isPinned ? 'Unpin message' : 'Pin message (scroll to on open)'"
+              :data-tooltip="isPinned ? 'Unpin' : 'Pin'"
             >
               <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                 <path v-if="isPinned" d="M16 12V4h1a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h1v8l-4.5 4.5A1 1 0 0 0 3 16v2a1 1 0 0 0 1 1h6v5l1 1 1-1v-5h6a1 1 0 0 0 1-1v-2a1 1 0 0 0-.5-.87L16 12z" />
@@ -205,7 +205,7 @@
               @click="toggleHide"
               class="px-2 py-1 text-xs transition-colors"
               :class="isHidden ? 'text-red-400 hover:text-red-300' : 'text-gray-500 hover:text-gray-400'"
-              :title="isHidden ? 'Unhide message (visible to all)' : 'Hide message (visible only to researchers)'"
+              :data-tooltip="isHidden ? 'Unhide' : 'Hide'"
             >
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path v-if="isHidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -217,7 +217,7 @@
               v-if="canHideMessage && !isHidden"
               @click="hideAllPrevious"
               class="px-2 py-1 text-xs text-gray-500 hover:text-gray-400 transition-colors"
-              title="Hide this message and all previous messages"
+              data-tooltip="Hide all previous"
             >
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 11l7-7 7 7M5 19l7-7 7 7" />
@@ -229,7 +229,7 @@
               @click="toggleHiddenFromModels"
               class="px-2 py-1 text-xs transition-colors flex items-center gap-1"
               :class="isHiddenFromModels ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-400'"
-              :title="isHiddenFromModels ? 'Include in model context' : 'Exclude from model context (hidden from AI)'"
+              :data-tooltip="isHiddenFromModels ? 'Show to models' : 'Hide from models'"
             >
               <span class="text-[10px]">🫥</span>
             </button>
@@ -245,7 +245,7 @@
               :class="hasUserReacted(reactionType) 
                 ? 'bg-indigo-500/30 border border-indigo-500/60 text-indigo-300' 
                 : 'text-gray-400 hover:bg-gray-700/50'"
-              :title="getReactionLabel(reactionType)"
+              :data-tooltip="getReactionLabel(reactionType)"
             >
               <span>{{ getReactionEmoji(reactionType) }}</span>
               <span v-if="getReactionCount(reactionType) > 0" class="font-mono text-[10px]">{{ getReactionCount(reactionType) }}</span>
@@ -594,6 +594,35 @@ function formatTime(timestamp?: string) {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Fast CSS tooltips */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  padding: 4px 8px;
+  background: rgba(17, 24, 39, 0.95);
+  color: #e5e7eb;
+  font-size: 11px;
+  white-space: nowrap;
+  border-radius: 4px;
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 100;
+}
+
+[data-tooltip]:hover::after {
+  opacity: 1;
+  transition-delay: 0.1s;
 }
 </style>
 
