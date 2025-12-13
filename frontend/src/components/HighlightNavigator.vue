@@ -1,62 +1,121 @@
 <template>
-  <div 
-    v-if="highlights.length > 0"
-    class="fixed right-6 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-2"
-  >
-    <!-- Navigation panel -->
-    <div class="bg-gray-900/90 backdrop-blur-sm border border-gray-700/50 rounded-xl shadow-xl p-2 flex flex-col items-center gap-1">
-      <!-- Header with count -->
-      <div class="text-[10px] text-gray-400 px-2 py-1 border-b border-gray-700/50 w-full text-center">
-        {{ currentIndex + 1 }} / {{ highlights.length }}
+  <div v-if="highlights.length > 0">
+    <!-- Desktop: Vertical bar on right side -->
+    <div class="hidden lg:flex fixed right-6 top-1/2 -translate-y-1/2 z-30 flex-col items-center gap-2">
+      <div class="bg-gray-900/90 backdrop-blur-sm border border-gray-700/50 rounded-xl shadow-xl p-2 flex flex-col items-center gap-1">
+        <!-- Header with count -->
+        <div class="text-[10px] text-gray-400 px-2 py-1 border-b border-gray-700/50 w-full text-center">
+          {{ currentIndex + 1 }} / {{ highlights.length }}
+        </div>
+        
+        <!-- Messages above indicator -->
+        <div class="text-[9px] text-gray-500 py-0.5 flex flex-col items-center leading-tight">
+          <span class="text-indigo-400">↑ {{ highlightsAbove }}</span>
+          <span class="text-gray-600 text-[8px]">{{ messagesAbove }} msgs</span>
+        </div>
+        
+        <!-- Up button -->
+        <button
+          @click="navigatePrev"
+          :disabled="currentIndex <= 0"
+          class="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+          :class="currentIndex > 0 
+            ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white' 
+            : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
+        
+        <!-- Current highlight type indicator (carousel style) -->
+        <div class="flex flex-col items-center gap-1 py-1">
+          <span class="text-sm">{{ currentHighlightIcon }}</span>
+          <!-- Vertical dot indicators -->
+          <div class="flex flex-col items-center gap-0.5">
+            <template v-for="(_, idx) in Math.min(highlights.length, 5)" :key="idx">
+              <div 
+                v-if="highlights.length <= 5 || isVisibleDotVertical(idx)"
+                class="rounded-full transition-all"
+                :class="getDotClass(idx)"
+              />
+            </template>
+          </div>
+        </div>
+        
+        <!-- Down button -->
+        <button
+          @click="navigateNext"
+          :disabled="currentIndex >= highlights.length - 1"
+          class="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+          :class="currentIndex < highlights.length - 1 
+            ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white' 
+            : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        <!-- Messages below indicator -->
+        <div class="text-[9px] text-gray-500 py-0.5 flex flex-col items-center leading-tight">
+          <span class="text-gray-600 text-[8px]">{{ messagesBelow }} msgs</span>
+          <span class="text-indigo-400">↓ {{ highlightsBelow }}</span>
+        </div>
       </div>
-      
-      <!-- Messages above indicator -->
-      <div class="text-[9px] text-gray-500 py-0.5 flex flex-col items-center leading-tight">
-        <span class="text-indigo-400">↑ {{ highlightsAbove }}</span>
-        <span class="text-gray-600 text-[8px]">{{ messagesAbove }} msgs</span>
-      </div>
-      
-      <!-- Up button -->
-      <button
-        @click="navigatePrev"
-        :disabled="currentIndex <= 0"
-        class="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
-        :class="currentIndex > 0 
-          ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white' 
-          : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-        </svg>
-      </button>
-      
-      <!-- Current highlight type indicator -->
-      <div 
-        class="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
-        :class="currentHighlightClass"
-        :title="currentHighlightTitle"
-      >
-        {{ currentHighlightIcon }}
-      </div>
-      
-      <!-- Down button -->
-      <button
-        @click="navigateNext"
-        :disabled="currentIndex >= highlights.length - 1"
-        class="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
-        :class="currentIndex < highlights.length - 1 
-          ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white' 
-          : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      
-      <!-- Messages below indicator -->
-      <div class="text-[9px] text-gray-500 py-0.5 flex flex-col items-center leading-tight">
-        <span class="text-gray-600 text-[8px]">{{ messagesBelow }} msgs</span>
-        <span class="text-indigo-400">↓ {{ highlightsBelow }}</span>
+    </div>
+    
+    <!-- Mobile: Horizontal bar at bottom -->
+    <div class="lg:hidden fixed bottom-0 left-0 right-0 z-30 safe-area-bottom">
+      <div class="bg-gray-900/95 backdrop-blur-sm border-t border-gray-700/50 px-4 py-2 flex items-center justify-between gap-2">
+        <!-- Left: Previous button with count -->
+        <button
+          @click="navigatePrev"
+          :disabled="currentIndex <= 0"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg transition-all"
+          :class="currentIndex > 0 
+            ? 'bg-gray-800 active:bg-gray-700 text-gray-300' 
+            : 'bg-gray-800/50 text-gray-600'"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          <span class="text-xs text-indigo-400">{{ highlightsAbove }}</span>
+        </button>
+        
+        <!-- Center: Carousel-style indicator -->
+        <div class="flex flex-col items-center gap-1">
+          <div class="flex items-center gap-1.5">
+            <span class="text-sm">{{ currentHighlightIcon }}</span>
+            <span class="text-sm text-gray-300">{{ currentIndex + 1 }}<span class="text-gray-500">/{{ highlights.length }}</span></span>
+          </div>
+          <!-- Dot indicators -->
+          <div class="flex items-center gap-1">
+            <template v-for="(_, idx) in Math.min(highlights.length, 7)" :key="idx">
+              <div 
+                v-if="highlights.length <= 7 || isVisibleDot(idx)"
+                class="rounded-full transition-all"
+                :class="getDotClass(idx)"
+              />
+            </template>
+            <span v-if="highlights.length > 7" class="text-[8px] text-gray-500">...</span>
+          </div>
+        </div>
+        
+        <!-- Right: Next button with count -->
+        <button
+          @click="navigateNext"
+          :disabled="currentIndex >= highlights.length - 1"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg transition-all"
+          :class="currentIndex < highlights.length - 1 
+            ? 'bg-gray-800 active:bg-gray-700 text-gray-300' 
+            : 'bg-gray-800/50 text-gray-600'"
+        >
+          <span class="text-xs text-indigo-400">{{ highlightsBelow }}</span>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
     </div>
   </div>
@@ -177,6 +236,47 @@ const highlightsAbove = computed(() => {
 const highlightsBelow = computed(() => {
   return highlights.value.filter((h, i) => i > currentIndex.value).length
 })
+
+// Dot indicator helpers for carousel view
+function isVisibleDot(idx: number): boolean {
+  // Show dots around current position (horizontal/mobile)
+  const total = highlights.value.length
+  if (total <= 7) return true
+  
+  // Show first, last, and dots near current
+  if (idx === 0 || idx === total - 1) return true
+  if (Math.abs(idx - currentIndex.value) <= 2) return true
+  return false
+}
+
+function isVisibleDotVertical(idx: number): boolean {
+  // Show dots around current position (vertical/desktop - fewer dots)
+  const total = highlights.value.length
+  if (total <= 5) return true
+  
+  // Show dots near current only
+  if (Math.abs(idx - currentIndex.value) <= 2) return true
+  return false
+}
+
+function getDotClass(idx: number): string {
+  const isCurrent = idx === currentIndex.value
+  const highlight = highlights.value[idx]
+  
+  if (isCurrent) {
+    // Current dot is larger and colored by type
+    const typeColors: Record<string, string> = {
+      pinned: 'w-2.5 h-2.5 bg-amber-400',
+      starred: 'w-2.5 h-2.5 bg-yellow-400',
+      commented: 'w-2.5 h-2.5 bg-blue-400',
+      tagged: 'w-2.5 h-2.5 bg-purple-400'
+    }
+    return typeColors[highlight?.type || 'pinned'] || 'w-2.5 h-2.5 bg-gray-400'
+  }
+  
+  // Non-current dots are smaller and dimmer
+  return 'w-1.5 h-1.5 bg-gray-600'
+}
 
 function navigatePrev() {
   if (currentIndex.value > 0) {

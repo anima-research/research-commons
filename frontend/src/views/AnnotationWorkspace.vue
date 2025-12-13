@@ -181,7 +181,7 @@
       <!-- Two-column layout for desktop, single column for mobile -->
       <div class="flex flex-col lg:flex-row">
         <!-- Conversation (full width mobile, 60% desktop) -->
-        <div class="w-full lg:w-[60%] px-6 py-8" ref="conversationContainerEl">
+        <div class="w-full lg:w-[60%] px-6 py-8 pb-20 lg:pb-8" ref="conversationContainerEl">
           <MessageList
             v-if="messages.length > 0"
             :messages="messages"
