@@ -75,7 +75,7 @@
           </span>
         </div>
         <span v-if="props.message.model_info" class="text-xs text-gray-500 font-mono">
-          {{ props.message.model_info.model_id.split('-')[0] }}
+          {{ formatModelName(props.message.model_info.model_id) }}
         </span>
         <div class="flex items-center gap-2 ml-auto">
           <!-- Reaction counts (always visible if reactions exist) -->
@@ -805,6 +805,21 @@ function applyHighlightsToHtml(html: string): string {
 function renderTextWithHighlights(text: string, _blockIndex: number): string {
   const renderedMarkdown = renderMarkdown(text)
   return applyHighlightsToHtml(renderedMarkdown)
+}
+
+// Format model name for display - keep date suffixes (important for sonnet-3.5 versions)
+function formatModelName(modelId: string): string {
+  if (!modelId) return ''
+  
+  // For Claude models, strip the "claude-" prefix but keep everything else
+  // claude-opus-4.5 -> opus-4.5
+  // claude-3-5-sonnet-20241022 -> 3-5-sonnet-20241022
+  // claude-opus-4-5-20251101 -> opus-4-5-20251101
+  if (modelId.startsWith('claude-')) {
+    return modelId.replace('claude-', '')
+  }
+  
+  return modelId
 }
 
 // Get thinking content from various formats
