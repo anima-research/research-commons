@@ -1175,6 +1175,15 @@ function handleTextSelected(messageId: string, text: string, start: number, end:
 async function handleHighlightSelection() {
   if (!pendingTextSelection.value) return
   
+  console.log('[Highlight Create Debug]', {
+    messageId: pendingTextSelection.value.messageId,
+    text: pendingTextSelection.value.text,
+    textCharCodes: [...pendingTextSelection.value.text].map(c => c.charCodeAt(0)),
+    start: pendingTextSelection.value.start,
+    end: pendingTextSelection.value.end,
+    labelWillBe: pendingTextSelection.value.text.substring(0, 100)
+  })
+  
   // Create a highlight-only selection (no tags, no comments)
   try {
     const selection = await submissionsStore.createSelection({

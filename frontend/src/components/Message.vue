@@ -582,8 +582,21 @@ function onTextSelect(event: MouseEvent) {
   const startOffset = content.indexOf(text)
   const endOffset = startOffset + text.length
   
+  console.log('[Selection Debug]', {
+    selectedText: text,
+    selectedTextCharCodes: [...text].map(c => c.charCodeAt(0)),
+    contentLength: content.length,
+    startOffset,
+    endOffset,
+    foundInContent: startOffset !== -1
+  })
+  
   if (startOffset !== -1) {
     emit('text-selected', props.message.id, text, startOffset, endOffset)
+  } else {
+    console.log('[Selection Debug] Text not found in content!')
+    console.log('[Selection Debug] Content preview:', content.substring(0, 200))
+    console.log('[Selection Debug] Content char codes (first 100):', [...content.substring(0, 100)].map(c => c.charCodeAt(0)))
   }
 }
 
@@ -707,6 +720,22 @@ function toggleReaction(reactionType: 'star' | 'laugh' | 'sparkles') {
   emit('toggle-reaction', props.message.id, reactionType)
 }
 
+// Normalize text for comparison (collapse whitespace, normalize quotes/apostrophes)
+function normalizeText(text: string): string {
+  return text
+    .replace(/\s+/g, ' ')
+    .replace(/[''`]/g, "'")  // Normalize apostrophes
+    .replace(/[""]/g, '"')   // Normalize quotes
+    .trim()
+}
+
+// Decode HTML entities for comparison
+function decodeHtmlEntities(text: string): string {
+  const textarea = document.createElement('textarea')
+  textarea.innerHTML = text
+  return textarea.value
+}
+
 // Apply highlights to rendered HTML by finding the label text
 function applyHighlightsToHtml(html: string): string {
   if (!props.selections || props.selections.length === 0) return html
@@ -718,32 +747,98 @@ function applyHighlightsToHtml(html: string): string {
     if (!sel.label) continue
     
     const searchText = sel.label
+    const normalizedSearch = normalizeText(searchText)
     const hasAnnotations = sel.hasComments || sel.hasTags
     const className = hasAnnotations ? 'selection-highlight annotated' : 'selection-highlight'
     
-    // Escape special regex characters in the search text
-    const escapedText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    console.log('[Highlight Debug]', {
+      selectionId: sel.id,
+      rawLabel: searchText,
+      normalizedLabel: normalizedSearch,
+      labelCharCodes: [...searchText].map(c => c.charCodeAt(0))
+    })
     
-    // Find the text outside of HTML tags
-    // Strategy: split by tags, apply highlight to text parts only
+    // Create a flexible regex that matches the text with normalized apostrophes/quotes
+    // Replace apostrophes with a pattern that matches any apostrophe variant OR HTML entities
+    let escapedText = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    // Match apostrophes as: ' or ' or ` or ' or &#39; or &apos;
+    escapedText = escapedText.replace(/'/g, "(?:[''`']|&#39;|&apos;)")
+    // Match quotes as: " or " or " or &#34; or &quot;
+    escapedText = escapedText.replace(/"/g, '(?:["""]|&#34;|&quot;)')
+    escapedText = escapedText.replace(/ /g, '\\s+')    // Flexible whitespace
+    
+    console.log('[Highlight Debug] Escaped pattern:', escapedText)
+    
+    // First try: simple search in text parts (for text within single elements)
     const tagPattern = /(<[^>]+>)/g
     const parts = result.split(tagPattern)
     let found = false
     
+    // Log all text parts (non-tag parts)
+    const textParts = parts.filter(p => !p.startsWith('<'))
+    console.log('[Highlight Debug] Text parts to search:', textParts.map(p => ({
+      text: p.substring(0, 100),
+      charCodes: [...p.substring(0, 50)].map(c => c.charCodeAt(0))
+    })))
+    
     for (let i = 0; i < parts.length && !found; i++) {
-      // Skip tag parts (odd indices after split, or parts that start with <)
       if (parts[i].startsWith('<')) continue
       
-      // Try to find and replace in this text part
-      const textRegex = new RegExp(`(${escapedText})`)
-      if (textRegex.test(parts[i])) {
+      // Try flexible match (regex now handles HTML entities)
+      const textRegex = new RegExp(`(${escapedText})`, 'i')
+      const testResult = textRegex.test(parts[i])
+      console.log(`[Highlight Debug] Testing part ${i}:`, { 
+        partPreview: parts[i].substring(0, 80), 
+        matches: testResult 
+      })
+      
+      if (testResult) {
         parts[i] = parts[i].replace(textRegex, `<mark class="${className}" data-selection-id="${sel.id}">$1</mark>`)
         found = true
+        console.log('[Highlight Debug] Found match in part', i)
       }
     }
     
     if (found) {
       result = parts.join('')
+      continue
+    }
+    
+    console.log('[Highlight Debug] Full match failed, trying progressive substrings')
+    
+    // Second try: progressively shorter substrings until we find a match
+    // Start with full text, then try first 80%, 60%, 40%, 20%
+    const percentages = [0.8, 0.6, 0.4, 0.2]
+    
+    for (const pct of percentages) {
+      if (found) break
+      
+      const substringLen = Math.max(5, Math.floor(normalizedSearch.length * pct))
+      const substring = normalizedSearch.substring(0, substringLen)
+      
+      let subEscaped = substring.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      subEscaped = subEscaped.replace(/'/g, "(?:[''`']|&#39;|&apos;)")
+      subEscaped = subEscaped.replace(/"/g, '(?:["""]|&#34;|&quot;)')
+      subEscaped = subEscaped.replace(/ /g, '\\s+')
+      
+      console.log(`[Highlight Debug] Trying ${pct * 100}%:`, substring)
+      
+      for (let i = 0; i < parts.length && !found; i++) {
+        if (parts[i].startsWith('<')) continue
+        
+        const subRegex = new RegExp(`(${subEscaped})`, 'i')
+        if (subRegex.test(parts[i])) {
+          parts[i] = parts[i].replace(subRegex, `<mark class="${className}" data-selection-id="${sel.id}">$1</mark>`)
+          found = true
+          console.log(`[Highlight Debug] Found ${pct * 100}% match in part`, i)
+        }
+      }
+    }
+    
+    if (found) {
+      result = parts.join('')
+    } else {
+      console.log('[Highlight Debug] NO MATCH FOUND for selection', sel.id)
     }
   }
   
