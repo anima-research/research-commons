@@ -43,45 +43,62 @@
       </header>
 
       <!-- Filters & Search -->
-      <div class="px-6 py-4">
-        <div class="flex gap-2">
+      <div class="px-6 py-3">
+        <div class="flex gap-2 flex-wrap">
+          <!-- Model filter -->
+          <div class="relative">
+            <select
+              v-model="selectedModel"
+              @change="filterConversations"
+              class="px-3 py-1.5 pr-8 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg text-gray-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer"
+            >
+              <option value="">All Models</option>
+              <option v-for="model in availableModels" :key="model" :value="model">
+                {{ model }}
+              </option>
+            </select>
+            <svg class="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+
           <!-- Topic filter -->
           <div class="relative">
             <select
               v-model="selectedTopic"
               @change="filterConversations"
-              class="px-3 py-2 pr-8 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer"
+              class="px-3 py-1.5 pr-8 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg text-gray-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer"
             >
               <option value="">All Topics</option>
               <option v-for="topic in availableTopics" :key="topic" :value="topic">
                 {{ topic }}
               </option>
             </select>
-            <svg class="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
           </div>
 
           <!-- Search -->
-          <div class="flex-1 relative">
-            <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="flex-1 relative min-w-[200px]">
+            <svg class="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
               v-model="searchQuery"
               @input="filterConversations"
               type="text"
-              placeholder="Search conversations..."
-              class="w-full pl-10 pr-4 py-2 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg text-gray-200 text-sm placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="Search..."
+              class="w-full pl-8 pr-3 py-1.5 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg text-gray-200 text-xs placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
           
           <button 
-            v-if="searchQuery || selectedTopic"
+            v-if="searchQuery || selectedTopic || selectedModel"
             @click="clearFilters"
-            class="px-3 py-2 border border-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-800/50 hover:text-gray-200 transition-all flex items-center gap-1.5"
+            class="px-2 py-1.5 border border-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-800/50 hover:text-gray-200 transition-all flex items-center gap-1 text-xs"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
             Clear
@@ -99,102 +116,77 @@
       </div>
 
       <!-- Conversation Cards -->
-      <div v-else class="px-6 pb-8 space-y-1.5">
+      <div v-else class="px-6 pb-8 space-y-1">
         <div
           v-for="submission in submissions"
           :key="submission.id"
           @click="router.push(`/submissions/${submission.id}`)"
           class="group bg-gray-800/40 backdrop-blur-sm rounded border border-gray-700/50 hover:border-indigo-500/30 hover:bg-gray-800/60 transition-all cursor-pointer px-3 py-2"
         >
-          <!-- Responsive layout: 2 rows on mobile, 1 row on desktop -->
-          <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            <!-- Row 1 (mobile) / Left section (desktop): Title + Metadata -->
-            <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-              <!-- Title -->
-              <h3 class="text-sm font-medium text-gray-100 group-hover:text-indigo-300 transition-colors truncate flex-1 min-w-0">
-                {{ submission.title }}
-              </h3>
-              
-              <!-- Metadata -->
-              <div class="flex items-center gap-2 text-[11px] text-gray-500 shrink-0">
-                <span class="hidden sm:inline">{{ formatDate(submission.submitted_at) }}</span>
-                <span class="hidden sm:inline text-gray-700">•</span>
-                <span class="truncate max-w-[100px]">{{ (submission as any).submitter_name || 'Unknown' }}</span>
-              </div>
+          <!-- Two-row dense layout -->
+          <!-- Row 1: Title + Models + Stats -->
+          <div class="flex items-center gap-2">
+            <!-- Title -->
+            <h3 class="text-sm font-medium text-gray-100 group-hover:text-indigo-300 transition-colors truncate flex-1 min-w-0">
+              {{ submission.title }}
+            </h3>
+            
+            <!-- Models (prominent, clickable, with message counts) -->
+            <div class="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+              <button
+                v-for="item in getTopModelsWithCounts(submission)"
+                :key="item.model"
+                @click.stop="filterByModel(item.model)"
+                class="px-2 py-0.5 bg-cyan-500/15 border border-cyan-500/25 text-cyan-300 text-[11px] rounded hover:bg-cyan-500/25 transition-all font-mono whitespace-nowrap flex items-center gap-1"
+              >
+                {{ item.model }}
+                <span class="text-cyan-400/60 text-[9px]">{{ item.count }}</span>
+              </button>
+              <span v-if="(submission.metadata.model_summary?.length || 0) > 2" class="text-[10px] text-gray-500">
+                +{{ (submission.metadata.model_summary?.length || 0) - 2 }}
+              </span>
             </div>
             
-            <!-- Row 2 (mobile) / Right section (desktop): Model, Tags, Stats -->
-            <div class="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
-              <!-- Model & Participants -->
-              <div class="flex items-center gap-2 text-[11px] text-gray-500 shrink-0">
-                <span v-if="submission.metadata.model_summary?.length" class="truncate max-w-[120px]" :title="submission.metadata.model_summary.join(', ')">
-                  {{ submission.metadata.model_summary[0] }}{{ submission.metadata.model_summary.length > 1 ? ` +${submission.metadata.model_summary.length - 1}` : '' }}
-                </span>
-                <span v-if="submission.metadata.participants_summary?.length" class="text-gray-600 hidden sm:inline">
-                  ({{ submission.metadata.participants_summary.length }} participants)
-                </span>
-              </div>
-              
-              <!-- Topic tags (max 2 on mobile, hide on very small) -->
-              <div class="hidden xs:flex items-center gap-1 shrink-0">
-                <button
-                  v-for="tag in submission.metadata.tags?.slice(0, 2)"
-                  :key="tag"
-                  class="px-1.5 py-0.5 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] rounded hover:bg-indigo-500/30 transition-all"
-                  @click.stop
-                >
-                  #{{ tag }}
-                </button>
-                <span v-if="(submission.metadata.tags?.length || 0) > 2" class="text-[10px] text-gray-600">
-                  +{{ (submission.metadata.tags?.length || 0) - 2 }}
-                </span>
-              </div>
-              
-              <!-- Stats pills -->
-              <div class="flex items-center gap-1.5 shrink-0">
-              <!-- Message count -->
-              <div v-if="(submission.metadata as any).message_count" class="px-1.5 py-0.5 bg-gray-700/50 text-gray-400 text-[10px] rounded font-mono flex items-center gap-1">
-                <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
-                </svg>
+            <!-- Stats pills -->
+            <div class="flex items-center gap-1 shrink-0">
+              <div v-if="(submission.metadata as any).message_count" class="px-1 py-0.5 bg-gray-700/50 text-gray-400 text-[9px] rounded font-mono" :title="'Messages'">
                 {{ (submission.metadata as any).message_count }}
               </div>
-              
-              <!-- Rating count -->
-              <div v-if="(submission as any).stats?.rating_count" class="px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] rounded font-mono flex items-center gap-1">
-                <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-                {{ (submission as any).stats.rating_count }}
+              <div v-if="(submission as any).stats?.comment_count" class="px-1 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] rounded font-mono" :title="'Comments'">
+                💬{{ (submission as any).stats.comment_count }}
               </div>
-              
-              <!-- Tag count -->
-              <div v-if="(submission as any).stats?.tag_count" class="px-1.5 py-0.5 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[10px] rounded font-mono flex items-center gap-1">
-                <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                </svg>
-                {{ (submission as any).stats.tag_count }}
-              </div>
-              
-              <!-- Comment count -->
-              <div v-if="(submission as any).stats?.comment_count" class="px-1.5 py-0.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] rounded font-mono flex items-center gap-1">
-                <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
-                </svg>
-                {{ (submission as any).stats.comment_count }}
-              </div>
-              
-              <!-- ARC badge -->
               <span 
                 v-if="submission.source_type === 'arc-certified'"
-                class="px-1.5 py-0.5 bg-green-500/20 border border-green-500/30 text-green-400 text-[10px] rounded flex items-center gap-0.5 font-medium"
+                class="px-1 py-0.5 bg-green-500/20 text-green-400 text-[9px] rounded font-medium"
+                title="ARC Certified"
+              >✓</span>
+            </div>
+            
+            <!-- Date -->
+            <span class="text-[10px] text-gray-500 shrink-0 hidden sm:inline">{{ formatDate(submission.submitted_at) }}</span>
+          </div>
+          
+          <!-- Row 2: Description + Tags -->
+          <div v-if="(submission as any).description || submission.metadata.tags?.length" class="flex items-center gap-2 mt-1">
+            <!-- Description preview -->
+            <p v-if="(submission as any).description" class="text-[11px] text-gray-500 truncate flex-1 min-w-0">
+              {{ truncateDescription((submission as any).description) }}
+            </p>
+            <div v-else class="flex-1"></div>
+            
+            <!-- Topic tags -->
+            <div class="flex items-center gap-1 shrink-0">
+              <button
+                v-for="tag in submission.metadata.tags?.slice(0, 2)"
+                :key="tag"
+                @click.stop="filterByTopic(tag)"
+                class="px-1 py-0.5 bg-indigo-500/15 text-indigo-300 text-[9px] rounded hover:bg-indigo-500/25 transition-all"
               >
-                <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                </svg>
-                ARC
+                #{{ tag }}
+              </button>
+              <span v-if="(submission.metadata.tags?.length || 0) > 2" class="text-[9px] text-gray-600">
+                +{{ (submission.metadata.tags?.length || 0) - 2 }}
               </span>
-              </div>
             </div>
           </div>
         </div>
@@ -256,9 +248,11 @@ function handleNavigate(route: string) {
 
 const searchQuery = ref('')
 const selectedTopic = ref('')
+const selectedModel = ref('')
 const submissions = ref<Submission[]>([])
 const allSubmissions = ref<Submission[]>([])
 const availableTopics = ref<string[]>([])
+const availableModels = ref<string[]>([])
 const loading = ref(false)
 
 onMounted(async () => {
@@ -272,12 +266,15 @@ async function loadSubmissions() {
     allSubmissions.value = response.data.submissions
     submissions.value = response.data.submissions
     
-    // Extract unique topics
+    // Extract unique topics and models
     const topicsSet = new Set<string>()
+    const modelsSet = new Set<string>()
     response.data.submissions.forEach(sub => {
       sub.metadata.tags?.forEach(tag => topicsSet.add(tag))
+      sub.metadata.model_summary?.forEach(model => modelsSet.add(model))
     })
     availableTopics.value = Array.from(topicsSet).sort()
+    availableModels.value = Array.from(modelsSet).sort()
     
     console.log('Loaded conversations:', response.data.submissions.length)
   } catch (error) {
@@ -289,6 +286,13 @@ async function loadSubmissions() {
 
 function filterConversations() {
   let filtered = allSubmissions.value
+  
+  // Filter by model
+  if (selectedModel.value) {
+    filtered = filtered.filter(sub => 
+      sub.metadata.model_summary?.includes(selectedModel.value)
+    )
+  }
   
   // Filter by topic
   if (selectedTopic.value) {
@@ -305,7 +309,10 @@ function filterConversations() {
       if (sub.title.toLowerCase().includes(query)) return true
       
       // Search in description
-      if ((sub.metadata as any).description?.toLowerCase().includes(query)) return true
+      if ((sub as any).description?.toLowerCase().includes(query)) return true
+      
+      // Search in models
+      if (sub.metadata.model_summary?.some(m => m.toLowerCase().includes(query))) return true
       
       return false
     })
@@ -317,7 +324,63 @@ function filterConversations() {
 function clearFilters() {
   searchQuery.value = ''
   selectedTopic.value = ''
+  selectedModel.value = ''
   submissions.value = allSubmissions.value
+}
+
+function filterByModel(model: string) {
+  selectedModel.value = model
+  filterConversations()
+}
+
+function filterByTopic(topic: string) {
+  selectedTopic.value = topic
+  filterConversations()
+}
+
+function getTopModels(submission: Submission): string[] {
+  // Return top 2 models
+  return submission.metadata.model_summary?.slice(0, 2) || []
+}
+
+function getTopModelsWithCounts(submission: Submission): Array<{ model: string; count: number }> {
+  // Use model_counts if available (already sorted by count desc), fallback to model_summary
+  const modelCounts = (submission.metadata as any).model_counts as Array<{ model: string; count: number }> | undefined
+  if (modelCounts) {
+    return modelCounts.slice(0, 2)
+  }
+  // Fallback: just return names with count 0
+  return (submission.metadata.model_summary?.slice(0, 2) || []).map(m => ({ model: m, count: 0 }))
+}
+
+function shortenModel(model: string): string {
+  // Shorten common model names for display
+  if (model.length <= 12) return model
+  
+  // Common patterns
+  const patterns: Record<string, string> = {
+    'claude-3-opus': 'opus',
+    'claude-3-sonnet': 'sonnet',
+    'claude-3-haiku': 'haiku',
+    'claude-3.5-sonnet': 'sonnet-3.5',
+    'claude-3.5-haiku': 'haiku-3.5',
+    'gpt-4-turbo': 'gpt4t',
+    'gpt-4o': 'gpt4o',
+    'gpt-4': 'gpt4',
+    'gpt-3.5-turbo': 'gpt3.5',
+  }
+  
+  for (const [pattern, short] of Object.entries(patterns)) {
+    if (model.toLowerCase().includes(pattern)) return short
+  }
+  
+  // Fallback: first 10 chars
+  return model.substring(0, 10) + '…'
+}
+
+function truncateDescription(desc: string): string {
+  if (desc.length <= 80) return desc
+  return desc.substring(0, 77) + '...'
 }
 
 function formatDate(date: string) {

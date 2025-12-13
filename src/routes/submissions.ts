@@ -35,8 +35,53 @@ export function createSubmissionRoutes(context: AppContext): Router {
           const submitter = await context.userStore.getUserById(sub.submitter_id);
           const submitterName = submitter?.name || 'Unknown';
           
+          // Compute model_summary and participants_summary if not already set
+          let enhancedMetadata = { ...sub.metadata };
+          if (!enhancedMetadata.model_summary || !enhancedMetadata.participants_summary) {
+            try {
+              const messages = await context.submissionStore.getMessages(sub.id);
+              
+              // Extract unique participants
+              const participantCounts = new Map<string, number>();
+              const modelCounts = new Map<string, number>();
+              
+              for (const msg of messages) {
+                // Count participants
+                const name = msg.participant_name;
+                participantCounts.set(name, (participantCounts.get(name) || 0) + 1);
+                
+                // Count models (from model_info if present)
+                if (msg.model_info?.model_id) {
+                  const model = msg.model_info.model_id;
+                  modelCounts.set(model, (modelCounts.get(model) || 0) + 1);
+                }
+              }
+              
+              // Sort by message count, take top entries
+              const sortedParticipants = [...participantCounts.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .map(([name]) => name);
+              
+              const sortedModels = [...modelCounts.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .map(([model, count]) => ({ model, count }));
+              
+              if (!enhancedMetadata.participants_summary && sortedParticipants.length > 0) {
+                enhancedMetadata.participants_summary = sortedParticipants;
+              }
+              if (sortedModels.length > 0) {
+                // Store both the list and the counts
+                enhancedMetadata.model_summary = sortedModels.map(m => m.model);
+                enhancedMetadata.model_counts = sortedModels;
+              }
+            } catch (msgErr) {
+              // Ignore errors loading messages
+            }
+          }
+          
           return {
             ...sub,
+            metadata: enhancedMetadata,
             submitter_name: submitterName,
             stats: {
               tag_count: tagCount,
