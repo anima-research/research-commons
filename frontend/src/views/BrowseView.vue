@@ -131,8 +131,9 @@
                 :key="item.model"
                 @click.stop="filterByModel(item.model)"
                 class="px-2 py-0.5 bg-cyan-500/15 border border-cyan-500/25 text-cyan-300 text-[11px] rounded hover:bg-cyan-500/25 transition-all font-mono whitespace-nowrap flex items-center gap-1"
+                :title="item.model"
               >
-                {{ item.model }}
+                {{ formatModelPill(item.model) }}
                 <span class="text-cyan-400/60 text-[9px]">{{ item.count }}</span>
               </button>
               <span v-if="(submission.metadata.model_summary?.length || 0) > 2" class="text-[10px] text-gray-500">
@@ -398,6 +399,39 @@ function getTopModelsWithCounts(submission: Submission): Array<{ model: string; 
   }
   // Fallback: just return names with count 0
   return (submission.metadata.model_summary?.slice(0, 2) || []).map(m => ({ model: m, count: 0 }))
+}
+
+// Format model name for compact pill display
+function formatModelPill(modelId: string): string {
+  if (!modelId) return ''
+  
+  let name = modelId
+  
+  // Strip provider prefixes like google/, openai/, anthropic/
+  if (name.includes('/')) {
+    name = name.split('/').pop() || name
+  }
+  
+  // Strip claude- prefix
+  if (name.startsWith('claude-')) {
+    name = name.replace('claude-', '')
+  }
+  
+  // For dated models like 3-5-sonnet-20241022, show 3.5-sonnet-1022 (month-day)
+  const dateMatch = name.match(/-(\d{4})(\d{2})(\d{2})$/)
+  if (dateMatch) {
+    const monthDay = dateMatch[2] + dateMatch[3] // e.g., "1022"
+    name = name.replace(/-\d{8}$/, '-' + monthDay)
+  }
+  
+  // For models like opus-4-5, show opus-4.5 (only when followed by non-digit or end)
+  // Match: opus-4-5, sonnet-3-5, but not 3-5-sonnet
+  name = name.replace(/^([a-z]+)-(\d+)-(\d+)/, '$1-$2.$3')
+  
+  // For models like 3-5-sonnet, show 3.5-sonnet
+  name = name.replace(/^(\d+)-(\d+)-/, '$1.$2-')
+  
+  return name
 }
 
 function truncateDescription(desc: string): string {
