@@ -1153,9 +1153,25 @@ async function parseJSON() {
         // Store mapping of branch ID to our message ID
         branchToMessageId.set(activeBranch.id, messageId)
         
-        // Extract content blocks from branch content
+        // Extract content blocks from branch
+        // ARC format has contentBlocks array with thinking/text blocks
         let contentBlocks = []
-        if (typeof activeBranch.content === 'string') {
+        if (activeBranch.contentBlocks && Array.isArray(activeBranch.contentBlocks)) {
+          // Transform ARC contentBlocks format to our format
+          contentBlocks = activeBranch.contentBlocks.map((block: any) => {
+            if (block.type === 'thinking') {
+              // ARC has thinking as a direct string, we need { content, signature }
+              return {
+                type: 'thinking',
+                thinking: {
+                  content: block.thinking,
+                  signature: block.signature
+                }
+              }
+            }
+            return block
+          })
+        } else if (typeof activeBranch.content === 'string') {
           contentBlocks = [{ type: 'text', text: activeBranch.content }]
         } else if (Array.isArray(activeBranch.content)) {
           contentBlocks = activeBranch.content

@@ -14,8 +14,10 @@ export const ImageContentBlockSchema = z.object({
 
 export const ThinkingContentBlockSchema = z.object({
   type: z.literal('thinking'),
-  content: z.string(),
-  signature: z.string().optional()
+  thinking: z.object({
+    content: z.string(),
+    signature: z.string().optional()
+  })
 });
 
 export const FileAttachmentBlockSchema = z.object({

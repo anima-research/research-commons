@@ -142,9 +142,26 @@
               alt="Discord attachment"
             />
           </div>
-          <div v-else-if="block.type === 'thinking'" class="mt-3 p-3 bg-gray-900/50 border border-gray-700/50 rounded text-xs">
-            <div class="text-gray-500 mb-1 uppercase tracking-wide">Thinking</div>
-            <div class="text-gray-400" v-html="renderMarkdown(block.thinking?.content || '')" />
+          <div v-else-if="block.type === 'thinking'" class="mt-2 mb-2">
+            <details class="group thinking-block" :open="thinkingOpenByDefault">
+              <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+                <div class="flex items-start gap-2 p-2 rounded-lg bg-amber-950/20 border border-amber-900/30 hover:bg-amber-950/30 transition-colors">
+                  <svg class="w-3 h-3 mt-0.5 text-amber-600/70 transition-transform group-open:rotate-90 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <div class="flex-1 min-w-0">
+                    <span class="text-[10px] uppercase tracking-wide font-medium text-amber-600/70">Thinking</span>
+                    <!-- Preview: hidden when open -->
+                    <div class="text-[11px] text-amber-200/60 leading-relaxed mt-0.5 line-clamp-4 group-open:hidden">{{ getThinkingPreview(block, 4) }}</div>
+                    <!-- Expanded label: shown when open -->
+                    <div class="text-[10px] text-amber-500/50 mt-0.5 hidden group-open:block">Click to collapse</div>
+                  </div>
+                </div>
+              </summary>
+              <div class="p-3 bg-amber-950/15 border border-amber-900/20 border-t-0 rounded-b-lg -mt-1">
+                <div class="text-[11px] text-amber-100/70 leading-relaxed thinking-content" v-html="renderMarkdown(getThinkingContent(block))" />
+              </div>
+            </details>
           </div>
         </template>
       </div>
@@ -567,6 +584,11 @@ const hasReactions = computed(() => {
   return props.reactions && props.reactions.length > 0
 })
 
+// Thinking blocks should be open by default if message is pinned, has reactions, or has annotations
+const thinkingOpenByDefault = computed(() => {
+  return props.isPinned || props.hasAnnotation || (props.reactions && props.reactions.length > 0)
+})
+
 function getReactionEmoji(reactionType: string): string {
   const emojis = {
     star: '⭐',
@@ -608,6 +630,36 @@ function toggleReaction(reactionType: 'star' | 'laugh' | 'sparkles') {
   emit('toggle-reaction', props.message.id, reactionType)
 }
 
+// Get thinking content from various formats
+function getThinkingContent(block: any): string {
+  // Handle nested object format: { thinking: { content: "..." } }
+  if (block.thinking?.content) {
+    return block.thinking.content
+  }
+  // Handle direct string format: { thinking: "..." }
+  if (typeof block.thinking === 'string') {
+    return block.thinking
+  }
+  return ''
+}
+
+// Get preview of thinking for collapsed view
+function getThinkingPreview(block: any, lines: number = 4): string {
+  const content = getThinkingContent(block)
+  if (!content) return ''
+  
+  // Get first N non-empty lines
+  const allLines = content.split('\n').filter(l => l.trim())
+  const previewLines = allLines.slice(0, lines)
+  const preview = previewLines.join('\n')
+  
+  // Add ellipsis if there's more content
+  if (allLines.length > lines) {
+    return preview + '...'
+  }
+  return preview
+}
+
 function formatTime(timestamp?: string) {
   if (!timestamp) return ''
   const date = new Date(timestamp)
@@ -630,6 +682,31 @@ function formatTime(timestamp?: string) {
 
 .prose :deep(pre) {
   @apply bg-gray-900/50 p-3 rounded overflow-x-auto;
+}
+
+/* Thinking block styles */
+.thinking-content :deep(p) {
+  @apply my-1 text-[11px] leading-relaxed;
+}
+
+.thinking-content :deep(ul), .thinking-content :deep(ol) {
+  @apply my-1 text-[11px];
+}
+
+.thinking-content :deep(li) {
+  @apply my-0.5;
+}
+
+.thinking-content :deep(strong) {
+  @apply text-amber-200/80;
+}
+
+.thinking-content :deep(code) {
+  @apply bg-amber-900/30 px-1 py-0.5 rounded text-amber-200/70 text-[10px];
+}
+
+.thinking-content :deep(pre) {
+  @apply bg-amber-900/20 p-2 rounded text-[10px];
 }
 
 .prose :deep(ul), .prose :deep(ol) {
