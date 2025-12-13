@@ -58,22 +58,6 @@
         <span class="text-gray-600 text-[8px]">{{ messagesBelow }} msgs</span>
         <span class="text-indigo-400">↓ {{ highlightsBelow }}</span>
       </div>
-      
-      <!-- Filter buttons -->
-      <div class="border-t border-gray-700/50 pt-2 mt-1 flex flex-col gap-1">
-        <button
-          v-for="filter in availableFilters"
-          :key="filter.type"
-          @click="toggleFilter(filter.type)"
-          class="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all"
-          :class="activeFilters.has(filter.type) 
-            ? filter.activeClass 
-            : 'bg-gray-800/50 text-gray-500 hover:bg-gray-800 hover:text-gray-400'"
-          :title="`${filter.label} (${filter.count})`"
-        >
-          {{ filter.icon }}
-        </button>
-      </div>
     </div>
   </div>
 </template>
@@ -153,23 +137,6 @@ const highlights = computed<Highlight[]>(() => {
   return allHighlights.value.filter(h => activeFilters.value.has(h.type))
 })
 
-// Available filter buttons
-const availableFilters = computed(() => {
-  const counts = {
-    pinned: allHighlights.value.filter(h => h.type === 'pinned').length,
-    starred: allHighlights.value.filter(h => h.type === 'starred').length,
-    commented: allHighlights.value.filter(h => h.type === 'commented').length,
-    tagged: allHighlights.value.filter(h => h.type === 'tagged').length
-  }
-  
-  return [
-    { type: 'pinned', icon: '📌', label: 'Pinned', count: counts.pinned, activeClass: 'bg-amber-500/20 text-amber-400' },
-    { type: 'starred', icon: '⭐', label: 'Starred', count: counts.starred, activeClass: 'bg-yellow-500/20 text-yellow-400' },
-    { type: 'commented', icon: '💬', label: 'Comments', count: counts.commented, activeClass: 'bg-blue-500/20 text-blue-400' },
-    { type: 'tagged', icon: '🏷️', label: 'Tags', count: counts.tagged, activeClass: 'bg-purple-500/20 text-purple-400' }
-  ].filter(f => f.count > 0)
-})
-
 // Current highlight info
 const currentHighlight = computed(() => highlights.value[currentIndex.value])
 
@@ -226,20 +193,6 @@ function navigateNext() {
 }
 
 let navigationTimeout: number | null = null
-
-function toggleFilter(type: string) {
-  if (activeFilters.value.has(type)) {
-    activeFilters.value.delete(type)
-  } else {
-    activeFilters.value.add(type)
-  }
-  activeFilters.value = new Set(activeFilters.value)
-  
-  // Reset index if current is out of bounds
-  if (currentIndex.value >= highlights.value.length) {
-    currentIndex.value = Math.max(0, highlights.value.length - 1)
-  }
-}
 
 function scrollToCurrentHighlight() {
   const highlight = highlights.value[currentIndex.value]
