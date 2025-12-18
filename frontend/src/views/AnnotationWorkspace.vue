@@ -115,6 +115,11 @@
               <span class="text-blue-400">💬{{ totalCommentCount }}</span>
             </template>
           </div>
+          <!-- Row 3: Credits -->
+          <div class="text-[10px] text-gray-500">
+            Research & data: <a href="https://vgel.me/" target="_blank" class="text-indigo-400">Theia Vogel</a>
+            · Visualization: <a href="https://animalabs.ai" target="_blank" class="text-indigo-400">Antra Tessera</a>
+          </div>
         </div>
 
         <!-- Desktop layout: single row -->
@@ -163,6 +168,11 @@
             <span class="text-xs text-gray-400 opacity-60">by {{ submitterName }}</span>
             <span class="text-xs text-gray-500 opacity-50">•</span>
             <span class="text-xs text-gray-400 opacity-60">{{ formatDate(submission?.submitted_at) }}</span>
+            <span class="text-xs text-gray-500 opacity-50">•</span>
+            <span class="text-xs text-gray-500 opacity-60">
+              Research & data: <a href="https://vgel.me/" target="_blank" class="text-indigo-400 hover:text-indigo-300 transition-colors">Theia Vogel</a>
+              · Visualization: <a href="https://animalabs.ai" target="_blank" class="text-indigo-400 hover:text-indigo-300 transition-colors">Antra Tessera</a>
+            </span>
           </div>
           
           <!-- Topic tags inline -->
@@ -177,14 +187,18 @@
             </button>
           </div>
           
-          <!-- Stats pills -->
-          <div class="flex items-center gap-2">
+          <!-- Stats pills (clickable to see charts) -->
+          <div 
+            v-if="systemRatingAverages.length > 0 || tagStats.length > 0"
+            class="flex items-center gap-2 cursor-pointer group"
+            @click="showStatsDetail = true"
+            title="Click to see detailed charts"
+          >
             <!-- Per-system rating averages -->
             <div
               v-for="sysRating in systemRatingAverages"
               :key="sysRating.system_id"
-              class="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-full font-mono flex items-center gap-1"
-              :title="`${sysRating.system_name}: ${sysRating.avg.toFixed(1)}/${sysRating.max} (${sysRating.count} ratings)`"
+              class="px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-full font-mono flex items-center gap-1 group-hover:bg-amber-500/20 transition-colors"
             >
               <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -192,18 +206,21 @@
               <span class="uppercase">{{ abbreviate(sysRating.system_name) }}</span>
               <span class="font-semibold">{{ sysRating.avg.toFixed(1) }}</span>
             </div>
-            <div v-if="tagStats.length > 0" class="px-2 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs rounded-full font-mono flex items-center gap-1">
+            <div v-if="tagStats.length > 0" class="px-2 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs rounded-full font-mono flex items-center gap-1 group-hover:bg-purple-500/20 transition-colors">
               <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
               </svg>
               {{ tagStats.length }}
             </div>
-            <div v-if="totalCommentCount > 0" class="px-2 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs rounded-full font-mono flex items-center gap-1">
-              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
-              </svg>
-              {{ totalCommentCount }}
-            </div>
+            <!-- Hint text -->
+            <span class="text-[10px] text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">click for charts</span>
+          </div>
+          <!-- Comment count (not part of stats modal) -->
+          <div v-if="totalCommentCount > 0" class="px-2 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs rounded-full font-mono flex items-center gap-1">
+            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
+            </svg>
+            {{ totalCommentCount }}
           </div>
           
           <!-- Actions -->
