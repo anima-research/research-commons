@@ -115,11 +115,6 @@
               <span class="text-blue-400">💬{{ totalCommentCount }}</span>
             </template>
           </div>
-          <!-- Row 3: Credits -->
-          <div class="text-[10px] text-gray-500">
-            Research & data: <a href="https://vgel.me/" target="_blank" class="text-indigo-400">Theia Vogel</a>
-            · Visualization: <a href="https://animalabs.ai" target="_blank" class="text-indigo-400">Antra Tessera</a>
-          </div>
         </div>
 
         <!-- Desktop layout: single row -->
@@ -168,11 +163,6 @@
             <span class="text-xs text-gray-400 opacity-60">by {{ submitterName }}</span>
             <span class="text-xs text-gray-500 opacity-50">•</span>
             <span class="text-xs text-gray-400 opacity-60">{{ formatDate(submission?.submitted_at) }}</span>
-            <span class="text-xs text-gray-500 opacity-50">•</span>
-            <span class="text-xs text-gray-500 opacity-60">
-              Research & data: <a href="https://vgel.me/" target="_blank" class="text-indigo-400 hover:text-indigo-300 transition-colors">Theia Vogel</a>
-              · Visualization: <a href="https://animalabs.ai" target="_blank" class="text-indigo-400 hover:text-indigo-300 transition-colors">Antra Tessera</a>
-            </span>
           </div>
           
           <!-- Topic tags inline -->
