@@ -72,6 +72,25 @@
             @update:model-value="filterConversations"
           />
 
+          <!-- Visibility filter -->
+          <div class="relative">
+            <select
+              v-model="selectedVisibility"
+              @change="filterConversations"
+              class="appearance-none px-3 py-1.5 pr-7 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer min-w-[100px]"
+              :class="selectedVisibility ? 'text-gray-200' : 'text-gray-400'"
+            >
+              <option value="" class="bg-gray-800 text-gray-400">All Visibility</option>
+              <option value="public" class="bg-gray-800 text-gray-200">🌐 Public</option>
+              <option value="researcher" class="bg-gray-800 text-gray-200">🔬 Researchers</option>
+              <option value="unlisted" class="bg-gray-800 text-gray-200">🔗 Unlisted</option>
+              <option value="private" class="bg-gray-800 text-gray-200">🔒 Private</option>
+            </select>
+            <svg class="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+
           <!-- Search -->
           <div class="flex-1 relative min-w-[150px]">
             <svg class="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,6 +162,24 @@
             
             <!-- Stats pills -->
             <div class="flex items-center gap-1 shrink-0">
+              <!-- Visibility badge -->
+              <span 
+                v-if="submission.visibility === 'researcher'"
+                class="px-1 py-0.5 bg-purple-500/20 text-purple-400 text-[9px] rounded font-medium"
+                title="Visible to researchers only"
+              >🔬</span>
+              <span 
+                v-else-if="submission.visibility === 'unlisted'"
+                class="px-1 py-0.5 bg-yellow-500/20 text-yellow-400 text-[9px] rounded font-medium"
+                title="Unlisted - direct link only"
+              >🔗</span>
+              <span 
+                v-else-if="submission.visibility === 'private'"
+                class="px-1 py-0.5 bg-red-500/20 text-red-400 text-[9px] rounded font-medium"
+                title="Private - only you and admins"
+              >🔒</span>
+              <!-- No badge for public - it's the default expectation -->
+              
               <div v-if="(submission.metadata as any).message_count" class="px-1 py-0.5 bg-gray-700/50 text-gray-400 text-[9px] rounded font-mono" :title="'Messages'">
                 {{ (submission.metadata as any).message_count }}
               </div>
@@ -250,6 +287,7 @@ const searchQuery = ref('')
 const selectedTopics = ref<string[]>([])
 const selectedModels = ref<string[]>([])
 const selectedUsers = ref<string[]>([])
+const selectedVisibility = ref('')
 const submissions = ref<Submission[]>([])
 const allSubmissions = ref<Submission[]>([])
 const availableTopics = ref<Array<{ value: string; label: string }>>([])
@@ -319,7 +357,7 @@ async function loadSubmissions() {
 }
 
 const hasActiveFilters = computed(() => 
-  searchQuery.value || selectedTopics.value.length > 0 || selectedModels.value.length > 0 || selectedUsers.value.length > 0
+  searchQuery.value || selectedTopics.value.length > 0 || selectedModels.value.length > 0 || selectedUsers.value.length > 0 || selectedVisibility.value
 )
 
 function filterConversations() {
@@ -343,6 +381,13 @@ function filterConversations() {
   if (selectedUsers.value.length > 0) {
     filtered = filtered.filter(sub => 
       selectedUsers.value.includes(sub.submitter_id)
+    )
+  }
+  
+  // Filter by visibility
+  if (selectedVisibility.value) {
+    filtered = filtered.filter(sub => 
+      (sub.visibility || 'public') === selectedVisibility.value
     )
   }
   
@@ -374,6 +419,7 @@ function clearFilters() {
   selectedTopics.value = []
   selectedModels.value = []
   selectedUsers.value = []
+  selectedVisibility.value = ''
   submissions.value = allSubmissions.value
 }
 

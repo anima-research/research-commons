@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { ShardedEventStore, EventStore, Event } from './event-store.js';
-import { Submission, Message } from '../types/submission.js';
+import { Submission, Message, Visibility } from '../types/submission.js';
 import { Rating } from '../types/annotation.js';
 
 /**
@@ -51,13 +51,15 @@ export class SubmissionStore {
     sourceType: Submission['source_type'],
     messages: Message[],
     metadata?: Submission['metadata'],
-    certificationData?: Submission['certification_data']
+    certificationData?: Submission['certification_data'],
+    visibility: Visibility = 'researcher'
   ): Promise<Submission> {
     const submission: Submission = {
       id: uuidv4(),
       title,
       submitter_id: submitterId,
       source_type: sourceType,
+      visibility,
       certification_data: certificationData,
       metadata: metadata || {},
       submitted_at: new Date()

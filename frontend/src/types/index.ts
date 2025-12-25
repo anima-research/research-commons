@@ -38,11 +38,14 @@ export interface Message {
   hidden_from_models?: boolean // Message excluded from AI model context
 }
 
+export type Visibility = 'public' | 'unlisted' | 'researcher' | 'private'
+
 export interface Submission {
   id: string
   title: string
   submitter_id: string
   source_type: 'arc-certified' | 'json-upload' | 'discord' | 'other'
+  visibility?: Visibility
   certification_data?: {
     arc_conversation_id?: string
     signature_hash?: string
