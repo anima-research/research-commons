@@ -87,12 +87,17 @@ export const CertificationDataSchema = z.object({
 
 export type CertificationData = z.infer<typeof CertificationDataSchema>;
 
+// Visibility levels for submissions
+export const VisibilitySchema = z.enum(['public', 'unlisted', 'researcher', 'private']);
+export type Visibility = z.infer<typeof VisibilitySchema>;
+
 // Submission metadata
 export const SubmissionSchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
   submitter_id: z.string().uuid(),
   source_type: z.enum(['arc-certified', 'json-upload', 'discord', 'other']),
+  visibility: VisibilitySchema.default('researcher'),
   certification_data: CertificationDataSchema.optional(),
   metadata: z.object({
     original_date: z.date().optional(),
@@ -126,6 +131,7 @@ export const CreateMessageRequestSchema = z.object({
 export const CreateSubmissionRequestSchema = z.object({
   title: z.string(),
   source_type: z.enum(['arc-certified', 'json-upload', 'discord', 'other']),
+  visibility: VisibilitySchema.optional(), // defaults to 'researcher' in store
   arc_conversation_id: z.string().optional(),
   messages: z.array(CreateMessageRequestSchema),
   metadata: z.record(z.unknown()).optional()

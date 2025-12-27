@@ -11,7 +11,48 @@ export function createSubmissionRoutes(context: AppContext): Router {
   // List submissions
   router.get('/', async (req, res) => {
     try {
-      const submissions = await context.submissionStore.listSubmissions();
+      const allSubmissions = await context.submissionStore.listSubmissions();
+      
+      // Parse optional auth to determine visibility access
+      const authHeader = req.headers.authorization;
+      let userId: string | undefined;
+      let userRoles: string[] = [];
+      
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET) as any;
+          userId = decoded.userId;
+          userRoles = decoded.roles || [];
+        } catch (err) {
+          // Invalid token - treat as guest
+        }
+      }
+      
+      const isResearcher = userRoles.includes('researcher') || userRoles.includes('admin');
+      
+      // Filter by visibility
+      const submissions = allSubmissions.filter(sub => {
+        const visibility = sub.visibility || 'public'; // Default for legacy submissions
+        
+        // Public: everyone can see
+        if (visibility === 'public') return true;
+        
+        // Unlisted: never appears in listings (accessible via direct link only)
+        if (visibility === 'unlisted') return false;
+        
+        // Private: only owner and admins
+        if (visibility === 'private') {
+          return userId === sub.submitter_id || userRoles.includes('admin');
+        }
+        
+        // Researcher: researchers, admins, and owner
+        if (visibility === 'researcher') {
+          return isResearcher || userId === sub.submitter_id;
+        }
+        
+        return false;
+      });
       
       // Enhance each submission with stats and submitter name
       const submissionsWithStats = await Promise.all(submissions.map(async sub => {
@@ -139,7 +180,8 @@ export function createSubmissionRoutes(context: AppContext): Router {
         data.arc_conversation_id ? {
           arc_conversation_id: data.arc_conversation_id
           // TODO: Fetch certification from ARC API
-        } : undefined
+        } : undefined,
+        data.visibility || 'researcher'
       );
 
       // Don't attach anything at creation - will be dynamically looked up from topics
@@ -215,6 +257,44 @@ export function createSubmissionRoutes(context: AppContext): Router {
       
       if (!submission) {
         res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Check visibility access
+      const authHeader = req.headers.authorization;
+      let userId: string | undefined;
+      let userRoles: string[] = [];
+      
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET) as any;
+          userId = decoded.userId;
+          userRoles = decoded.roles || [];
+        } catch (err) {
+          // Invalid token - treat as guest
+        }
+      }
+      
+      const visibility = submission.visibility || 'public';
+      const isResearcher = userRoles.includes('researcher') || userRoles.includes('admin');
+      const isOwner = userId === submission.submitter_id;
+      
+      let hasAccess = false;
+      
+      if (visibility === 'public' || visibility === 'unlisted') {
+        // Public and unlisted are accessible to anyone (unlisted just doesn't appear in listings)
+        hasAccess = true;
+      } else if (visibility === 'private') {
+        // Private: only owner and admins
+        hasAccess = isOwner || userRoles.includes('admin');
+      } else if (visibility === 'researcher') {
+        // Researcher: researchers, admins, and owner
+        hasAccess = isResearcher || isOwner;
+      }
+      
+      if (!hasAccess) {
+        res.status(403).json({ error: 'You do not have access to this submission' });
         return;
       }
 
@@ -325,11 +405,14 @@ export function createSubmissionRoutes(context: AppContext): Router {
 
       // Check permissions
       const user = await context.userStore.getUserById(req.userId!);
-      const canEdit = submission.submitter_id === req.userId! || 
-                      user?.roles.includes('researcher') ||
-                      user?.roles.includes('admin');
+      const isOwner = submission.submitter_id === req.userId!;
+      const isAdmin = user?.roles.includes('admin');
+      const isResearcher = user?.roles.includes('researcher');
       
-      if (!canEdit) {
+      const canEditMetadata = isOwner || isResearcher || isAdmin;
+      const canEditVisibility = isOwner || isAdmin; // Only owner + admin can change visibility
+      
+      if (!canEditMetadata) {
         res.status(403).json({ error: 'Not authorized to edit this submission' });
         return;
       }
@@ -339,6 +422,20 @@ export function createSubmissionRoutes(context: AppContext): Router {
       // Update title
       if (req.body.title !== undefined) {
         submission.title = req.body.title;
+      }
+      
+      // Update visibility (only owner + admin)
+      if (req.body.visibility !== undefined) {
+        if (!canEditVisibility) {
+          res.status(403).json({ error: 'Only the owner or admin can change visibility' });
+          return;
+        }
+        const validVisibilities = ['public', 'unlisted', 'researcher', 'private'];
+        if (!validVisibilities.includes(req.body.visibility)) {
+          res.status(400).json({ error: 'Invalid visibility value' });
+          return;
+        }
+        submission.visibility = req.body.visibility;
       }
       
       // Update metadata

@@ -264,6 +264,35 @@
 
           <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Visibility
+            </label>
+            <select
+              v-model="visibility"
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 transition-colors"
+            >
+              <option value="researcher">🔬 Researchers Only — visible to verified researchers</option>
+              <option value="public">🌐 Public — visible to everyone</option>
+              <option value="unlisted">🔗 Unlisted — accessible via direct link only</option>
+              <option value="private">🔒 Private — only you and admins</option>
+            </select>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <span v-if="visibility === 'researcher'">
+                Recommended for sensitive conversations. You can make it public later.
+              </span>
+              <span v-else-if="visibility === 'public'">
+                Anyone can find and view this conversation.
+              </span>
+              <span v-else-if="visibility === 'unlisted'">
+                Won't appear in browse listings, but anyone with the link can view it.
+              </span>
+              <span v-else-if="visibility === 'private'">
+                Only you and platform admins can see this conversation.
+              </span>
+            </p>
+          </div>
+
+          <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Identify Participants
               <span class="text-xs text-gray-500 dark:text-gray-400 font-normal ml-2">
                 (Map each participant to a model or mark as human)
@@ -688,6 +717,7 @@ function resetToUpload() {
   step.value = 'upload'
   title.value = ''
   description.value = ''
+  visibility.value = 'researcher'
   selectedTopics.value = []
   participantMapping.value = {}
   previewMessages.value = []
@@ -699,6 +729,7 @@ function resetToUpload() {
 const title = ref('')
 const description = ref('')
 const sourceType = ref<'json-upload' | 'arc-certified' | 'discord' | 'other'>('json-upload')
+const visibility = ref<'public' | 'unlisted' | 'researcher' | 'private'>('researcher')
 const selectedTopics = ref<string[]>([])
 const availableTopics = ref<any[]>([])
 const availableModels = ref<any[]>([])
@@ -1477,6 +1508,7 @@ async function submit() {
     const response = await submissionsAPI.create({
       title: title.value,
       source_type: sourceType.value,
+      visibility: visibility.value,
       messages: updatedMessages,
       metadata: {
         tags: selectedTopics.value,

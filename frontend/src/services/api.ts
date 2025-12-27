@@ -132,7 +132,7 @@ export const submissionsAPI = {
   get: (id: string) =>
     api.get<Submission>(`/submissions/${id}`),
   
-  update: (id: string, updates: { title?: string; description?: string; tags?: string[] }) =>
+  update: (id: string, updates: { title?: string; description?: string; tags?: string[]; visibility?: 'public' | 'unlisted' | 'researcher' | 'private' }) =>
     api.patch<Submission>(`/submissions/${id}`, updates),
   
   delete: (id: string) =>
