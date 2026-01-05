@@ -188,7 +188,11 @@ export function createOgMiddleware(context: AppContext) {
         : 'A conversation on Research Commons';
       
       const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
-      const baseUrl = process.env.BASE_URL || `${protocol}://${req.headers.host}`;
+      let baseUrl = process.env.BASE_URL || `${protocol}://${req.headers.host}`;
+      // Ensure baseUrl has protocol
+      if (baseUrl && !baseUrl.startsWith('http')) {
+        baseUrl = `https://${baseUrl}`;
+      }
       const url = `${baseUrl}/submissions/${submissionId}`;
       const imageUrl = `${baseUrl}/api/og-image/${submissionId}`;
 
