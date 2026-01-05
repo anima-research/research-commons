@@ -36,7 +36,7 @@
               to="/submit" 
               class="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-xl font-medium text-sm shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
             >
-              <span class="mr-1.5">+</span> New Conversation
+              <span class="mr-1.5">+</span> New Submission
             </router-link>
           </div>
         </div>

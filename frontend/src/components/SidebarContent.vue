@@ -69,7 +69,7 @@
         <div class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2">Actions</div>
         <NavItem 
           icon-path="M12 4v16m8-8H4" 
-          label="New Conversation" 
+          label="New Submission" 
           route="/submit" 
           :active="isActive('/submit')"
           highlight

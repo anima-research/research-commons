@@ -21,6 +21,7 @@ import { createModelRoutes } from './routes/models.js';
 import { createAdminRoutes } from './routes/admin.js';
 import { createImportRoutes } from './routes/imports.js';
 import { createDiscordPreviewRoutes } from './routes/discord-preview.js';
+import { createOgMetaRoutes, createOgMiddleware } from './routes/og-meta.js';
 import { EmailService } from './services/email-service.js';
 
 dotenv.config();
@@ -245,6 +246,10 @@ async function main() {
   app.use('/api/admin', createAdminRoutes(context));
   app.use('/api/imports', createImportRoutes(context));
   app.use('/api/discord-preview', createDiscordPreviewRoutes(context));
+  app.use('/api', createOgMetaRoutes(context));
+
+  // OG meta middleware for social media crawlers (must be before SPA fallback)
+  app.use(createOgMiddleware(context));
 
   // Serve frontend in production
   if (process.env.NODE_ENV === 'production') {
