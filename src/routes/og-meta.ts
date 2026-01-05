@@ -149,13 +149,14 @@ export function createOgMetaRoutes(context: AppContext): Router {
 // Middleware to intercept crawler requests and serve OG meta tags
 export function createOgMiddleware(context: AppContext) {
   return async (req: Request, res: Response, next: () => void) => {
-    // Only intercept conversation pages for crawlers
-    const match = req.path.match(/^\/c\/([a-f0-9-]{36})$/i);
+    // Only intercept conversation/submission pages for crawlers
+    // Match both /c/:id and /submissions/:id URL formats
+    const match = req.path.match(/^\/(c|submissions)\/([a-f0-9-]{36})$/i);
     if (!match || !isCrawler(req.headers['user-agent'])) {
       return next();
     }
 
-    const submissionId = match[1];
+    const submissionId = match[2]; // Index 2 due to the (c|submissions) capture group
     
     try {
       const submission = await context.submissionStore.getSubmission(submissionId);
@@ -186,8 +187,9 @@ export function createOgMiddleware(context: AppContext) {
         ? escapeHtml(truncate(extractTextFromBlocks(previewMessage.content_blocks), 200))
         : 'A conversation on Research Commons';
       
-      const baseUrl = process.env.BASE_URL || `https://${req.headers.host}`;
-      const url = `${baseUrl}/c/${submissionId}`;
+      const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+      const baseUrl = process.env.BASE_URL || `${protocol}://${req.headers.host}`;
+      const url = `${baseUrl}/submissions/${submissionId}`;
       const imageUrl = `${baseUrl}/api/og-image/${submissionId}`;
 
       const html = `<!DOCTYPE html>
