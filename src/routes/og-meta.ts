@@ -97,6 +97,11 @@ export function createOgMetaRoutes(context: AppContext): Router {
         .slice(0, 22) // More lines with tighter spacing
         .map(line => truncate(line, 110)); // Wider truncation for smaller font
 
+      // Font stacks for Linux server compatibility
+      // DejaVu and Liberation are commonly available on Linux
+      const sansFont = 'DejaVu Sans, Liberation Sans, sans-serif';
+      const monoFont = 'DejaVu Sans Mono, Liberation Mono, monospace';
+
       // Generate SVG with tighter layout
       const svg = `
         <svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
@@ -112,26 +117,26 @@ export function createOgMetaRoutes(context: AppContext): Router {
           <rect x="0" y="0" width="6" height="630" fill="#6366f1"/>
           
           <!-- Header row -->
-          <text x="40" y="45" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#6366f1" font-weight="bold">Research Commons</text>
-          <text x="230" y="45" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#64748b">· ${escapeHtml(typeLabel)}</text>
+          <text x="40" y="45" font-family="${sansFont}" font-size="18" fill="#6366f1" font-weight="bold">Research Commons</text>
+          <text x="230" y="45" font-family="${sansFont}" font-size="16" fill="#64748b">· ${escapeHtml(typeLabel)}</text>
           
           <!-- Title -->
-          <text x="40" y="100" font-family="Arial, Helvetica, sans-serif" font-size="42" fill="#ffffff" font-weight="bold">${escapeHtml(truncate(title, 45))}</text>
+          <text x="40" y="100" font-family="${sansFont}" font-size="42" fill="#ffffff" font-weight="bold">${escapeHtml(truncate(title, 45))}</text>
           
           <!-- Author -->
-          <text x="40" y="140" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#a5b4fc">${escapeHtml(participant)}</text>
+          <text x="40" y="140" font-family="${sansFont}" font-size="20" fill="#a5b4fc">${escapeHtml(participant)}</text>
           
           <!-- Content box -->
           <rect x="40" y="160" width="1120" height="420" rx="8" fill="#1e293b"/>
           
           <!-- Content text (monospace, no wrap, tight line spacing for ASCII art) -->
-          <text font-family="'Courier New', Courier, monospace" font-size="16" fill="#94a3b8" xml:space="preserve">
+          <text font-family="${monoFont}" font-size="16" fill="#94a3b8" xml:space="preserve">
             ${lines.map((line, i) => `<tspan x="60" y="${195 + i * 18}">${escapeHtml(line || ' ')}</tspan>`).join('\n            ')}
           </text>
           
           <!-- Footer -->
           <rect x="1020" y="590" width="140" height="30" rx="15" fill="#6366f1"/>
-          <text x="1090" y="611" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">${messages.length} message${messages.length !== 1 ? 's' : ''}</text>
+          <text x="1090" y="611" font-family="${sansFont}" font-size="14" fill="#ffffff" text-anchor="middle">${messages.length} message${messages.length !== 1 ? 's' : ''}</text>
         </svg>
       `;
 
