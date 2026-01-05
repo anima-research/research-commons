@@ -3,7 +3,7 @@ import sharp from 'sharp';
 import { AppContext } from '../index.js';
 import type { Message } from '../types/submission.js';
 
-// User agents for social media crawlers
+// User agents for social media crawlers and OG validators
 const CRAWLER_USER_AGENTS = [
   'facebookexternalhit',
   'Facebot',
@@ -16,14 +16,40 @@ const CRAWLER_USER_AGENTS = [
   'Googlebot',
   'bingbot',
   'Applebot',
-  'ia_archiver'
+  'ia_archiver',
+  // OG validators and preview tools
+  'OpenGraph',
+  'opengraph.xyz',
+  'Embedly',
+  'Iframely',
+  'MetaInspector',
+  'curl',  // Often used by validators
+  'wget',
+  'python-requests',
+  'axios',
+  'node-fetch',
+  'got',
+  'Paw',
+  'Postman',
+  'insomnia'
 ];
 
 function isCrawler(userAgent: string | undefined): boolean {
   if (!userAgent) return false;
-  return CRAWLER_USER_AGENTS.some(crawler => 
-    userAgent.toLowerCase().includes(crawler.toLowerCase())
-  );
+  const ua = userAgent.toLowerCase();
+  
+  // Check for specific known crawlers
+  if (CRAWLER_USER_AGENTS.some(crawler => ua.includes(crawler.toLowerCase()))) {
+    return true;
+  }
+  
+  // Also catch any User-Agent with common bot/crawler patterns
+  if (ua.includes('bot') || ua.includes('crawler') || ua.includes('spider') || 
+      ua.includes('preview') || ua.includes('fetch') || ua.includes('scraper')) {
+    return true;
+  }
+  
+  return false;
 }
 
 function escapeHtml(text: string): string {
