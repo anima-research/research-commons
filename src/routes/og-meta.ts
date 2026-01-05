@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import type { RouteContext } from './types.js';
+import { AppContext } from '../index.js';
+import type { Message } from '../types/submission.js';
 
 // User agents for social media crawlers
 const CRAWLER_USER_AGENTS = [
@@ -45,7 +46,7 @@ function extractTextFromBlocks(contentBlocks: any[]): string {
     .join('\n');
 }
 
-export function createOgMetaRoutes(context: RouteContext): Router {
+export function createOgMetaRoutes(context: AppContext): Router {
   const router = Router();
 
   // Generate OG preview image for a submission
@@ -70,7 +71,7 @@ export function createOgMetaRoutes(context: RouteContext): Router {
       // Find pinned message or use first message
       const pinnedMessageId = submission.metadata?.pinned_message_id;
       let previewMessage = pinnedMessageId 
-        ? messages.find(m => m.id === pinnedMessageId)
+        ? messages.find((m: Message) => m.id === pinnedMessageId)
         : messages[0];
       
       if (!previewMessage) {
@@ -146,8 +147,8 @@ export function createOgMetaRoutes(context: RouteContext): Router {
 }
 
 // Middleware to intercept crawler requests and serve OG meta tags
-export function createOgMiddleware(context: RouteContext) {
-  return async (req: Request, res: Response, next: Function) => {
+export function createOgMiddleware(context: AppContext) {
+  return async (req: Request, res: Response, next: () => void) => {
     // Only intercept conversation pages for crawlers
     const match = req.path.match(/^\/c\/([a-f0-9-]{36})$/i);
     if (!match || !isCrawler(req.headers['user-agent'])) {
@@ -173,7 +174,7 @@ export function createOgMiddleware(context: RouteContext) {
       // Find pinned message or use first message
       const pinnedMessageId = submission.metadata?.pinned_message_id;
       let previewMessage = pinnedMessageId 
-        ? messages.find(m => m.id === pinnedMessageId)
+        ? messages.find((m: Message) => m.id === pinnedMessageId)
         : messages[0];
       
       if (!previewMessage) {
