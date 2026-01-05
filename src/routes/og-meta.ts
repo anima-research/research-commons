@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import sharp from 'sharp';
 import { AppContext } from '../index.js';
 import type { Message } from '../types/submission.js';
 
@@ -134,9 +135,14 @@ export function createOgMetaRoutes(context: AppContext): Router {
         </svg>
       `;
 
-      res.setHeader('Content-Type', 'image/svg+xml');
+      // Convert SVG to PNG using sharp
+      const pngBuffer = await sharp(Buffer.from(svg))
+        .png()
+        .toBuffer();
+
+      res.setHeader('Content-Type', 'image/png');
       res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-      res.send(svg);
+      res.send(pngBuffer);
     } catch (error) {
       console.error('OG image generation error:', error);
       res.status(500).send('Error');
