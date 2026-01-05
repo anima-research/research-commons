@@ -40,10 +40,14 @@ export interface Message {
 
 export type Visibility = 'public' | 'unlisted' | 'researcher' | 'private'
 
+// Submission types - conversation is default, document is single-message, loom is branched
+export type SubmissionType = 'conversation' | 'document' | 'loom'
+
 export interface Submission {
   id: string
   title: string
   submitter_id: string
+  submission_type?: SubmissionType // defaults to 'conversation'
   source_type: 'arc-certified' | 'json-upload' | 'discord' | 'other'
   visibility?: Visibility
   certification_data?: {
@@ -56,6 +60,7 @@ export interface Submission {
     participants_summary?: string[]
     model_summary?: string[]
     tags?: string[]
+    description?: string
   }
   submitted_at: string
 }

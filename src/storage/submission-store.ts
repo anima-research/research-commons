@@ -52,12 +52,14 @@ export class SubmissionStore {
     messages: Message[],
     metadata?: Submission['metadata'],
     certificationData?: Submission['certification_data'],
-    visibility: Visibility = 'researcher'
+    visibility: Visibility = 'researcher',
+    submissionType: Submission['submission_type'] = 'conversation'
   ): Promise<Submission> {
     const submission: Submission = {
       id: uuidv4(),
       title,
       submitter_id: submitterId,
+      submission_type: submissionType,
       source_type: sourceType,
       visibility,
       certification_data: certificationData,

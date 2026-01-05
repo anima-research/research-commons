@@ -15,7 +15,7 @@
 
     <div class="lg:ml-64">
       <header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-4 transition-colors">
-        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">✨ New Conversation</h1>
+        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">✨ New Submission</h1>
       </header>
 
       <div class="max-w-4xl mx-auto p-8">
@@ -23,11 +23,66 @@
         
         <!-- Step 1: Upload -->
         <div v-if="step === 'upload'">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Upload Conversation</h2>
-          
-          <div class="mb-6">
+          <!-- Submission Type Selector -->
+          <div class="mb-8">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">What are you submitting?</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <!-- Conversation -->
+              <button
+                @click="submissionCategory = 'conversation'"
+                class="relative p-4 rounded-xl border-2 transition-all text-left"
+                :class="submissionCategory === 'conversation' 
+                  ? 'border-indigo-500 bg-indigo-500/10 ring-2 ring-indigo-500/20' 
+                  : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800'"
+              >
+                <div class="text-2xl mb-2">💬</div>
+                <div class="font-medium text-gray-100">Conversation</div>
+                <div class="text-xs text-gray-500 mt-1">Multi-turn dialogue, potentially containing multiple forks</div>
+              </button>
+              
+              <!-- Completion -->
+              <button
+                @click="submissionCategory = 'completion'"
+                class="relative p-4 rounded-xl border-2 transition-all text-left"
+                :class="submissionCategory === 'completion' 
+                  ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/20' 
+                  : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800'"
+              >
+                <div class="text-2xl mb-2">📄</div>
+                <div class="font-medium text-gray-100">Completion</div>
+                <div class="text-xs text-gray-500 mt-1">Single text document that can be marked up to separate prefix from completion</div>
+              </button>
+              
+              <!-- Loom (disabled) -->
+              <button
+                disabled
+                class="relative p-4 rounded-xl border-2 transition-all text-left opacity-50 cursor-not-allowed border-gray-700 bg-gray-800/30"
+              >
+                <div class="text-2xl mb-2 grayscale">🌳</div>
+                <div class="font-medium text-gray-400">Loom</div>
+                <div class="text-xs text-gray-600 mt-1">A document containing multiple forks of LLM generations paths</div>
+                <div class="absolute top-2 right-2 text-[10px] bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">Soon</div>
+              </button>
+              
+              <!-- Other -->
+              <button
+                @click="submissionCategory = 'other'"
+                class="relative p-4 rounded-xl border-2 transition-all text-left"
+                :class="submissionCategory === 'other' 
+                  ? 'border-purple-500 bg-purple-500/10 ring-2 ring-purple-500/20' 
+                  : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800'"
+              >
+                <div class="text-2xl mb-2">📦</div>
+                <div class="font-medium text-gray-100">Other</div>
+                <div class="text-xs text-gray-500 mt-1">Custom format</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Source Type (for conversation category) -->
+          <div v-if="submissionCategory === 'conversation'" class="mb-6">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Source Type
+              Import Source
             </label>
             <select
               v-model="sourceType"
@@ -36,12 +91,25 @@
               <option value="json-upload">JSON Upload</option>
               <option value="arc-certified">ARC Certified</option>
               <option value="discord">Discord</option>
-              <option value="other">Other</option>
+            </select>
+          </div>
+          
+          <!-- Source Type (for other category) -->
+          <div v-if="submissionCategory === 'other'" class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Format
+            </label>
+            <select
+              v-model="sourceType"
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 transition-colors"
+            >
+              <option value="json-upload">JSON Upload</option>
+              <option value="other">Other Format</option>
             </select>
           </div>
 
           <!-- Discord Import -->
-          <div v-if="sourceType === 'discord'" class="space-y-4 mb-6">
+          <div v-if="submissionCategory === 'conversation' && sourceType === 'discord'" class="space-y-4 mb-6">
             <div class="p-3 bg-blue-900/20 border border-blue-700/50 rounded text-sm text-blue-200">
               <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
@@ -129,8 +197,8 @@
             </div>
           </div>
 
-          <!-- JSON Upload -->
-          <div v-if="sourceType === 'json-upload' || sourceType === 'arc-certified' || sourceType === 'other'" class="mb-6">
+          <!-- JSON Upload (for conversation and other categories) -->
+          <div v-if="(submissionCategory === 'conversation' || submissionCategory === 'other') && (sourceType === 'json-upload' || sourceType === 'arc-certified' || sourceType === 'other')" class="mb-6">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Upload JSON File
             </label>
@@ -174,18 +242,98 @@
             </div>
           </div>
 
+          <!-- Completion/Document Upload -->
+          <div v-if="submissionCategory === 'completion'" class="mb-6">
+            <div class="mb-3 p-3 bg-emerald-900/20 border border-emerald-700/50 rounded text-sm text-emerald-200">
+              <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
+              </svg>
+              <strong>Completion:</strong> Submit a model output, essay, or any text for annotation. Supports Markdown. 
+              You can add highlights, comments, and tags to sections of the text.
+            </div>
+            
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Title
+            </label>
+            <input
+              v-model="documentTitle"
+              type="text"
+              placeholder="e.g., Claude on consciousness..."
+              class="w-full px-3 py-2 mb-4 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 transition-colors"
+            />
+            
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Content <span class="font-normal text-gray-500">(Markdown supported)</span>
+            </label>
+            <textarea
+              v-model="documentContent"
+              placeholder="Paste the model output or text here...
+
+Supports Markdown formatting:
+# Headings
+**bold**, *italic*
+- Lists
+- Code blocks"
+              rows="16"
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 transition-colors font-mono text-sm"
+            ></textarea>
+            <p class="mt-1 text-xs text-gray-500">{{ documentContent.length.toLocaleString() }} characters</p>
+            
+            <!-- Or upload file -->
+            <div class="mt-4 text-center text-gray-500 text-sm">— or —</div>
+            <div class="mt-4 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4 text-center bg-gray-50 dark:bg-gray-800 transition-colors hover:border-indigo-400 dark:hover:border-indigo-600">
+              <input
+                type="file"
+                accept=".md,.txt,.markdown"
+                @change="handleDocumentFileUpload"
+                class="hidden"
+                ref="docFileInput"
+              />
+              <button
+                type="button"
+                @click="($refs.docFileInput as any)?.click()"
+                class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors text-sm"
+              >
+                📄 Upload .md or .txt file
+              </button>
+            </div>
+            
+            <!-- Display options -->
+            <div class="mt-6 pt-4 border-t border-gray-700/50">
+              <label class="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  v-model="useMonospace"
+                  class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                />
+                <div>
+                  <span class="text-sm text-gray-300 group-hover:text-gray-100">Display in monospace font</span>
+                  <p class="text-xs text-gray-500">Enable for ASCII art, formatted tables, or code-heavy content</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
           <div v-if="error" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-red-700 dark:text-red-400 text-sm transition-colors">
             {{ error }}
           </div>
 
           <div class="flex justify-end">
             <button
-              v-if="sourceType === 'discord'"
+              v-if="submissionCategory === 'conversation' && sourceType === 'discord'"
               @click="fetchDiscordMessages"
               :disabled="!discordLastMessageUrl || submitting"
               class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {{ submitting ? 'Fetching...' : 'Fetch Messages →' }}
+            </button>
+            <button
+              v-else-if="submissionCategory === 'completion'"
+              @click="prepareDocument"
+              :disabled="!documentContent || !documentTitle"
+              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Continue →
             </button>
             <button
               v-else
@@ -713,6 +861,59 @@ async function handleFileUpload(event: Event) {
   error.value = ''
 }
 
+async function handleDocumentFileUpload(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  
+  try {
+    const text = await file.text()
+    documentContent.value = text
+    // Use filename (without extension) as title if not set
+    if (!documentTitle.value) {
+      documentTitle.value = file.name.replace(/\.(md|txt|markdown)$/i, '')
+    }
+    error.value = ''
+  } catch (err) {
+    error.value = 'Failed to read file'
+    console.error('Document file read error:', err)
+  }
+}
+
+// Prepare a document for submission - creates a single-message submission
+function prepareDocument() {
+  if (!documentContent.value || !documentTitle.value) {
+    error.value = 'Please provide a title and content'
+    return
+  }
+  
+  error.value = ''
+  title.value = documentTitle.value
+  
+  // Create a single message for the document
+  const documentMessage: Message = {
+    id: crypto.randomUUID(),
+    submission_id: '', // Will be filled by server
+    parent_message_id: null,
+    order: 0,
+    participant_name: 'Document',
+    participant_type: 'system',
+    content_blocks: [{
+      type: 'text',
+      text: documentContent.value
+    }],
+    metadata: useMonospace.value ? { monospace: true } : undefined
+  }
+  
+  previewMessages.value = [documentMessage]
+  participantNames.value = ['Document']
+  // Auto-map Document as system (skips the mapping step)
+  participantMapping.value = { 'Document': 'human' } // Treat as human to skip model selection
+  
+  // Skip straight to configure step
+  step.value = 'configure'
+}
+
 function resetToUpload() {
   step.value = 'upload'
   title.value = ''
@@ -728,7 +929,13 @@ function resetToUpload() {
 
 const title = ref('')
 const description = ref('')
+const submissionCategory = ref<'conversation' | 'completion' | 'loom' | 'other'>('conversation')
 const sourceType = ref<'json-upload' | 'arc-certified' | 'discord' | 'other'>('json-upload')
+
+// Document/Completion upload state
+const documentTitle = ref('')
+const documentContent = ref('')
+const useMonospace = ref(false) // Display content in monospace font
 const visibility = ref<'public' | 'unlisted' | 'researcher' | 'private'>('researcher')
 const selectedTopics = ref<string[]>([])
 const availableTopics = ref<any[]>([])
@@ -1505,9 +1712,18 @@ async function submit() {
       }
     })
     
+    // Map submissionCategory to submission_type
+    const submissionTypeMap: Record<string, 'conversation' | 'document' | 'loom'> = {
+      'conversation': 'conversation',
+      'completion': 'document',
+      'loom': 'loom',
+      'other': 'conversation'
+    }
+    
     const response = await submissionsAPI.create({
       title: title.value,
-      source_type: sourceType.value,
+      submission_type: submissionTypeMap[submissionCategory.value] || 'conversation',
+      source_type: submissionCategory.value === 'completion' ? 'other' : sourceType.value,
       visibility: visibility.value,
       messages: updatedMessages,
       metadata: {

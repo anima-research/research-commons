@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import { SubmissionStore } from './storage/submission-store.js';
 import { AnnotationDatabase } from './database/db.js';
@@ -182,6 +183,7 @@ async function main() {
 
   // Middleware
   app.use(cors());
+  app.use(compression()); // Gzip compress all responses
   app.use(express.json({ limit: '50mb' })); // Large submissions with images
 
   // Initialize stores

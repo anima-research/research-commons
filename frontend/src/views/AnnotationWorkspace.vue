@@ -206,11 +206,11 @@
             <span class="text-[10px] text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">click for charts</span>
           </div>
           <!-- Comment count (not part of stats modal) -->
-          <div v-if="totalCommentCount > 0" class="px-2 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs rounded-full font-mono flex items-center gap-1">
-            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
-            </svg>
-            {{ totalCommentCount }}
+            <div v-if="totalCommentCount > 0" class="px-2 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs rounded-full font-mono flex items-center gap-1">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
+              </svg>
+              {{ totalCommentCount }}
           </div>
           
           <!-- Actions -->
@@ -268,7 +268,7 @@
                 class="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
               >
                 👥 Multiuser JSON
-              </button>
+          </button>
             </div>
           </div>
         </div>
@@ -342,6 +342,7 @@
           <MessageList
             v-if="messages.length > 0"
             :messages="messages"
+            :document-mode="isDocumentMode"
             :annotated-message-ids="annotatedMessageIds"
             :inline-comments="inlineComments"
             :user-names="userNames"
@@ -361,6 +362,7 @@
             @toggle-pin="handleTogglePin"
             @toggle-hide="handleToggleHide"
             @toggle-hidden-from-models="handleToggleHiddenFromModels"
+            @toggle-monospace="handleToggleMonospace"
             @hide-all-previous="handleHideAllPrevious"
             @toggle-reaction="handleToggleReaction"
             @text-selected="handleTextSelected"
@@ -741,6 +743,11 @@ const canExport = computed(() => {
   if (!authStore.user) return false
   return authStore.user.roles.includes('researcher') || 
          authStore.user.roles.includes('admin')
+})
+
+// Document mode: single-message submissions displayed as readable documents
+const isDocumentMode = computed(() => {
+  return submission.value?.submission_type === 'document'
 })
 
 // Permission to hide messages (owner or admin only)
@@ -1142,9 +1149,9 @@ function handleAddCommentToMessage(messageId: string) {
     }
   } else {
     // On desktop, position to the right
-    commentInputPosition.value = {
-      x: rect.right + 10,
-      y: rect.top
+  commentInputPosition.value = {
+    x: rect.right + 10,
+    y: rect.top
     }
   }
   
@@ -1373,6 +1380,26 @@ async function handleToggleHiddenFromModels(messageId: string) {
     message.hidden_from_models = newValue
   } catch (err) {
     console.error('Failed to toggle hidden from models:', err)
+  }
+}
+
+async function handleToggleMonospace(messageId: string) {
+  try {
+    const message = messages.value.find(m => m.id === messageId)
+    if (!message) return
+    
+    const currentValue = message.metadata?.monospace === true
+    const newValue = !currentValue
+    
+    await submissionsAPI.setMessageMonospace(submissionId, messageId, newValue)
+    
+    // Update local state
+    if (!message.metadata) {
+      message.metadata = {}
+    }
+    message.metadata.monospace = newValue || undefined
+  } catch (err) {
+    console.error('Failed to toggle monospace:', err)
   }
 }
 

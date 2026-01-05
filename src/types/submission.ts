@@ -91,11 +91,16 @@ export type CertificationData = z.infer<typeof CertificationDataSchema>;
 export const VisibilitySchema = z.enum(['public', 'unlisted', 'researcher', 'private']);
 export type Visibility = z.infer<typeof VisibilitySchema>;
 
+// Submission types - conversation is default, document is single-message, loom is branched
+export const SubmissionTypeSchema = z.enum(['conversation', 'document', 'loom']);
+export type SubmissionType = z.infer<typeof SubmissionTypeSchema>;
+
 // Submission metadata
 export const SubmissionSchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
   submitter_id: z.string().uuid(),
+  submission_type: SubmissionTypeSchema.default('conversation'),
   source_type: z.enum(['arc-certified', 'json-upload', 'discord', 'other']),
   visibility: VisibilitySchema.default('researcher'),
   certification_data: CertificationDataSchema.optional(),
@@ -130,6 +135,7 @@ export const CreateMessageRequestSchema = z.object({
 // For API requests
 export const CreateSubmissionRequestSchema = z.object({
   title: z.string(),
+  submission_type: SubmissionTypeSchema.optional(), // defaults to 'conversation'
   source_type: z.enum(['arc-certified', 'json-upload', 'discord', 'other']),
   visibility: VisibilitySchema.optional(), // defaults to 'researcher' in store
   arc_conversation_id: z.string().optional(),

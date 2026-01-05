@@ -7,6 +7,7 @@
         <div v-if="item.type === 'message'">
           <Message
             :message="item.message"
+            :document-mode="documentMode"
             :has-annotation="hasAnnotation(item.message.id)"
             :is-pinned="pinnedMessageId === item.message.id"
             :is-hidden="hiddenMessageIds.has(item.message.id)"
@@ -25,6 +26,7 @@
             @toggle-pin="onTogglePin"
             @toggle-hide="onToggleHide"
             @toggle-hidden-from-models="onToggleHiddenFromModels"
+            @toggle-monospace="onToggleMonospace"
             @hide-all-previous="onHideAllPrevious"
             @toggle-reaction="onToggleReaction"
             @delete-selection="onDeleteSelection"
@@ -146,6 +148,7 @@ interface SelectionHighlight {
 
 interface Props {
   messages: MessageType[]
+  documentMode?: boolean // Document view: hide message chrome, full-width reading layout
   annotatedMessageIds?: Set<string>
   userNames?: Map<string, string>
   inlineComments?: Map<string, InlineComment[]> // messageId -> comments
@@ -162,6 +165,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  documentMode: false,
   annotatedMessageIds: () => new Set(),
   userNames: () => new Map(),
   inlineComments: () => new Map(),
@@ -183,6 +187,7 @@ const emit = defineEmits<{
   'toggle-pin': [messageId: string]
   'toggle-hide': [messageId: string]
   'toggle-hidden-from-models': [messageId: string]
+  'toggle-monospace': [messageId: string]
   'hide-all-previous': [messageId: string]
   'toggle-reaction': [messageId: string, reactionType: 'star' | 'laugh' | 'sparkles']
   'text-selected': [messageId: string, text: string, start: number, end: number]
@@ -381,6 +386,10 @@ function onToggleHide(messageId: string) {
 
 function onToggleHiddenFromModels(messageId: string) {
   emit('toggle-hidden-from-models', messageId)
+}
+
+function onToggleMonospace(messageId: string) {
+  emit('toggle-monospace', messageId)
 }
 
 function onHideAllPrevious(messageId: string) {

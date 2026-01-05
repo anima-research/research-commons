@@ -171,6 +171,9 @@ export const submissionsAPI = {
   setHiddenFromModels: (submissionId: string, messageId: string, hidden: boolean) =>
     api.post<{ success: boolean; hidden_from_models: boolean }>(`/submissions/${submissionId}/messages/${messageId}/hidden-from-models`, { hidden }),
   
+  setMessageMonospace: (submissionId: string, messageId: string, monospace: boolean) =>
+    api.post<{ success: boolean; monospace: boolean }>(`/submissions/${submissionId}/messages/${messageId}/monospace`, { monospace }),
+  
   getHiddenMessages: (submissionId: string) =>
     api.get<{ hidden_message_ids: string[] }>(`/submissions/${submissionId}/hidden-messages`)
 }

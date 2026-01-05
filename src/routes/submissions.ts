@@ -181,7 +181,8 @@ export function createSubmissionRoutes(context: AppContext): Router {
           arc_conversation_id: data.arc_conversation_id
           // TODO: Fetch certification from ARC API
         } : undefined,
-        data.visibility || 'researcher'
+        data.visibility || 'researcher',
+        data.submission_type || 'conversation'
       );
 
       // Don't attach anything at creation - will be dynamically looked up from topics
@@ -804,6 +805,63 @@ export function createSubmissionRoutes(context: AppContext): Router {
       res.json({ success: true, hidden_from_models: hidden });
     } catch (error) {
       console.error('Toggle hidden_from_models error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Toggle monospace display for a message
+  router.post('/:submissionId/messages/:messageId/monospace', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { submissionId, messageId } = req.params;
+      const { monospace } = req.body; // boolean
+      
+      const submission = await context.submissionStore.getSubmission(submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Check if user is admin, researcher, or submission owner
+      const user = await context.userStore.getUserById(req.userId!);
+      const isAdmin = user?.roles.includes('admin');
+      const isResearcher = user?.roles.includes('researcher');
+      const isOwner = submission.submitter_id === req.userId;
+      
+      if (!isAdmin && !isResearcher && !isOwner) {
+        res.status(403).json({ error: 'Only admins, researchers, and submission owners can change message display' });
+        return;
+      }
+
+      // Get current message to update its metadata
+      const messages = await context.submissionStore.getMessages(submissionId);
+      const message = messages.find(m => m.id === messageId);
+      
+      if (!message) {
+        res.status(404).json({ error: 'Message not found' });
+        return;
+      }
+
+      // Update the message metadata
+      const updatedMetadata = { 
+        ...(message.metadata || {}),
+        monospace: monospace === true ? true : undefined
+      };
+      
+      // Clean up undefined values
+      if (!updatedMetadata.monospace) {
+        delete updatedMetadata.monospace;
+      }
+
+      await context.submissionStore.updateMessage(submissionId, messageId, {
+        metadata: Object.keys(updatedMetadata).length > 0 ? updatedMetadata : undefined
+      });
+      
+      console.log(`[POST monospace] Message ${messageId} monospace set to ${monospace}`);
+      
+      res.json({ success: true, monospace });
+    } catch (error) {
+      console.error('Toggle monospace error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   });
