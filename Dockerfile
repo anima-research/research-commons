@@ -22,6 +22,9 @@ RUN npm run build
 FROM base AS production
 WORKDIR /app
 
+# Install fonts for SVG rendering (sharp/librsvg needs these)
+RUN apk add --no-cache fontconfig ttf-dejavu ttf-liberation
+
 # Install production dependencies only
 COPY package*.json ./
 RUN npm ci --production
