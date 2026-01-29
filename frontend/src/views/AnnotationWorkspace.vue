@@ -1520,11 +1520,31 @@ function handleTextSelected(messageId: string, text: string, start: number, end:
   const range = selection.getRangeAt(0)
   const rect = range.getBoundingClientRect()
   
-  // Position menu near the end of selection
-  textSelectionMenuPosition.value = {
-    x: rect.right + 10,
-    y: rect.top
+  // Position menu near the end of selection, but keep it on screen
+  const menuWidth = 160 // approximate menu width
+  const menuHeight = 120 // approximate menu height
+  const padding = 10
+  
+  let x = rect.right + padding
+  let y = rect.top
+  
+  // Keep menu on screen horizontally
+  if (x + menuWidth > window.innerWidth - padding) {
+    x = rect.left - menuWidth - padding
+    if (x < padding) {
+      x = padding
+    }
   }
+  
+  // Keep menu on screen vertically
+  if (y + menuHeight > window.innerHeight - padding) {
+    y = window.innerHeight - menuHeight - padding
+  }
+  if (y < padding) {
+    y = padding
+  }
+  
+  textSelectionMenuPosition.value = { x, y }
   
   showTextSelectionMenu.value = true
 }
@@ -1772,9 +1792,11 @@ function handleDocumentClick(event: MouseEvent) {
   }
   
   // Close text selection menu when clicking outside
+  // But don't close if clicking inside message content (where text selection happens)
   if (
     showTextSelectionMenu.value &&
-    !target.closest('.text-selection-menu')
+    !target.closest('.text-selection-menu') &&
+    !target.closest('.message-text')
   ) {
     showTextSelectionMenu.value = false
     pendingTextSelection.value = null
