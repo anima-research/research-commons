@@ -30,6 +30,7 @@
             @hide-all-previous="onHideAllPrevious"
             @toggle-reaction="onToggleReaction"
             @delete-selection="onDeleteSelection"
+            @switch-branch="onSwitchBranch"
           />
           
           <!-- Inline comments (mobile only) -->
@@ -198,6 +199,7 @@ const emit = defineEmits<{
   'delete-comment': [commentId: string]
   'remove-tag': [selectionId: string, tagId: string]
   'reply-to-comment': [commentId: string]
+  'switch-branch': [messageId: string, branchId: string]
 }>()
 
 // Expanded state for comments and replies
@@ -402,6 +404,10 @@ function onToggleReaction(messageId: string, reactionType: 'star' | 'laugh' | 's
 
 function onDeleteSelection(selectionId: string) {
   emit('delete-selection', selectionId)
+}
+
+function onSwitchBranch(messageId: string, branchId: string) {
+  emit('switch-branch', messageId, branchId)
 }
 </script>
 

@@ -366,6 +366,7 @@
             @hide-all-previous="handleHideAllPrevious"
             @toggle-reaction="handleToggleReaction"
             @text-selected="handleTextSelected"
+            @switch-branch="handleSwitchBranch"
             @add-tag="handleAddTag"
             @add-tag-vote="handleAddTagVote"
             @add-comment="handleAddCommentToSelection"
@@ -1479,6 +1480,79 @@ function scrollToPinnedMessage() {
   }
   
   checkAndScroll()
+}
+
+// Recursive helper to cascade branch switches through the message tree
+// When a parent branch is switched, all child messages must switch to branches
+// that have parent_branch_id matching the new parent branch
+function cascadeBranchSwitch(messageId: string, parentBranchId: string, allMessages: Message[]) {
+  const messageIndex = allMessages.findIndex(m => m.id === messageId)
+  if (messageIndex < 0) return
+  
+  // Find the next message in order (messages are sequential)
+  // We need to find the first message that has a branch with parent_branch_id === parentBranchId
+  for (let i = messageIndex + 1; i < allMessages.length; i++) {
+    const nextMessage = allMessages[i]
+    
+    // Check if this message has a branch that is a child of the parent branch
+    const matchingBranch = nextMessage.branches?.find(b => b.parent_branch_id === parentBranchId)
+    
+    if (matchingBranch) {
+      // Found a child branch - switch to it
+      nextMessage.active_branch_id = matchingBranch.id
+      
+      // Recursively cascade from this branch to its children
+      cascadeBranchSwitch(nextMessage.id, matchingBranch.id, allMessages)
+      
+      // After switching, we've found the direct child in this branch path
+      // Continue the loop to check if there are more messages that might be children
+      // of this new branch (though typically there's only one direct child per branch)
+    }
+    // If no matching branch, this message is not a child of the parent branch
+    // Continue checking - it might be a child of a different branch or a sibling
+    // Note: In a tree structure, once we've switched to a branch, we should only
+    // look for direct children. If a message doesn't match, we can stop for that path.
+    // However, messages are in order, so we continue to handle all descendants.
+  }
+}
+
+async function handleSwitchBranch(messageId: string, branchId: string) {
+  try {
+    const message = messages.value.find(m => m.id === messageId)
+    if (!message) return
+    
+    // Validate branch exists
+    const branch = message.branches?.find(b => b.id === branchId)
+    if (!branch) {
+      console.error('Branch not found:', branchId)
+      return
+    }
+    
+    // Update local state immediately (optimistic update)
+    message.active_branch_id = branchId
+    
+    // Cascade branch switching to all descendant messages
+    // This maintains the parent-child relationship in the conversation tree
+    cascadeBranchSwitch(messageId, branchId, messages.value)
+    
+    // Try to persist to server (only if logged in)
+    // If not logged in or if it fails, the local state update is still valid
+    try {
+      const response = await submissionsAPI.switchBranch(submissionId, messageId, branchId)
+      // If server returned a different state, use it (shouldn't happen but be safe)
+      if (response.data.message) {
+        message.active_branch_id = response.data.message.active_branch_id
+      }
+    } catch (apiErr: any) {
+      // If API call fails (e.g., not logged in), that's okay - local state is already updated
+      // Only log if it's an unexpected error (not 401/403)
+      if (apiErr.response?.status !== 401 && apiErr.response?.status !== 403) {
+        console.error('Failed to persist branch switch (but local state updated):', apiErr)
+      }
+    }
+  } catch (err) {
+    console.error('Failed to switch branch:', err)
+  }
 }
 
 async function handleToggleReaction(messageId: string, reactionType: 'star' | 'laugh' | 'sparkles') {

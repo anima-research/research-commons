@@ -163,12 +163,29 @@ export function createSubmissionRoutes(context: AppContext): Router {
       const tempSubmissionId = uuidv4();
       
       // Convert request messages to full Message objects
-      const messages: Message[] = data.messages.map(msg => ({
-        ...msg,
-        id: msg.id || uuidv4(),
-        submission_id: tempSubmissionId,
-        timestamp: msg.timestamp || new Date()
-      }));
+      const messages: Message[] = data.messages.map(msg => {
+        // If this is a loom submission with branches, handle branch format
+        if (msg.branches && msg.branches.length > 0) {
+          return {
+            ...msg,
+            id: msg.id || uuidv4(),
+            submission_id: tempSubmissionId,
+            branches: msg.branches.map(branch => ({
+              ...branch,
+              id: branch.id || uuidv4(),
+              timestamp: branch.timestamp || new Date()
+            }))
+          };
+        } else {
+          // Old format for non-loom submissions
+          return {
+            ...msg,
+            id: msg.id || uuidv4(),
+            submission_id: tempSubmissionId,
+            timestamp: msg.timestamp || new Date()
+          };
+        }
+      });
 
       // Create submission
       const submission = await context.submissionStore.createSubmission(
@@ -862,6 +879,92 @@ export function createSubmissionRoutes(context: AppContext): Router {
       res.json({ success: true, monospace });
     } catch (error) {
       console.error('Toggle monospace error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Update message active branch (for loom submissions only)
+  router.patch('/:submissionId/messages/:messageId', async (req, res) => {
+    try {
+      const { submissionId, messageId } = req.params;
+      const { active_branch_id } = req.body;
+      
+      const submission = await context.submissionStore.getSubmission(submissionId);
+      
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Only allow branch switching for loom submissions
+      if (submission.submission_type !== 'loom') {
+        res.status(400).json({ error: 'Branch switching is only available for loom submissions' });
+        return;
+      }
+
+      // Check if submission is public (allows unauthenticated access)
+      const visibility = submission.visibility || 'public';
+      const isPublic = visibility === 'public' || visibility === 'unlisted';
+      
+      // Try to get user from token (optional)
+      const authHeader = req.headers.authorization;
+      let userId: string | undefined;
+      let userRoles: string[] = [];
+      
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET) as any;
+          userId = decoded.userId;
+          userRoles = decoded.roles || [];
+        } catch (err) {
+          // Invalid token - treat as guest
+        }
+      }
+      
+      // For non-public submissions, require authentication
+      if (!isPublic && !userId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      
+      // Get the message
+      const messages = await context.submissionStore.getMessages(submissionId);
+      const message = messages.find(m => m.id === messageId);
+      
+      if (!message) {
+        res.status(404).json({ error: 'Message not found' });
+        return;
+      }
+      
+      // Validate this is a loom message with branches
+      if (!message.branches || message.branches.length === 0) {
+        res.status(400).json({ error: 'Message does not have branches' });
+        return;
+      }
+      
+      // Validate active_branch_id exists in message branches
+      if (active_branch_id && !message.branches.find(b => b.id === active_branch_id)) {
+        res.status(400).json({ error: 'Invalid branch ID' });
+        return;
+      }
+      
+      // Update the message (only if authenticated - for public conversations, allow viewing without persistence)
+      if (userId) {
+        await context.submissionStore.updateMessage(submissionId, messageId, {
+          active_branch_id: active_branch_id || message.active_branch_id
+        });
+      }
+      
+      // Return updated message (with new active_branch_id)
+      const updatedMessage = {
+        ...message,
+        active_branch_id: active_branch_id || message.active_branch_id
+      };
+      
+      res.json({ message: updatedMessage, persisted: !!userId });
+    } catch (error) {
+      console.error('Update message branch error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   });

@@ -46,6 +46,36 @@
         <span class="text-indigo-400 font-medium">@{{ replyInfo.username }}</span>
       </div>
       
+      <!-- Branch switcher (shown if message has multiple branches) -->
+      <div v-if="hasMultipleBranches && !documentMode" class="flex items-center gap-2 mb-2 px-2 py-1 bg-gray-800/40 border border-gray-700/50 rounded-lg">
+        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+        </svg>
+        <span class="text-xs text-gray-400">Branch</span>
+        <span class="text-xs text-gray-300 font-mono">{{ currentBranchIndex + 1 }}/{{ branchCount }}</span>
+        <div class="flex-1"></div>
+        <button
+          @click.stop="switchToPrevBranch"
+          :disabled="currentBranchIndex === 0"
+          class="px-1.5 py-0.5 text-xs text-gray-400 hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          :title="currentBranchIndex === 0 ? 'First branch' : 'Previous branch'"
+        >
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <button
+          @click.stop="switchToNextBranch"
+          :disabled="currentBranchIndex === branchCount - 1"
+          class="px-1.5 py-0.5 text-xs text-gray-400 hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          :title="currentBranchIndex === branchCount - 1 ? 'Last branch' : 'Next branch'"
+        >
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+      
       <!-- Participant header (hidden in document mode) -->
       <div v-if="!documentMode" class="flex items-center gap-2 mb-1">
         
@@ -53,7 +83,7 @@
         <img 
           v-if="participantAvatarUrl"
           :src="participantAvatarUrl"
-          :alt="props.message.participant_name"
+          :alt="activeBranch.participant_name"
           class="w-6 h-6 rounded-full object-cover border border-gray-600"
         />
         <div 
@@ -61,22 +91,22 @@
           class="w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium"
           :class="{
             'bg-indigo-500 text-white': isUser,
-            'bg-purple-500 text-white': !isUser && props.message.participant_type === 'model',
-            'bg-gray-600 text-white': !isUser && props.message.participant_type !== 'model'
+            'bg-purple-500 text-white': !isUser && activeBranch.participant_type === 'model',
+            'bg-gray-600 text-white': !isUser && activeBranch.participant_type !== 'model'
           }"
         >
-          {{ props.message.participant_name.charAt(0) }}
+          {{ activeBranch.participant_name.charAt(0) }}
         </div>
         <div class="flex flex-col">
           <span class="text-sm font-medium text-gray-300">
-            {{ props.message.participant_name }}
+            {{ activeBranch.participant_name }}
           </span>
-          <span v-if="props.message.metadata?.discord_username && props.message.metadata.discord_username !== props.message.participant_name" class="text-[10px] text-gray-500">
-            @{{ props.message.metadata.discord_username }}
+          <span v-if="activeBranch.metadata?.discord_username && activeBranch.metadata.discord_username !== activeBranch.participant_name" class="text-[10px] text-gray-500">
+            @{{ activeBranch.metadata.discord_username }}
           </span>
         </div>
-        <span v-if="props.message.model_info" class="text-xs text-gray-500 font-mono">
-          {{ formatModelName(props.message.model_info.model_id) }}
+        <span v-if="activeBranch.model_info" class="text-xs text-gray-500 font-mono">
+          {{ formatModelName(activeBranch.model_info.model_id) }}
         </span>
         <div class="flex items-center gap-2 ml-auto">
           <!-- Reaction counts (always visible if reactions exist) -->
@@ -97,7 +127,7 @@
           </div>
           
           <span class="text-xs text-gray-600 hidden sm:inline">
-            {{ formatTime(props.message.timestamp) }}
+            {{ formatTime(activeBranch.timestamp || props.message.timestamp) }}
           </span>
         </div>
         
@@ -421,8 +451,7 @@ const emit = defineEmits<{
   'hide-all-previous': [messageId: string]
   'toggle-reaction': [messageId: string, reactionType: 'star' | 'laugh' | 'sparkles']
   'delete-selection': [selectionId: string]
-  'prev-branch': []
-  'next-branch': []
+  'switch-branch': [messageId: string, branchId: string]
 }>()
 
 const contentEl = ref<HTMLElement>()
@@ -491,11 +520,88 @@ watch([showActions, actionsExpanded], () => {
   }
 })
 
-const isUser = computed(() => props.message.participant_type === 'human')
+// Get active branch (for loom submissions) or use message directly (for non-loom)
+const activeBranch = computed(() => {
+  if (props.message.branches && props.message.branches.length > 0 && props.message.active_branch_id) {
+    const branch = props.message.branches.find(b => b.id === props.message.active_branch_id)
+    if (branch) {
+      return branch
+    }
+  }
+  // Fall back to message fields for non-loom submissions
+  return {
+    id: props.message.id,
+    participant_name: props.message.participant_name || 'Unknown',
+    participant_type: props.message.participant_type || 'human',
+    content_blocks: props.message.content_blocks || [],
+    model_info: props.message.model_info,
+    timestamp: props.message.timestamp,
+    metadata: props.message.metadata,
+    hidden_from_models: props.message.hidden_from_models
+  }
+})
+
+const isUser = computed(() => activeBranch.value.participant_type === 'human')
+
+const isHiddenFromModels = computed(() => {
+  return props.isHiddenFromModels || activeBranch.value.hidden_from_models || false
+})
+
+// Branch switching
+// Only show branch switcher if branches were created at THIS message level
+// (i.e., all branches have the same parent_branch_id, meaning this message was edited multiple times)
+// If branches have different parent_branch_id values, they exist because the parent was edited,
+// and this message should only switch when the parent switches
+const hasMultipleBranches = computed(() => {
+  if (!props.message.branches || props.message.branches.length <= 1) {
+    return false
+  }
+  
+  // Check if all branches have the same parent_branch_id
+  // (or all have no parent for root messages)
+  const parentBranchIds = props.message.branches
+    .map(b => b.parent_branch_id)
+    .filter(id => id !== undefined)
+  
+  // If all branches have no parent (root message), show switcher
+  if (parentBranchIds.length === 0) {
+    return true
+  }
+  
+  // If all branches have the same parent, show switcher (branches created at this level)
+  const uniqueParentIds = new Set(parentBranchIds)
+  return uniqueParentIds.size === 1
+})
+
+const branchCount = computed(() => {
+  return props.message.branches?.length || 1
+})
+
+const currentBranchIndex = computed(() => {
+  if (!props.message.branches || props.message.branches.length === 0) return 0
+  const index = props.message.branches.findIndex(b => b.id === props.message.active_branch_id)
+  return index >= 0 ? index : 0
+})
+
+function switchToPrevBranch() {
+  if (currentBranchIndex.value === 0) return
+  const prevBranch = props.message.branches![currentBranchIndex.value - 1]
+  if (prevBranch) {
+    emit('switch-branch', props.message.id, prevBranch.id)
+  }
+}
+
+function switchToNextBranch() {
+  if (currentBranchIndex.value >= branchCount.value - 1) return
+  const nextBranch = props.message.branches![currentBranchIndex.value + 1]
+  if (nextBranch) {
+    emit('switch-branch', props.message.id, nextBranch.id)
+  }
+}
 
 // Extract reply mention from message content (for header display)
 const replyInfo = computed(() => {
-  const firstBlock = props.message.content_blocks[0]
+  const firstBlock = activeBranch.value.content_blocks[0]
   if (firstBlock?.type !== 'text' || !firstBlock.text) return null
   
   const text = firstBlock.text
@@ -522,9 +628,9 @@ const replyInfo = computed(() => {
 
 // Get content blocks with reply prefix stripped from first block
 const processedContentBlocks = computed(() => {
-  if (!replyInfo.value) return props.message.content_blocks
+  if (!replyInfo.value) return activeBranch.value.content_blocks
   
-  const blocks = [...props.message.content_blocks]
+  const blocks = [...activeBranch.value.content_blocks]
   if (blocks[0]?.type === 'text') {
     blocks[0] = {
       ...blocks[0],

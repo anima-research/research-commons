@@ -61,19 +61,50 @@ export const ModelInfoSchema = z.object({
 
 export type ModelInfo = z.infer<typeof ModelInfoSchema>;
 
-// Message in the conversation tree
-export const MessageSchema = z.object({
+// Message branch schema (for loom submissions)
+export const MessageBranchSchema = z.object({
   id: z.string().uuid(),
-  submission_id: z.string().uuid(),
-  parent_message_id: z.string().uuid().nullable(),
-  order: z.number().int(),
   participant_name: z.string(),
   participant_type: z.enum(['human', 'model', 'system']),
   content_blocks: z.array(ContentBlockSchema),
+  parent_branch_id: z.string().uuid().optional(),
+  model_info: ModelInfoSchema.optional(),
+  hidden_from_models: z.boolean().optional(),
+  timestamp: z.date().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export type MessageBranch = z.infer<typeof MessageBranchSchema>;
+
+// Message in the conversation tree
+// For 'loom' submissions: uses branches array and active_branch_id
+// For other submissions: uses parent_message_id, participant_name, etc.
+export const MessageSchema = z.object({
+  id: z.string().uuid(),
+  submission_id: z.string().uuid(),
+  parent_message_id: z.string().uuid().nullable().optional(), // For non-loom
+  order: z.number().int(),
+  // Old format fields (for non-loom)
+  participant_name: z.string().optional(),
+  participant_type: z.enum(['human', 'model', 'system']).optional(),
+  content_blocks: z.array(ContentBlockSchema).optional(),
   model_info: ModelInfoSchema.optional(),
   timestamp: z.date().optional(),
-  metadata: z.record(z.unknown()).optional(), // Store Discord message ID, avatar URL, etc.
-  hidden_from_models: z.boolean().optional() // Messages hidden from AI model context (e.g., dot-prefixed Discord messages)
+  metadata: z.record(z.unknown()).optional(),
+  hidden_from_models: z.boolean().optional(),
+  // Branch format fields (for loom)
+  branches: z.array(MessageBranchSchema).optional(),
+  active_branch_id: z.string().uuid().optional(),
+}).refine((data: any) => {
+  // For loom: must have branches and active_branch_id
+  // For non-loom: must have participant_name, content_blocks, etc.
+  const hasBranches = data.branches && data.branches.length > 0;
+  const hasOldFormat = data.participant_name && data.content_blocks;
+  
+  // Must have either branches (loom) or old format (non-loom), not both
+  return hasBranches !== hasOldFormat;
+}, {
+  message: "Message must have either branches (loom) or old format fields (non-loom), not both"
 });
 
 export type Message = z.infer<typeof MessageSchema>;
@@ -122,14 +153,28 @@ export type Submission = z.infer<typeof SubmissionSchema>;
 // Simplified message for API requests (IDs and submission_id filled by server)
 export const CreateMessageRequestSchema = z.object({
   id: z.string().uuid().optional(),
-  parent_message_id: z.string().uuid().nullable(),
+  // Old format (for non-loom)
+  parent_message_id: z.string().uuid().nullable().optional(),
   order: z.number().int(),
-  participant_name: z.string(),
-  participant_type: z.enum(['human', 'model', 'system']),
-  content_blocks: z.array(ContentBlockSchema),
+  participant_name: z.string().optional(),
+  participant_type: z.enum(['human', 'model', 'system']).optional(),
+  content_blocks: z.array(ContentBlockSchema).optional(),
   model_info: ModelInfoSchema.optional(),
   timestamp: z.coerce.date().optional(),
-  metadata: z.record(z.unknown()).optional()
+  metadata: z.record(z.unknown()).optional(),
+  // Branch format (for loom)
+  branches: z.array(z.object({
+    id: z.string().uuid().optional(),
+    participant_name: z.string(),
+    participant_type: z.enum(['human', 'model', 'system']),
+    content_blocks: z.array(ContentBlockSchema),
+    parent_branch_id: z.string().uuid().optional(),
+    model_info: ModelInfoSchema.optional(),
+    hidden_from_models: z.boolean().optional(),
+    timestamp: z.coerce.date().optional(),
+    metadata: z.record(z.unknown()).optional(),
+  })).optional(),
+  active_branch_id: z.string().uuid().optional(),
 });
 
 // For API requests

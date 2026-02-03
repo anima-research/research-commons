@@ -24,18 +24,35 @@ export interface ModelInfo {
   provider_metadata?: Record<string, unknown>
 }
 
-export interface Message {
+// Message branch (for loom submissions)
+export interface MessageBranch {
   id: string
-  submission_id: string
-  parent_message_id: string | null
-  order: number
   participant_name: string
   participant_type: 'human' | 'model' | 'system'
   content_blocks: ContentBlock[]
+  parent_branch_id?: string
+  model_info?: ModelInfo
+  hidden_from_models?: boolean
+  timestamp?: string
+  metadata?: Record<string, any>
+}
+
+export interface Message {
+  id: string
+  submission_id: string
+  parent_message_id?: string | null // For non-loom
+  order: number
+  // Old format fields (for non-loom)
+  participant_name?: string
+  participant_type?: 'human' | 'model' | 'system'
+  content_blocks?: ContentBlock[]
   model_info?: ModelInfo
   timestamp?: string
   metadata?: Record<string, any> // Discord message ID, avatar URL, etc.
   hidden_from_models?: boolean // Message excluded from AI model context
+  // Branch format fields (for loom)
+  branches?: MessageBranch[]
+  active_branch_id?: string
 }
 
 export type Visibility = 'public' | 'unlisted' | 'researcher' | 'private'
