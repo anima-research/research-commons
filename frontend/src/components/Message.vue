@@ -46,36 +46,6 @@
         <span class="text-indigo-400 font-medium">@{{ replyInfo.username }}</span>
       </div>
       
-      <!-- Branch switcher (shown if message has multiple branches) -->
-      <div v-if="hasMultipleBranches && !documentMode" class="flex items-center gap-2 mb-2 px-2 py-1 bg-gray-800/40 border border-gray-700/50 rounded-lg">
-        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-        </svg>
-        <span class="text-xs text-gray-400">Branch</span>
-        <span class="text-xs text-gray-300 font-mono">{{ currentBranchIndex + 1 }}/{{ branchCount }}</span>
-        <div class="flex-1"></div>
-        <button
-          @click.stop="switchToPrevBranch"
-          :disabled="currentBranchIndex === 0"
-          class="px-1.5 py-0.5 text-xs text-gray-400 hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          :title="currentBranchIndex === 0 ? 'First branch' : 'Previous branch'"
-        >
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <button
-          @click.stop="switchToNextBranch"
-          :disabled="currentBranchIndex === branchCount - 1"
-          class="px-1.5 py-0.5 text-xs text-gray-400 hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          :title="currentBranchIndex === branchCount - 1 ? 'Last branch' : 'Next branch'"
-        >
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-      
       <!-- Participant header (hidden in document mode) -->
       <div v-if="!documentMode" class="flex items-center gap-2 mb-1">
         
@@ -203,6 +173,37 @@
             </details>
           </div>
         </template>
+      </div>
+
+      <!-- Branch switcher (shown if message has multiple branches) - positioned at bottom right -->
+      <div v-if="hasMultipleBranches && !documentMode" class="flex justify-end mt-2">
+        <div class="flex items-center gap-2 px-2 py-1 bg-gray-800/40 border border-gray-700/50 rounded-lg">
+          <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          <span class="text-xs text-gray-400">Branch</span>
+          <span class="text-xs text-gray-300 font-mono">{{ currentBranchIndex + 1 }}/{{ branchCount }}</span>
+          <button
+            @click.stop="switchToPrevBranch"
+            :disabled="currentBranchIndex === 0"
+            class="px-1.5 py-0.5 text-xs text-gray-400 hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            :title="currentBranchIndex === 0 ? 'First branch' : 'Previous branch'"
+          >
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            @click.stop="switchToNextBranch"
+            :disabled="currentBranchIndex === branchCount - 1"
+            class="px-1.5 py-0.5 text-xs text-gray-400 hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            :title="currentBranchIndex === branchCount - 1 ? 'Last branch' : 'Next branch'"
+          >
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <!-- Actions bar (floats on top, appears on hover, becomes sticky at header) -->

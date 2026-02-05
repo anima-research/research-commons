@@ -55,7 +55,7 @@
               
               <!-- Loom -->
               <button
-                @click="submissionCategory = 'loom'"
+                @click="submissionCategory = 'loom'; sourceType = 'arc-certified'"
                 class="relative p-4 rounded-xl border-2 transition-all text-left"
                 :class="submissionCategory === 'loom' 
                   ? 'border-green-500 bg-green-500/10 ring-2 ring-green-500/20' 
@@ -81,8 +81,8 @@
             </div>
           </div>
 
-          <!-- Source Type (for conversation and loom categories) -->
-          <div v-if="submissionCategory === 'conversation' || submissionCategory === 'loom'" class="mb-6">
+          <!-- Source Type (for conversation category) -->
+          <div v-if="submissionCategory === 'conversation'" class="mb-6">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Import Source
             </label>
@@ -94,6 +94,17 @@
               <option value="arc-certified">ARC Certified</option>
               <option value="discord">Discord</option>
             </select>
+          </div>
+          
+          <!-- Source Type (for loom category - only ARC Certified) -->
+          <div v-if="submissionCategory === 'loom'" class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Import Source
+            </label>
+            <div class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-gray-100 dark:bg-gray-800/50 text-gray-900 dark:text-gray-100">
+              ARC Certified
+            </div>
+            <p class="mt-1 text-xs text-gray-500">Loom submissions only support ARC certified exports</p>
           </div>
           
           <!-- Source Type (for other category) -->
@@ -111,7 +122,7 @@
           </div>
 
           <!-- Discord Import -->
-          <div v-if="(submissionCategory === 'conversation' || submissionCategory === 'loom') && sourceType === 'discord'" class="space-y-4 mb-6">
+          <div v-if="submissionCategory === 'conversation' && sourceType === 'discord'" class="space-y-4 mb-6">
             <div class="p-3 bg-blue-900/20 border border-blue-700/50 rounded text-sm text-blue-200">
               <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
@@ -240,6 +251,45 @@
               </p>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 ARC exports or Anthropic API message format
+              </p>
+            </div>
+          </div>
+
+          <!-- Loom Upload (ARC Certified exports only) -->
+          <div v-if="submissionCategory === 'loom'" class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Upload Loom File
+            </label>
+            
+            <!-- Supported formats info -->
+            <div class="mb-3 p-3 bg-green-900/20 border border-green-700/50 rounded text-sm text-green-200">
+              <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+              </svg>
+              <strong>Loom format:</strong> ARC conversation exports containing multiple generation branches. The file should contain
+              branching conversation data from the ARC interface.
+            </div>
+            
+            <div class="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center bg-gray-50 dark:bg-gray-800 transition-colors hover:border-green-400 dark:hover:border-green-600">
+              <input
+                type="file"
+                accept=".json"
+                @change="handleFileUpload"
+                class="hidden"
+                ref="loomFileInput"
+              />
+              <button
+                type="button"
+                @click="($refs.loomFileInput as any)?.click()"
+                class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+              >
+                🌳 Choose Loom File
+              </button>
+              <p v-if="uploadedFile" class="mt-3 text-sm text-gray-900 dark:text-gray-100 font-medium">
+                ✓ {{ uploadedFile.name }}
+              </p>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                ARC loom export (JSON format)
               </p>
             </div>
           </div>
@@ -924,6 +974,7 @@ function resetToUpload() {
   selectedTopics.value = []
   participantMapping.value = {}
   previewMessages.value = []
+  allMessages.value = []
   participantNames.value = []
   error.value = ''
   fetchStats.value = null
@@ -943,7 +994,8 @@ const selectedTopics = ref<string[]>([])
 const availableTopics = ref<any[]>([])
 const availableModels = ref<any[]>([])
 const uploadedFile = ref<File | null>(null)
-const previewMessages = ref<Message[]>([])
+const previewMessages = ref<Message[]>([]) // For display (may be filtered for loom)
+const allMessages = ref<Message[]>([]) // All messages for submission (includes all branches)
 const participantNames = ref<string[]>([])
 const participantMapping = ref<Record<string, string>>({}) // participantName -> modelId or 'human'
 const error = ref('')
@@ -1242,6 +1294,61 @@ function getRandomColor(): string {
   return MODEL_COLOR_PALETTE[Math.floor(Math.random() * MODEL_COLOR_PALETTE.length)]
 }
 
+// Filter messages to only include those in the current branch path
+// For loom submissions, not all messages are visible - only those in the active branch chain
+function filterVisibleMessages(allMessages: Message[]): Message[] {
+  if (allMessages.length === 0) return []
+  
+  const firstMessage = allMessages[0]
+  
+  // If not a loom submission, return all messages
+  if (!firstMessage.branches || firstMessage.branches.length === 0) {
+    return allMessages
+  }
+  
+  // For loom submissions, filter to only include messages in the current branch path
+  const visible: Message[] = []
+  let currentActiveBranchId = firstMessage.active_branch_id || firstMessage.branches[0]?.id
+  
+  for (const message of allMessages) {
+    if (!message.branches || message.branches.length === 0) {
+      visible.push(message)
+      continue
+    }
+    
+    // For the first message, always include it
+    if (visible.length === 0) {
+      visible.push(message)
+      currentActiveBranchId = message.active_branch_id || message.branches[0]?.id
+      continue
+    }
+    
+    // For subsequent messages, check if any branch is a child of the current active branch
+    // First, check if the currently active branch is a child of the parent (respect user's selection)
+    const currentBranch = message.branches.find(b => b.id === message.active_branch_id)
+    
+    if (currentBranch && currentBranch.parent_branch_id === currentActiveBranchId) {
+      // The selected branch is valid for this path - use it
+      visible.push(message)
+      currentActiveBranchId = currentBranch.id
+    } else {
+      // Check if ANY branch is a child of the current active branch
+      const matchingBranch = message.branches.find(b => b.parent_branch_id === currentActiveBranchId)
+      
+      if (matchingBranch) {
+        // This message is in the current branch path - include it
+        message.active_branch_id = matchingBranch.id
+        currentActiveBranchId = matchingBranch.id
+        visible.push(message)
+      }
+      // If no matching branch, skip this message - it's not in the current path
+    }
+  }
+  
+  console.log('[Submit] Filtered to', visible.length, 'visible messages from', allMessages.length, 'total')
+  return visible
+}
+
 function detectProvider(participantName: string): 'anthropic' | 'openai' | 'google' | 'meta' | 'other' {
   const nameLower = participantName.toLowerCase()
   
@@ -1357,6 +1464,7 @@ async function parseJSON() {
   
   error.value = ''
   previewMessages.value = []
+  allMessages.value = []
   
   try {
     const text = await uploadedFile.value.text()
@@ -1482,7 +1590,10 @@ async function parseJSON() {
           })
         })
         
-        previewMessages.value = converted
+        // Store ALL messages for submission
+        allMessages.value = converted
+        // Filter for preview display only
+        previewMessages.value = filterVisibleMessages(converted)
         participantNames.value = Array.from(participants)
         
         // Auto-detect source type based on conversation format
@@ -1822,7 +1933,9 @@ async function submit() {
     // Update messages with correct participant types and model info
     // For loom submissions: apply mapping to branches (each branch has its own participant)
     // For non-loom submissions: apply mapping to messages
-    const updatedMessages = previewMessages.value.map(msg => {
+    // IMPORTANT: Use allMessages (not previewMessages) to include ALL branches for loom submissions
+    const messagesToSubmit = allMessages.value.length > 0 ? allMessages.value : previewMessages.value
+    const updatedMessages = messagesToSubmit.map(msg => {
       // If this is a loom message with branches
       if (msg.branches && msg.branches.length > 0) {
         const updatedBranches = msg.branches.map(branch => {
