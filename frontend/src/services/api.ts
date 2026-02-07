@@ -298,5 +298,56 @@ export const modelsAPI = {
     api.delete<{ success: boolean }>(`/models/${id}`)
 }
 
+export interface UserStats {
+  submission_count: number
+  comment_count: number
+  rating_count: number
+  tag_count: number
+  selection_count: number
+}
+
+export interface AdminUser extends User {
+  stats: UserStats
+  created_at: string
+  updated_at?: string
+}
+
+export interface SystemStats {
+  total_users: number
+  total_submissions: number
+  users_by_role: Record<string, number>
+  submissions_by_visibility: Record<string, number>
+}
+
+export const adminAPI = {
+  // Get all users with stats
+  getUsers: () =>
+    api.get<{ users: AdminUser[] }>('/admin/users'),
+  
+  // Get single user with stats
+  getUser: (userId: string) =>
+    api.get<{ user: AdminUser }>(`/admin/users/${userId}`),
+  
+  // Update all roles for a user
+  updateUserRoles: (userId: string, roles: User['roles']) =>
+    api.put<{ success: boolean; message: string; user: User }>(`/admin/users/${userId}/roles`, { roles }),
+  
+  // Add a single role to user
+  addUserRole: (userId: string, role: User['roles'][0]) =>
+    api.post<{ success: boolean; message: string; user: User }>(`/admin/users/${userId}/roles/${role}`),
+  
+  // Remove a single role from user
+  removeUserRole: (userId: string, role: string) =>
+    api.delete<{ success: boolean; message: string; user: User }>(`/admin/users/${userId}/roles/${role}`),
+  
+  // Promote user to admin
+  promoteUser: (userId: string) =>
+    api.post<{ success: boolean; message: string; user: User }>(`/admin/promote/${userId}`),
+  
+  // Get system-wide stats
+  getStats: () =>
+    api.get<{ stats: SystemStats }>('/admin/stats')
+}
+
 export default api
 
