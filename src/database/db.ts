@@ -469,6 +469,77 @@ export class AnnotationDatabase {
     return rows.map(r => r.message_id);
   }
 
+  // Folder member methods
+  addFolderMember(folderId: string, userId: string, addedBy: string): void {
+    const stmt = this.db.prepare(`
+      INSERT OR IGNORE INTO folder_members (folder_id, user_id, added_by, added_at)
+      VALUES (?, ?, ?, datetime('now'))
+    `);
+    stmt.run(folderId, userId, addedBy);
+  }
+
+  removeFolderMember(folderId: string, userId: string): void {
+    this.db.prepare('DELETE FROM folder_members WHERE folder_id = ? AND user_id = ?')
+      .run(folderId, userId);
+  }
+
+  getFolderMembers(folderId: string): Array<{ user_id: string; added_by: string; added_at: string }> {
+    const rows = this.db.prepare(
+      'SELECT user_id, added_by, added_at FROM folder_members WHERE folder_id = ?'
+    ).all(folderId);
+    return rows as Array<{ user_id: string; added_by: string; added_at: string }>;
+  }
+
+  isFolderMember(folderId: string, userId: string): boolean {
+    const row = this.db.prepare(
+      'SELECT 1 FROM folder_members WHERE folder_id = ? AND user_id = ? LIMIT 1'
+    ).get(folderId, userId);
+    return !!row;
+  }
+
+  getFolderIdsForUser(userId: string): string[] {
+    const rows = this.db.prepare(
+      'SELECT folder_id FROM folder_members WHERE user_id = ?'
+    ).all(userId);
+    return (rows as Array<{ folder_id: string }>).map(r => r.folder_id);
+  }
+
+  deleteFolderMembers(folderId: string): void {
+    this.db.prepare('DELETE FROM folder_members WHERE folder_id = ?').run(folderId);
+  }
+
+  // Folder submission methods
+  addSubmissionToFolder(folderId: string, submissionId: string, addedBy: string): void {
+    const stmt = this.db.prepare(`
+      INSERT OR IGNORE INTO folder_submissions (folder_id, submission_id, added_by, added_at)
+      VALUES (?, ?, ?, datetime('now'))
+    `);
+    stmt.run(folderId, submissionId, addedBy);
+  }
+
+  removeSubmissionFromFolder(folderId: string, submissionId: string): void {
+    this.db.prepare('DELETE FROM folder_submissions WHERE folder_id = ? AND submission_id = ?')
+      .run(folderId, submissionId);
+  }
+
+  getFolderSubmissions(folderId: string): Array<{ submission_id: string; added_by: string; added_at: string }> {
+    const rows = this.db.prepare(
+      'SELECT submission_id, added_by, added_at FROM folder_submissions WHERE folder_id = ? ORDER BY added_at DESC'
+    ).all(folderId);
+    return rows as Array<{ submission_id: string; added_by: string; added_at: string }>;
+  }
+
+  getSubmissionFolderIds(submissionId: string): string[] {
+    const rows = this.db.prepare(
+      'SELECT folder_id FROM folder_submissions WHERE submission_id = ?'
+    ).all(submissionId);
+    return (rows as Array<{ folder_id: string }>).map(r => r.folder_id);
+  }
+
+  deleteFolderSubmissions(folderId: string): void {
+    this.db.prepare('DELETE FROM folder_submissions WHERE folder_id = ?').run(folderId);
+  }
+
   close(): void {
     this.db.close();
   }

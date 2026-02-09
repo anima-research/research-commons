@@ -10,6 +10,7 @@ import { OntologyStore } from './services/ontology-store.js';
 import { RankingStore } from './services/ranking-store.js';
 import { ModelStore } from './services/model-store.js';
 import { ParticipantMappingStore } from './services/participant-mapping-store.js';
+import { FolderStore } from './services/folder-store.js';
 import { createAuthRoutes } from './routes/auth.js';
 import { createSubmissionRoutes } from './routes/submissions.js';
 import { createSubmissionSystemsRoutes } from './routes/submission-systems.js';
@@ -22,6 +23,7 @@ import { createAdminRoutes } from './routes/admin.js';
 import { createImportRoutes } from './routes/imports.js';
 import { createDiscordPreviewRoutes } from './routes/discord-preview.js';
 import { createOgMetaRoutes, createOgMiddleware } from './routes/og-meta.js';
+import { createFolderRoutes } from './routes/folders.js';
 import { EmailService } from './services/email-service.js';
 
 dotenv.config();
@@ -49,6 +51,7 @@ export interface AppContext {
   rankingStore: RankingStore;
   modelStore: ModelStore;
   participantMappingStore: ParticipantMappingStore;
+  folderStore: FolderStore;
   discordConfig: {
     apiUrl: string | undefined;
     apiToken: string | undefined;
@@ -198,6 +201,7 @@ async function main() {
   const rankingStore = new RankingStore(DATA_PATH);
   const modelStore = new ModelStore(DATA_PATH);
   const participantMappingStore = new ParticipantMappingStore(DATA_PATH);
+  const folderStore = new FolderStore(DATA_PATH);
 
   await submissionStore.init();
   await userStore.init();
@@ -206,6 +210,7 @@ async function main() {
   await rankingStore.init();
   await modelStore.init();
   await participantMappingStore.init();
+  await folderStore.init();
 
   // Auto-create defaults if needed
   await initializeDefaults(ontologyStore, rankingStore, modelStore, researchStore);
@@ -227,6 +232,7 @@ async function main() {
     rankingStore,
     modelStore,
     participantMappingStore,
+    folderStore,
     discordConfig: {
       apiUrl: DISCORD_API_URL,
       apiToken: DISCORD_API_TOKEN
@@ -246,6 +252,7 @@ async function main() {
   app.use('/api/admin', createAdminRoutes(context));
   app.use('/api/imports', createImportRoutes(context));
   app.use('/api/discord-preview', createDiscordPreviewRoutes(context));
+  app.use('/api/folders', createFolderRoutes(context));
   app.use('/api', createOgMetaRoutes(context));
 
   // OG meta middleware for social media crawlers (must be before SPA fallback)
@@ -299,6 +306,7 @@ async function main() {
     await researchStore.close();
     await ontologyStore.close();
     await rankingStore.close();
+    await folderStore.close();
     process.exit(0);
   });
 }

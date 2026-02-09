@@ -125,7 +125,10 @@ export const authAPI = {
 export const submissionsAPI = {
   list: () =>
     api.get<{ submissions: Submission[] }>('/submissions'),
-  
+
+  search: (q: string) =>
+    api.get<{ submissions: { id: string; title: string }[] }>('/submissions/search', { params: { q } }),
+
   create: (data: any) =>
     api.post<Submission>('/submissions', data),
   
@@ -347,6 +350,102 @@ export const adminAPI = {
   // Get system-wide stats
   getStats: () =>
     api.get<{ stats: SystemStats }>('/admin/stats')
+}
+
+// Folder types
+export type FolderVisibility = 'private' | 'shared' | 'public'
+
+export interface Folder {
+  id: string
+  name: string
+  description?: string
+  created_by: string
+  created_at: string
+  visibility: FolderVisibility
+  required_role?: string
+  color?: string
+}
+
+export interface FolderMember {
+  user_id: string
+  added_by: string
+  added_at: string
+  name?: string
+}
+
+export interface FolderSubmission {
+  id: string
+  title: string
+  source_type: string
+  submitted_at: string
+  added_to_folder_at: string
+  added_to_folder_by: string
+}
+
+export interface FolderDetail {
+  folder: Folder
+  submissions: FolderSubmission[]
+  members: FolderMember[]
+  submission_count: number
+  member_count: number
+}
+
+export const foldersAPI = {
+  // List folders accessible to current user
+  list: () =>
+    api.get<{ folders: Folder[] }>('/folders'),
+
+  // Get folder details with submissions and members
+  get: (id: string) =>
+    api.get<FolderDetail>(`/folders/${id}`),
+
+  // Create folder
+  create: (data: {
+    name: string
+    description?: string
+    visibility?: FolderVisibility
+    required_role?: string
+    color?: string
+  }) =>
+    api.post<{ folder: Folder }>('/folders', data),
+
+  // Update folder
+  update: (id: string, data: Partial<{
+    name: string
+    description: string | null
+    visibility: FolderVisibility
+    required_role: string | null
+    color: string | null
+  }>) =>
+    api.patch<{ folder: Folder }>(`/folders/${id}`, data),
+
+  // Delete folder
+  delete: (id: string) =>
+    api.delete<{ success: boolean; removed_submissions: number; removed_members: number }>(`/folders/${id}`),
+
+  // Add submission to folder
+  addSubmission: (folderId: string, submissionId: string) =>
+    api.post<{ success: boolean }>(`/folders/${folderId}/submissions`, { submission_id: submissionId }),
+
+  // Remove submission from folder
+  removeSubmission: (folderId: string, submissionId: string) =>
+    api.delete<{ success: boolean }>(`/folders/${folderId}/submissions/${submissionId}`),
+
+  // Add member to folder
+  addMember: (folderId: string, userId: string) =>
+    api.post<{ success: boolean; member: { user_id: string; name: string } }>(`/folders/${folderId}/members`, { user_id: userId }),
+
+  // Remove member from folder
+  removeMember: (folderId: string, userId: string) =>
+    api.delete<{ success: boolean }>(`/folders/${folderId}/members/${userId}`),
+
+  // Get folders containing a submission
+  getBySubmission: (submissionId: string) =>
+    api.get<{ folders: Folder[] }>(`/folders/by-submission/${submissionId}`),
+
+  // Search users for member picker
+  searchUsers: (q?: string) =>
+    api.get<{ users: { id: string; name: string; email: string }[] }>(`/folders/users/search`, { params: { q: q || '' } })
 }
 
 export default api

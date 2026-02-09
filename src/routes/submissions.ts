@@ -8,6 +8,40 @@ import { CreateSubmissionRequestSchema, Message } from '../types/submission.js';
 export function createSubmissionRoutes(context: AppContext): Router {
   const router = Router();
 
+  // Lightweight title search (for folder add-submission picker)
+  router.get('/search', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const q = (req.query.q as string || '').toLowerCase();
+      if (!q) {
+        res.json({ submissions: [] });
+        return;
+      }
+
+      const user = await context.userStore.getUserById(req.userId!);
+      const userRoles = user?.roles || [];
+      const isResearcher = userRoles.includes('researcher') || userRoles.includes('admin');
+
+      const all = await context.submissionStore.listSubmissions();
+      const results = all
+        .filter(sub => {
+          const vis = sub.visibility || 'public';
+          if (vis === 'public') return true;
+          if (vis === 'unlisted') return false;
+          if (vis === 'private') return req.userId === sub.submitter_id || userRoles.includes('admin');
+          if (vis === 'researcher') return isResearcher || req.userId === sub.submitter_id;
+          return false;
+        })
+        .filter(sub => sub.title.toLowerCase().includes(q))
+        .slice(0, 15)
+        .map(sub => ({ id: sub.id, title: sub.title }));
+
+      res.json({ submissions: results });
+    } catch (error) {
+      console.error('Submission search error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // List submissions
   router.get('/', async (req, res) => {
     try {

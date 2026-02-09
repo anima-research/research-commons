@@ -113,3 +113,27 @@ CREATE TABLE IF NOT EXISTS hidden_messages (
 
 CREATE INDEX IF NOT EXISTS idx_hidden_messages_submission ON hidden_messages(submission_id);
 
+-- Folder members: Who has explicit access to which folders
+CREATE TABLE IF NOT EXISTS folder_members (
+  folder_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  added_by TEXT NOT NULL,
+  added_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (folder_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_folder_members_user ON folder_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_folder_members_folder ON folder_members(folder_id);
+
+-- Folder submissions: Which submissions are in which folders
+CREATE TABLE IF NOT EXISTS folder_submissions (
+  folder_id TEXT NOT NULL,
+  submission_id TEXT NOT NULL,
+  added_by TEXT NOT NULL,
+  added_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (folder_id, submission_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_folder_submissions_folder ON folder_submissions(folder_id);
+CREATE INDEX IF NOT EXISTS idx_folder_submissions_submission ON folder_submissions(submission_id);
+

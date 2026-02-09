@@ -51,6 +51,14 @@
                 Rate
               </button>
               <button
+                v-if="authStore.isAuthenticated()"
+                @click="openFolderPicker"
+                class="px-2 py-1 bg-gray-700/50 border border-gray-600/30 text-gray-300 text-[10px] rounded hover:bg-gray-600/50"
+                title="Manage folders"
+              >
+                📁<template v-if="submissionFolderCount > 0"> {{ submissionFolderCount }}</template>
+              </button>
+              <button
                 v-if="canDeleteSubmission"
                 @click="handleDeleteSubmission"
                 class="p-1 text-gray-500 hover:text-red-400"
@@ -230,13 +238,21 @@
           </router-link>
           
           <button
+            v-if="authStore.isAuthenticated()"
+            @click="openFolderPicker"
+            class="px-3 py-1.5 bg-gray-700/30 hover:bg-gray-700/50 border border-gray-600/30 text-gray-300 text-xs rounded font-medium transition-all"
+            title="Manage folders"
+          >
+            📁 Folder<template v-if="submissionFolderCount > 0"> ({{ submissionFolderCount }})</template>
+          </button>
+          <button
             v-if="canDeleteSubmission"
             @click="handleDeleteSubmission"
             class="px-2 py-1 text-red-400/70 hover:text-red-400 text-xs transition-colors"
           >
             🗑️
           </button>
-          
+
           <!-- More menu (desktop) -->
           <div class="relative" v-if="canExport">
             <button
@@ -530,6 +546,86 @@
       </div>
     </div>
 
+    <!-- Folder Picker Modal -->
+    <div
+      v-if="showFolderPicker"
+      class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+      @click.self="showFolderPicker = false"
+    >
+      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-sm w-full border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Folders</h3>
+        </div>
+
+        <div v-if="folderPickerLoading" class="px-5 py-8 text-center text-sm text-gray-500">Loading...</div>
+
+        <template v-else>
+          <!-- Current folders -->
+          <div v-if="folderPickerCurrentFolders.length > 0">
+            <div class="px-5 pt-3 pb-1 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">In folders</div>
+            <div class="max-h-32 overflow-y-auto">
+              <div
+                v-for="folder in folderPickerCurrentFolders"
+                :key="folder.id"
+                class="px-5 py-2.5 flex items-center gap-3 group"
+              >
+                <svg class="w-4 h-4 text-indigo-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                </svg>
+                <router-link
+                  :to="`/folders/${folder.id}`"
+                  @click="showFolderPicker = false"
+                  class="flex-1 min-w-0 text-sm text-gray-900 dark:text-gray-100 hover:text-indigo-500 dark:hover:text-indigo-400 truncate transition-colors"
+                >
+                  {{ folder.name }}
+                </router-link>
+                <button
+                  @click="removeFromFolder(folder.id)"
+                  class="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-red-400 transition-all shrink-0"
+                  title="Remove from folder"
+                >
+                  &times;
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Available folders to add -->
+          <div v-if="folderPickerAvailable.length > 0">
+            <div class="px-5 pt-3 pb-1 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider border-t border-gray-100 dark:border-gray-800">Add to folder</div>
+            <div class="max-h-32 overflow-y-auto">
+              <button
+                v-for="folder in folderPickerAvailable"
+                :key="folder.id"
+                @click="addToFolder(folder.id)"
+                class="w-full px-5 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3"
+              >
+                <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <span class="text-sm text-gray-600 dark:text-gray-400 truncate">{{ folder.name }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div v-if="folderPickerFolders.length === 0" class="px-5 py-8 text-center text-sm text-gray-500">
+            No folders yet.
+            <router-link to="/folders" @click="showFolderPicker = false" class="text-indigo-500 hover:underline block mt-2">Create one</router-link>
+          </div>
+        </template>
+
+        <div class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+          <button
+            @click="showFolderPicker = false"
+            class="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Tag Popover (inline tag selection) -->
     <TagPopover
       :show="showTagPopover"
@@ -613,7 +709,7 @@ import TopicSelector from '@/components/TopicSelector.vue'
 import RatingForm from '@/components/RatingForm.vue'
 import type { Message, Selection, Comment, Rating, Topic } from '@/types'
 import type { MarginAnnotation, VerticalBar } from '@/utils/layout-manager'
-import { ontologiesAPI, submissionsAPI, annotationsAPI, researchAPI, rankingsAPI, authAPI } from '@/services/api'
+import { ontologiesAPI, submissionsAPI, annotationsAPI, researchAPI, rankingsAPI, authAPI, foldersAPI, type Folder } from '@/services/api'
 import { renderMarkdown } from '@/utils/markdown'
 
 const route = useRoute()
@@ -812,6 +908,7 @@ onMounted(async () => {
   window.addEventListener('resize', checkMobile)
   document.addEventListener('click', handleDocumentClick)
   await loadData()
+  loadSubmissionFolderCount()
   
   // Use ResizeObserver to track header height changes
   const updateHeaderHeight = () => {
@@ -1849,6 +1946,18 @@ const showTagPicker = ref(false)
 const showRatingForm = ref(false)
 const showStatsDetail = ref(false)
 const showMoreMenu = ref(false)
+const showFolderPicker = ref(false)
+const folderPickerLoading = ref(false)
+const folderPickerFolders = ref<Folder[]>([])
+const folderPickerExisting = ref<Set<string>>(new Set())
+const submissionFolderCount = ref(0)
+
+const folderPickerCurrentFolders = computed(() =>
+  folderPickerFolders.value.filter(f => folderPickerExisting.value.has(f.id))
+)
+const folderPickerAvailable = computed(() =>
+  folderPickerFolders.value.filter(f => !folderPickerExisting.value.has(f.id))
+)
 const activeSelectionId = ref<string | null>(null)
 const replyToCommentId = ref<string | null>(null)
 const commentContext = ref<{ messageId: string; text?: string; selectionId?: string } | null>(null)
@@ -2643,6 +2752,57 @@ async function handleDeleteSubmission() {
   } catch (err: any) {
     console.error('Failed to delete submission:', err)
     alert('Failed to delete submission: ' + (err.response?.data?.error || err.message))
+  }
+}
+
+async function loadSubmissionFolderCount() {
+  if (!authStore.isAuthenticated()) return
+  try {
+    const res = await foldersAPI.getBySubmission(submissionId)
+    submissionFolderCount.value = res.data.folders.length
+  } catch { /* ignore for unauthenticated */ }
+}
+
+async function openFolderPicker() {
+  showFolderPicker.value = true
+  folderPickerLoading.value = true
+  try {
+    const [foldersRes, existingRes] = await Promise.all([
+      foldersAPI.list(),
+      foldersAPI.getBySubmission(submissionId)
+    ])
+    folderPickerFolders.value = foldersRes.data.folders
+    folderPickerExisting.value = new Set(existingRes.data.folders.map(f => f.id))
+    submissionFolderCount.value = existingRes.data.folders.length
+  } catch (err) {
+    console.error('Failed to load folders:', err)
+  } finally {
+    folderPickerLoading.value = false
+  }
+}
+
+async function addToFolder(folderId: string) {
+  try {
+    await foldersAPI.addSubmission(folderId, submissionId)
+    folderPickerExisting.value = new Set([...folderPickerExisting.value, folderId])
+    submissionFolderCount.value = folderPickerExisting.value.size
+  } catch (err: any) {
+    console.error('Failed to add to folder:', err)
+    alert('Failed to add to folder: ' + (err.response?.data?.error || err.message))
+  }
+}
+
+async function removeFromFolder(folderId: string) {
+  if (!confirm('Remove this conversation from the folder?')) return
+  try {
+    await foldersAPI.removeSubmission(folderId, submissionId)
+    const next = new Set(folderPickerExisting.value)
+    next.delete(folderId)
+    folderPickerExisting.value = next
+    submissionFolderCount.value = next.size
+  } catch (err: any) {
+    console.error('Failed to remove from folder:', err)
+    alert('Failed to remove from folder: ' + (err.response?.data?.error || err.message))
   }
 }
 
