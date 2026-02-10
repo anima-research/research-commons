@@ -69,6 +69,19 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/folders',
+      name: 'folders',
+      component: () => import('@/views/FoldersView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/folders/:id',
+      name: 'folder-detail',
+      component: () => import('@/views/FolderDetailView.vue'),
+      props: true,
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/admin',
       name: 'admin',
       component: () => import('@/views/AdminView.vue'),
