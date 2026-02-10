@@ -50,6 +50,17 @@ export function createFolderRoutes(context: AppContext): Router {
     return folder.created_by === userId || userRoles.includes('admin');
   }
 
+  // Helper: Check if user can access a submission based on its visibility
+  function canAccessSubmission(userId: string, submission: { visibility?: string; submitter_id: string }, userRoles: string[]): boolean {
+    const vis = submission.visibility || 'public';
+    if (vis === 'public' || vis === 'unlisted') return true; // unlisted is accessible via direct reference
+    const isOwner = userId === submission.submitter_id;
+    const isAdmin = userRoles.includes('admin');
+    if (vis === 'private') return isOwner || isAdmin;
+    if (vis === 'researcher') return isOwner || isAdmin || userRoles.includes('researcher');
+    return false;
+  }
+
   // Search users (lightweight, for member pickers - any authenticated user)
   router.get('/users/search', authenticateToken, async (req: AuthRequest, res) => {
     try {
@@ -289,9 +300,13 @@ export function createFolderRoutes(context: AppContext): Router {
 
       const data = AddFolderSubmissionRequestSchema.parse(req.body);
 
-      // Verify submission exists
+      // Verify submission exists and caller can access it
       const submission = await context.submissionStore.getSubmission(data.submission_id);
       if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+      if (!canAccessSubmission(req.userId!, submission, user.roles)) {
         res.status(404).json({ error: 'Submission not found' });
         return;
       }
@@ -427,12 +442,7 @@ export function createFolderRoutes(context: AppContext): Router {
         res.status(404).json({ error: 'Submission not found' });
         return;
       }
-      const vis = submission.visibility || 'public';
-      const isResearcher = user.roles.includes('researcher') || user.roles.includes('admin');
-      const canAccess = vis === 'public'
-        || (vis === 'private' && (req.userId === submission.submitter_id || user.roles.includes('admin')))
-        || (vis === 'researcher' && (isResearcher || req.userId === submission.submitter_id));
-      if (!canAccess) {
+      if (!canAccessSubmission(req.userId!, submission, user.roles)) {
         res.status(404).json({ error: 'Submission not found' });
         return;
       }

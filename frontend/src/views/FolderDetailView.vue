@@ -239,7 +239,6 @@
             class="w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ sub.title }}</div>
-            <div class="text-xs text-gray-500">{{ sub.source_type }}</div>
           </button>
           <div v-if="!searchingSubmissions && submissionSearch && availableSubmissions.length === 0" class="text-center py-4 text-gray-400 text-sm">
             No submissions found
