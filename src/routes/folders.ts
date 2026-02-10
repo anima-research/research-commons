@@ -204,6 +204,15 @@ export function createFolderRoutes(context: AppContext): Router {
 
       const data = UpdateFolderRequestSchema.parse(req.body);
 
+      // Validate required_role if provided
+      if (data.required_role != null && data.required_role !== '') {
+        const validRoles = ['viewer', 'contributor', 'rater', 'expert', 'researcher', 'agent', 'admin'];
+        if (!validRoles.includes(data.required_role)) {
+          res.status(400).json({ error: `Invalid role: ${data.required_role}` });
+          return;
+        }
+      }
+
       const updates: Partial<Folder> = {};
       if (data.name !== undefined) updates.name = data.name;
       if (data.description !== undefined) updates.description = data.description || undefined;
@@ -246,12 +255,11 @@ export function createFolderRoutes(context: AppContext): Router {
       const submissionCount = context.annotationDb.getFolderSubmissions(folder.id).length;
       const memberCount = context.annotationDb.getFolderMembers(folder.id).length;
 
-      // Clean up SQLite tables
-      context.annotationDb.deleteFolderSubmissions(folder.id);
-      context.annotationDb.deleteFolderMembers(folder.id);
-
-      // Delete the folder
+      // Delete folder from event store first - if this fails, nothing is lost
       await context.folderStore.deleteFolder(folder.id);
+
+      // Clean up SQLite tables in a transaction
+      context.annotationDb.deleteFolderData(folder.id);
 
       res.json({
         success: true,
@@ -352,7 +360,12 @@ export function createFolderRoutes(context: AppContext): Router {
       // Auto-switch to 'shared' visibility if adding members to private folder
       let updatedFolder = folder;
       if (folder.visibility === 'private') {
-        updatedFolder = await context.folderStore.updateFolder(folder.id, { visibility: 'shared' }) || folder;
+        const result = await context.folderStore.updateFolder(folder.id, { visibility: 'shared' });
+        if (!result) {
+          res.status(404).json({ error: 'Folder not found' });
+          return;
+        }
+        updatedFolder = result;
       }
 
       context.annotationDb.addFolderMember(folder.id, data.user_id, req.userId!);
@@ -405,6 +418,22 @@ export function createFolderRoutes(context: AppContext): Router {
       const user = await context.userStore.getUserById(req.userId!);
       if (!user) {
         res.status(401).json({ error: 'User not found' });
+        return;
+      }
+
+      // Verify the caller can access this submission
+      const submission = await context.submissionStore.getSubmission(req.params.submissionId);
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+      const vis = submission.visibility || 'public';
+      const isResearcher = user.roles.includes('researcher') || user.roles.includes('admin');
+      const canAccess = vis === 'public'
+        || (vis === 'private' && (req.userId === submission.submitter_id || user.roles.includes('admin')))
+        || (vis === 'researcher' && (isResearcher || req.userId === submission.submitter_id));
+      if (!canAccess) {
+        res.status(404).json({ error: 'Submission not found' });
         return;
       }
 

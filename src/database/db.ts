@@ -540,6 +540,15 @@ export class AnnotationDatabase {
     this.db.prepare('DELETE FROM folder_submissions WHERE folder_id = ?').run(folderId);
   }
 
+  // Atomic cleanup of all folder data in SQLite
+  deleteFolderData(folderId: string): void {
+    const cleanup = this.db.transaction((id: string) => {
+      this.db.prepare('DELETE FROM folder_submissions WHERE folder_id = ?').run(id);
+      this.db.prepare('DELETE FROM folder_members WHERE folder_id = ?').run(id);
+    });
+    cleanup(folderId);
+  }
+
   close(): void {
     this.db.close();
   }

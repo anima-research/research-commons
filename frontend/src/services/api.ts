@@ -433,7 +433,7 @@ export const foldersAPI = {
 
   // Add member to folder
   addMember: (folderId: string, userId: string) =>
-    api.post<{ success: boolean; member: { user_id: string; name: string } }>(`/folders/${folderId}/members`, { user_id: userId }),
+    api.post<{ success: boolean; member: { user_id: string; name: string }; folder: Folder }>(`/folders/${folderId}/members`, { user_id: userId }),
 
   // Remove member from folder
   removeMember: (folderId: string, userId: string) =>

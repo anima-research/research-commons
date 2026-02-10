@@ -908,7 +908,7 @@ onMounted(async () => {
   window.addEventListener('resize', checkMobile)
   document.addEventListener('click', handleDocumentClick)
   await loadData()
-  loadSubmissionFolderCount()
+  await loadSubmissionFolderCount()
   
   // Use ResizeObserver to track header height changes
   const updateHeaderHeight = () => {

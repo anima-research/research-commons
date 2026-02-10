@@ -89,7 +89,6 @@ export class FolderStore {
     const { id: _, created_by: __, created_at: ___, ...safeUpdates } = updates;
 
     const updated = { ...folder, ...safeUpdates };
-    this.folders.set(id, updated);
 
     await this.foldersFile.appendEvent({
       timestamp: new Date(),
@@ -97,13 +96,12 @@ export class FolderStore {
       data: { id, updates: safeUpdates }
     });
 
+    this.folders.set(id, updated);
     return updated;
   }
 
   async deleteFolder(id: string): Promise<boolean> {
     if (!this.folders.has(id)) return false;
-
-    this.folders.delete(id);
 
     await this.foldersFile.appendEvent({
       timestamp: new Date(),
@@ -111,6 +109,7 @@ export class FolderStore {
       data: { id }
     });
 
+    this.folders.delete(id);
     return true;
   }
 
