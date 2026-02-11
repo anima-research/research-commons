@@ -53,15 +53,17 @@
                 <div class="text-xs text-gray-500 mt-1">Single text document that can be marked up to separate prefix from completion</div>
               </button>
               
-              <!-- Loom (disabled) -->
+              <!-- Loom -->
               <button
-                disabled
-                class="relative p-4 rounded-xl border-2 transition-all text-left opacity-50 cursor-not-allowed border-gray-700 bg-gray-800/30"
+                @click="submissionCategory = 'loom'; sourceType = 'arc-certified'"
+                class="relative p-4 rounded-xl border-2 transition-all text-left"
+                :class="submissionCategory === 'loom' 
+                  ? 'border-green-500 bg-green-500/10 ring-2 ring-green-500/20' 
+                  : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800'"
               >
-                <div class="text-2xl mb-2 grayscale">🌳</div>
-                <div class="font-medium text-gray-400">Loom</div>
-                <div class="text-xs text-gray-600 mt-1">A document containing multiple forks of LLM generations paths</div>
-                <div class="absolute top-2 right-2 text-[10px] bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">Soon</div>
+                <div class="text-2xl mb-2">🌳</div>
+                <div class="font-medium text-gray-100">Loom</div>
+                <div class="text-xs text-gray-500 mt-1">A document containing multiple forks of LLM generation paths</div>
               </button>
               
               <!-- Other -->
@@ -92,6 +94,17 @@
               <option value="arc-certified">ARC Certified</option>
               <option value="discord">Discord</option>
             </select>
+          </div>
+          
+          <!-- Source Type (for loom category - only ARC Certified) -->
+          <div v-if="submissionCategory === 'loom'" class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Import Source
+            </label>
+            <div class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-gray-100 dark:bg-gray-800/50 text-gray-900 dark:text-gray-100">
+              ARC Certified
+            </div>
+            <p class="mt-1 text-xs text-gray-500">Loom submissions only support ARC certified exports</p>
           </div>
           
           <!-- Source Type (for other category) -->
@@ -238,6 +251,45 @@
               </p>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 ARC exports or Anthropic API message format
+              </p>
+            </div>
+          </div>
+
+          <!-- Loom Upload (ARC Certified exports only) -->
+          <div v-if="submissionCategory === 'loom'" class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Upload Loom File
+            </label>
+            
+            <!-- Supported formats info -->
+            <div class="mb-3 p-3 bg-green-900/20 border border-green-700/50 rounded text-sm text-green-200">
+              <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+              </svg>
+              <strong>Loom format:</strong> ARC conversation exports containing multiple generation branches. The file should contain
+              branching conversation data from the ARC interface.
+            </div>
+            
+            <div class="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center bg-gray-50 dark:bg-gray-800 transition-colors hover:border-green-400 dark:hover:border-green-600">
+              <input
+                type="file"
+                accept=".json"
+                @change="handleFileUpload"
+                class="hidden"
+                ref="loomFileInput"
+              />
+              <button
+                type="button"
+                @click="($refs.loomFileInput as any)?.click()"
+                class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+              >
+                🌳 Choose Loom File
+              </button>
+              <p v-if="uploadedFile" class="mt-3 text-sm text-gray-900 dark:text-gray-100 font-medium">
+                ✓ {{ uploadedFile.name }}
+              </p>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                ARC loom export (JSON format)
               </p>
             </div>
           </div>
@@ -922,6 +974,7 @@ function resetToUpload() {
   selectedTopics.value = []
   participantMapping.value = {}
   previewMessages.value = []
+  allMessages.value = []
   participantNames.value = []
   error.value = ''
   fetchStats.value = null
@@ -941,7 +994,8 @@ const selectedTopics = ref<string[]>([])
 const availableTopics = ref<any[]>([])
 const availableModels = ref<any[]>([])
 const uploadedFile = ref<File | null>(null)
-const previewMessages = ref<Message[]>([])
+const previewMessages = ref<Message[]>([]) // For display (may be filtered for loom)
+const allMessages = ref<Message[]>([]) // All messages for submission (includes all branches)
 const participantNames = ref<string[]>([])
 const participantMapping = ref<Record<string, string>>({}) // participantName -> modelId or 'human'
 const error = ref('')
@@ -1240,6 +1294,61 @@ function getRandomColor(): string {
   return MODEL_COLOR_PALETTE[Math.floor(Math.random() * MODEL_COLOR_PALETTE.length)]
 }
 
+// Filter messages to only include those in the current branch path
+// For loom submissions, not all messages are visible - only those in the active branch chain
+function filterVisibleMessages(allMessages: Message[]): Message[] {
+  if (allMessages.length === 0) return []
+  
+  const firstMessage = allMessages[0]
+  
+  // If not a loom submission, return all messages
+  if (!firstMessage.branches || firstMessage.branches.length === 0) {
+    return allMessages
+  }
+  
+  // For loom submissions, filter to only include messages in the current branch path
+  const visible: Message[] = []
+  let currentActiveBranchId = firstMessage.active_branch_id || firstMessage.branches[0]?.id
+  
+  for (const message of allMessages) {
+    if (!message.branches || message.branches.length === 0) {
+      visible.push(message)
+      continue
+    }
+    
+    // For the first message, always include it
+    if (visible.length === 0) {
+      visible.push(message)
+      currentActiveBranchId = message.active_branch_id || message.branches[0]?.id
+      continue
+    }
+    
+    // For subsequent messages, check if any branch is a child of the current active branch
+    // First, check if the currently active branch is a child of the parent (respect user's selection)
+    const currentBranch = message.branches.find(b => b.id === message.active_branch_id)
+    
+    if (currentBranch && currentBranch.parent_branch_id === currentActiveBranchId) {
+      // The selected branch is valid for this path - use it
+      visible.push(message)
+      currentActiveBranchId = currentBranch.id
+    } else {
+      // Check if ANY branch is a child of the current active branch
+      const matchingBranch = message.branches.find(b => b.parent_branch_id === currentActiveBranchId)
+      
+      if (matchingBranch) {
+        // This message is in the current branch path - include it
+        message.active_branch_id = matchingBranch.id
+        currentActiveBranchId = matchingBranch.id
+        visible.push(message)
+      }
+      // If no matching branch, skip this message - it's not in the current path
+    }
+  }
+  
+  console.log('[Submit] Filtered to', visible.length, 'visible messages from', allMessages.length, 'total')
+  return visible
+}
+
 function detectProvider(participantName: string): 'anthropic' | 'openai' | 'google' | 'meta' | 'other' {
   const nameLower = participantName.toLowerCase()
   
@@ -1355,6 +1464,7 @@ async function parseJSON() {
   
   error.value = ''
   previewMessages.value = []
+  allMessages.value = []
   
   try {
     const text = await uploadedFile.value.text()
@@ -1369,93 +1479,218 @@ async function parseJSON() {
         title.value = data.conversation.title
       }
       
-      // Convert ARC branching format to linear format by following active branches
-      const converted: Message[] = []
-      const participants = new Set<string>()
-      let parentId: string | null = null
-      
-      // Build map of branch IDs to their parent message IDs
-      const branchToMessageId = new Map<string, string>()
-      
-      data.messages.forEach((msg: any, idx: number) => {
-        // Get the active branch for this message
-        const activeBranch = msg.branches.find((b: any) => b.id === msg.activeBranchId)
+      // If this is a loom submission, preserve all branches
+      if (submissionCategory.value === 'loom') {
+        console.log('[Submit] Preserving branches for loom submission')
         
-        if (!activeBranch) {
-          console.warn('[Submit] Message has no active branch:', msg.id)
-          return
-        }
+        // Convert ARC branching format to research-commons branch format
+        // Preserve ALL branches, not just the active one
+        const converted: Message[] = []
+        const participants = new Set<string>()
+        const branchIdMap = new Map<string, string>() // ARC branch ID -> new branch ID
         
-        const messageId = crypto.randomUUID()
-        
-        // Store mapping of branch ID to our message ID
-        branchToMessageId.set(activeBranch.id, messageId)
-        
-        // Extract content blocks from branch
-        // ARC format has contentBlocks array with thinking/text blocks
-        let contentBlocks = []
-        if (activeBranch.contentBlocks && Array.isArray(activeBranch.contentBlocks)) {
-          // Transform ARC contentBlocks format to our format
-          contentBlocks = activeBranch.contentBlocks.map((block: any) => {
-            if (block.type === 'thinking') {
-              // ARC has thinking as a direct string, we need { content, signature }
-              return {
-                type: 'thinking',
-                thinking: {
-                  content: block.thinking,
-                  signature: block.signature
+        data.messages.forEach((arcMsg: any, idx: number) => {
+          const messageId = crypto.randomUUID()
+          
+          // Convert all branches
+          const branches = arcMsg.branches.map((arcBranch: any) => {
+            const branchId = crypto.randomUUID()
+            branchIdMap.set(arcBranch.id, branchId)
+            
+            // Extract content blocks
+            // ARC format can have contentBlocks array OR content string
+            // Prefer contentBlocks if it exists and has items, otherwise use content
+            let contentBlocks = []
+            if (arcBranch.contentBlocks && Array.isArray(arcBranch.contentBlocks) && arcBranch.contentBlocks.length > 0) {
+              // Use contentBlocks array (may include thinking blocks)
+              contentBlocks = arcBranch.contentBlocks.map((block: any) => {
+                if (block.type === 'thinking') {
+                  return {
+                    type: 'thinking',
+                    thinking: {
+                      content: block.thinking,
+                      signature: block.signature
+                    }
+                  }
                 }
-              }
+                // For text blocks, ensure they have the right format
+                if (block.type === 'text') {
+                  return {
+                    type: 'text',
+                    text: block.text || ''
+                  }
+                }
+                return block
+              })
+            } else if (typeof arcBranch.content === 'string' && arcBranch.content) {
+              // Fall back to content string if no contentBlocks
+              contentBlocks = [{ type: 'text', text: arcBranch.content }]
+            } else if (Array.isArray(arcBranch.content)) {
+              contentBlocks = arcBranch.content
             }
-            return block
+            
+            // Determine participant type
+            let participantType: 'human' | 'model' | 'system' = 'human'
+            if (arcBranch.role === 'assistant') {
+              participantType = 'model'
+            } else if (arcBranch.role === 'system') {
+              participantType = 'system'
+            }
+            
+            // Map participant name
+            const participantName = arcBranch.participantName || 
+              (arcBranch.role === 'user' ? 'User' : 
+               arcBranch.role === 'assistant' ? 'Assistant' : 
+               arcBranch.role || 'Unknown')
+            
+            participants.add(participantName)
+            
+            // Map parentBranchId
+            let parentBranchId: string | undefined
+            if (arcBranch.parentBranchId && arcBranch.parentBranchId !== 'root') {
+              parentBranchId = branchIdMap.get(arcBranch.parentBranchId)
+            }
+            
+            // Map timestamp
+            const timestamp = arcBranch.createdAt 
+              ? (typeof arcBranch.createdAt === 'string' ? new Date(arcBranch.createdAt) : arcBranch.createdAt)
+              : new Date()
+            
+            return {
+              id: branchId,
+              participant_name: participantName,
+              participant_type: participantType,
+              content_blocks: contentBlocks,
+              parent_branch_id: parentBranchId,
+              model_info: arcBranch.model ? {
+                model_id: arcBranch.model,
+                provider: 'other',
+                reasoning_enabled: false
+              } : undefined,
+              timestamp: timestamp,
+              hidden_from_models: arcBranch.hiddenFromAi || false,
+              metadata: {}
+            }
           })
-        } else if (typeof activeBranch.content === 'string') {
-          contentBlocks = [{ type: 'text', text: activeBranch.content }]
-        } else if (Array.isArray(activeBranch.content)) {
-          contentBlocks = activeBranch.content
-        }
-        
-        // Determine participant name from role
-        let participantName = activeBranch.role === 'user' ? 'User' : 
-                             activeBranch.role === 'assistant' ? 'Assistant' : 
-                             activeBranch.role || 'Unknown'
-        
-        participants.add(participantName)
-        
-        // Figure out parent message ID by looking up parent branch
-        let actualParentId = parentId
-        if (activeBranch.parentBranchId && activeBranch.parentBranchId !== 'root') {
-          actualParentId = branchToMessageId.get(activeBranch.parentBranchId) || parentId
-        }
-        
-        converted.push({
-          id: messageId,
-          submission_id: '', // Will be filled by server
-          parent_message_id: actualParentId,
-          order: idx,
-          participant_name: participantName,
-          participant_type: 'human' as any, // Will be updated based on selection
-          content_blocks: contentBlocks,
-          model_info: activeBranch.model ? { 
-            model_id: activeBranch.model,
-            provider: 'other',
-            reasoning_enabled: false
-          } : undefined,
-          timestamp: activeBranch.createdAt || new Date().toISOString()
+          
+          // Map activeBranchId
+          const activeBranchId = branchIdMap.get(arcMsg.activeBranchId) || branches[0]?.id
+          
+          if (!activeBranchId) {
+            console.warn('[Submit] Message has no branches or active branch:', arcMsg.id)
+            return
+          }
+          
+          converted.push({
+            id: messageId,
+            submission_id: '', // Will be filled by server
+            branches: branches,
+            active_branch_id: activeBranchId,
+            order: idx
+          })
         })
         
-        parentId = messageId
-      })
-      
-      previewMessages.value = converted
-      participantNames.value = Array.from(participants)
-      
-      // Auto-detect source type based on conversation format
-      if (sourceType.value === 'json-upload') {
-        sourceType.value = 'arc-certified'
+        // Store ALL messages for submission
+        allMessages.value = converted
+        // Filter for preview display only
+        previewMessages.value = filterVisibleMessages(converted)
+        participantNames.value = Array.from(participants)
+        
+        // Auto-detect source type based on conversation format
+        if (sourceType.value === 'json-upload') {
+          sourceType.value = 'arc-certified'
+        }
+        
+        console.log('[Submit] Converted', converted.length, 'messages from ARC format with branches preserved')
+      } else {
+        // For non-loom submissions, convert to linear format by following active branches
+        const converted: Message[] = []
+        const participants = new Set<string>()
+        let parentId: string | null = null
+        
+        // Build map of branch IDs to their parent message IDs
+        const branchToMessageId = new Map<string, string>()
+        
+        data.messages.forEach((msg: any, idx: number) => {
+          // Get the active branch for this message
+          const activeBranch = msg.branches.find((b: any) => b.id === msg.activeBranchId)
+          
+          if (!activeBranch) {
+            console.warn('[Submit] Message has no active branch:', msg.id)
+            return
+          }
+          
+          const messageId = crypto.randomUUID()
+          
+          // Store mapping of branch ID to our message ID
+          branchToMessageId.set(activeBranch.id, messageId)
+          
+          // Extract content blocks from branch
+          // ARC format has contentBlocks array with thinking/text blocks
+          let contentBlocks = []
+          if (activeBranch.contentBlocks && Array.isArray(activeBranch.contentBlocks)) {
+            // Transform ARC contentBlocks format to our format
+            contentBlocks = activeBranch.contentBlocks.map((block: any) => {
+              if (block.type === 'thinking') {
+                // ARC has thinking as a direct string, we need { content, signature }
+                return {
+                  type: 'thinking',
+                  thinking: {
+                    content: block.thinking,
+                    signature: block.signature
+                  }
+                }
+              }
+              return block
+            })
+          } else if (typeof activeBranch.content === 'string') {
+            contentBlocks = [{ type: 'text', text: activeBranch.content }]
+          } else if (Array.isArray(activeBranch.content)) {
+            contentBlocks = activeBranch.content
+          }
+          
+          // Determine participant name from role
+          let participantName = activeBranch.role === 'user' ? 'User' : 
+                               activeBranch.role === 'assistant' ? 'Assistant' : 
+                               activeBranch.role || 'Unknown'
+          
+          participants.add(participantName)
+          
+          // Figure out parent message ID by looking up parent branch
+          let actualParentId = parentId
+          if (activeBranch.parentBranchId && activeBranch.parentBranchId !== 'root') {
+            actualParentId = branchToMessageId.get(activeBranch.parentBranchId) || parentId
+          }
+          
+          converted.push({
+            id: messageId,
+            submission_id: '', // Will be filled by server
+            parent_message_id: actualParentId,
+            order: idx,
+            participant_name: participantName,
+            participant_type: 'human' as any, // Will be updated based on selection
+            content_blocks: contentBlocks,
+            model_info: activeBranch.model ? { 
+              model_id: activeBranch.model,
+              provider: 'other',
+              reasoning_enabled: false
+            } : undefined,
+            timestamp: activeBranch.createdAt || new Date().toISOString()
+          })
+          
+          parentId = messageId
+        })
+        
+        previewMessages.value = converted
+        participantNames.value = Array.from(participants)
+        
+        // Auto-detect source type based on conversation format
+        if (sourceType.value === 'json-upload') {
+          sourceType.value = 'arc-certified'
+        }
+        
+        console.log('[Submit] Converted', converted.length, 'messages from ARC format')
       }
-      
-      console.log('[Submit] Converted', converted.length, 'messages from ARC format')
       
     } else if (data.messages && Array.isArray(data.messages)) {
       // Standard Anthropic API format
@@ -1696,19 +1931,48 @@ async function submit() {
   
   try {
     // Update messages with correct participant types and model info
-    const updatedMessages = previewMessages.value.map(msg => {
-      const mapping = participantMapping.value[msg.participant_name]
-      const isHuman = mapping === 'human'
-      const modelData = isHuman ? null : availableModels.value.find(m => m.id === mapping)
-      
-      return {
-        ...msg,
-        participant_type: isHuman ? 'human' : 'model',
-        model_info: modelData ? {
-          model_id: modelData.model_id,
-          provider: modelData.provider,
-          reasoning_enabled: false
-        } : undefined
+    // For loom submissions: apply mapping to branches (each branch has its own participant)
+    // For non-loom submissions: apply mapping to messages
+    // IMPORTANT: Use allMessages (not previewMessages) to include ALL branches for loom submissions
+    const messagesToSubmit = allMessages.value.length > 0 ? allMessages.value : previewMessages.value
+    const updatedMessages = messagesToSubmit.map(msg => {
+      // If this is a loom message with branches
+      if (msg.branches && msg.branches.length > 0) {
+        const updatedBranches = msg.branches.map(branch => {
+          const mapping = participantMapping.value[branch.participant_name]
+          const isHuman = mapping === 'human'
+          const modelData = isHuman ? null : availableModels.value.find(m => m.id === mapping)
+          
+          return {
+            ...branch,
+            participant_type: isHuman ? 'human' : 'model',
+            model_info: modelData ? {
+              model_id: modelData.model_id,
+              provider: modelData.provider,
+              reasoning_enabled: false
+            } : undefined
+          }
+        })
+        
+        return {
+          ...msg,
+          branches: updatedBranches
+        }
+      } else {
+        // Non-loom message - apply mapping directly
+        const mapping = participantMapping.value[msg.participant_name]
+        const isHuman = mapping === 'human'
+        const modelData = isHuman ? null : availableModels.value.find(m => m.id === mapping)
+        
+        return {
+          ...msg,
+          participant_type: isHuman ? 'human' : 'model',
+          model_info: modelData ? {
+            model_id: modelData.model_id,
+            provider: modelData.provider,
+            reasoning_enabled: false
+          } : undefined
+        }
       }
     })
     

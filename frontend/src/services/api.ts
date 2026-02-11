@@ -178,7 +178,13 @@ export const submissionsAPI = {
     api.post<{ success: boolean; monospace: boolean }>(`/submissions/${submissionId}/messages/${messageId}/monospace`, { monospace }),
   
   getHiddenMessages: (submissionId: string) =>
-    api.get<{ hidden_message_ids: string[] }>(`/submissions/${submissionId}/hidden-messages`)
+    api.get<{ hidden_message_ids: string[] }>(`/submissions/${submissionId}/hidden-messages`),
+  
+  switchBranch: (submissionId: string, messageId: string, activeBranchId: string) =>
+    api.patch<{ message: Message; persisted: boolean }>(
+      `/submissions/${submissionId}/messages/${messageId}`, 
+      { active_branch_id: activeBranchId }
+    ),
 }
 
 export const annotationsAPI = {

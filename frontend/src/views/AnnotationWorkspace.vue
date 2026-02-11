@@ -356,8 +356,8 @@
         <!-- Conversation (full width mobile, 60% desktop) -->
         <div class="w-full lg:w-[60%] px-6 py-8 pb-20 lg:pb-8" ref="conversationContainerEl">
           <MessageList
-            v-if="messages.length > 0"
-            :messages="messages"
+            v-if="visibleMessages.length > 0"
+            :messages="visibleMessages"
             :document-mode="isDocumentMode"
             :annotated-message-ids="annotatedMessageIds"
             :inline-comments="inlineComments"
@@ -382,6 +382,7 @@
             @hide-all-previous="handleHideAllPrevious"
             @toggle-reaction="handleToggleReaction"
             @text-selected="handleTextSelected"
+            @switch-branch="handleSwitchBranch"
             @add-tag="handleAddTag"
             @add-tag-vote="handleAddTagVote"
             @add-comment="handleAddCommentToSelection"
@@ -682,7 +683,7 @@
 
     <!-- Highlight Navigator -->
     <HighlightNavigator
-      :messages="messages"
+      :messages="visibleMessages"
       :pinned-message-id="pinnedMessageId"
       :message-reactions="messageReactions"
       :messages-with-comments="messagesWithComments"
@@ -973,6 +974,8 @@ async function loadData() {
     messages.value = messagesData
     selections.value = selectionsData
     availableTopics.value = topicsData.data.topics
+    
+    // Note: Branch consistency and visibility are handled by the visibleMessages computed property
     
     // Build user names map - collect all user IDs from all sources
     userNames.value.clear()
@@ -1576,6 +1579,143 @@ function scrollToPinnedMessage() {
   }
   
   checkAndScroll()
+}
+
+// Track the branch path version to force recomputation when branches change
+const branchVersion = ref(0)
+
+// Ensure branch consistency and compute visible messages
+// This is called after loading messages and after branch switching
+function computeVisibleBranchPath(): Message[] {
+  if (messages.value.length === 0) return []
+  
+  const firstMessage = messages.value[0]
+  
+  // If not a loom submission, return all messages
+  if (!firstMessage.branches || firstMessage.branches.length === 0) {
+    return [...messages.value]
+  }
+  
+  // For loom submissions, compute visibility based on branch hierarchy
+  const visible: Message[] = []
+  let currentActiveBranchId = firstMessage.active_branch_id || firstMessage.branches[0]?.id
+  
+  // Ensure first message has active_branch_id set
+  if (!firstMessage.active_branch_id) {
+    firstMessage.active_branch_id = currentActiveBranchId
+  }
+  
+  for (const message of messages.value) {
+    if (!message.branches || message.branches.length === 0) {
+      visible.push(message)
+      continue
+    }
+    
+    // For the first message, always include it
+    if (visible.length === 0) {
+      visible.push(message)
+      currentActiveBranchId = message.active_branch_id || message.branches[0]?.id
+      continue
+    }
+    
+    // For subsequent messages, check if any branch is a child of the current active branch
+    // First, check if the currently active branch is a child of the parent (respect user's selection)
+    const currentBranch = message.branches.find(b => b.id === message.active_branch_id)
+    
+    if (currentBranch && currentBranch.parent_branch_id === currentActiveBranchId) {
+      // The user's selected branch is valid for this path - use it
+      visible.push(message)
+      currentActiveBranchId = currentBranch.id
+    } else {
+      // Check if ANY branch is a child of the current active branch
+      const matchingBranch = message.branches.find(b => b.parent_branch_id === currentActiveBranchId)
+      
+      if (matchingBranch) {
+        // This message is in the current branch path - include it
+        // Set the matching branch as active (ensures consistency)
+        message.active_branch_id = matchingBranch.id
+        currentActiveBranchId = matchingBranch.id
+        visible.push(message)
+      }
+      // If no matching branch, this message is NOT in the current path - skip it
+    }
+  }
+  
+  return visible
+}
+
+// Computed visible messages - reacts to messages changes and branch version
+const visibleMessages = computed(() => {
+  // Access branchVersion to create dependency for reactivity
+  const _ = branchVersion.value
+  return computeVisibleBranchPath()
+})
+
+// Recursive helper to cascade branch switches through the message tree
+// When a parent branch is switched, all child messages must switch to branches
+// that have parent_branch_id matching the new parent branch
+function cascadeBranchSwitch(messageId: string, parentBranchId: string, allMessages: Message[]) {
+  const messageIndex = allMessages.findIndex(m => m.id === messageId)
+  if (messageIndex < 0) return
+  
+  // Find the next message in order (messages are sequential)
+  // We need to find the first message that has a branch with parent_branch_id === parentBranchId
+  for (let i = messageIndex + 1; i < allMessages.length; i++) {
+    const nextMessage = allMessages[i]
+    
+    // Check if this message has a branch that is a child of the parent branch
+    const matchingBranch = nextMessage.branches?.find(b => b.parent_branch_id === parentBranchId)
+    
+    if (matchingBranch) {
+      // Found a child branch - switch to it
+      nextMessage.active_branch_id = matchingBranch.id
+      
+      // Recursively cascade from this branch to its children
+      cascadeBranchSwitch(nextMessage.id, matchingBranch.id, allMessages)
+    }
+  }
+}
+
+async function handleSwitchBranch(messageId: string, branchId: string) {
+  try {
+    const message = messages.value.find(m => m.id === messageId)
+    if (!message) return
+    
+    // Validate branch exists
+    const branch = message.branches?.find(b => b.id === branchId)
+    if (!branch) {
+      console.error('Branch not found:', branchId)
+      return
+    }
+    
+    // Update local state immediately (optimistic update)
+    message.active_branch_id = branchId
+    
+    // Cascade branch switching to all descendant messages
+    // This maintains the parent-child relationship in the conversation tree
+    cascadeBranchSwitch(messageId, branchId, messages.value)
+    
+    // Trigger recomputation of visible messages
+    branchVersion.value++
+    
+    // Try to persist to server (only if logged in)
+    // If not logged in or if it fails, the local state update is still valid
+    try {
+      const response = await submissionsAPI.switchBranch(submissionId, messageId, branchId)
+      // If server returned a different state, use it (shouldn't happen but be safe)
+      if (response.data.message) {
+        message.active_branch_id = response.data.message.active_branch_id
+      }
+    } catch (apiErr: any) {
+      // If API call fails (e.g., not logged in), that's okay - local state is already updated
+      // Only log if it's an unexpected error (not 401/403)
+      if (apiErr.response?.status !== 401 && apiErr.response?.status !== 403) {
+        console.error('Failed to persist branch switch (but local state updated):', apiErr)
+      }
+    }
+  } catch (err) {
+    console.error('Failed to switch branch:', err)
+  }
 }
 
 async function handleToggleReaction(messageId: string, reactionType: 'star' | 'laugh' | 'sparkles') {

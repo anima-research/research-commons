@@ -112,14 +112,27 @@ export class SubmissionStore {
       throw new Error('Submission must have at least one message');
     }
 
-    const rootMessages = messages.filter(m => m.parent_message_id === null);
+    // Check if this is a loom submission (has branches)
+    const hasBranches = messages.some(m => m.branches && m.branches.length > 0);
+    
+    if (hasBranches) {
+      // Validate branch-based structure (loom)
+      this.validateBranchTree(messages);
+    } else {
+      // Validate old structure (conversation/document)
+      this.validateOldMessageTree(messages);
+    }
+  }
+
+  private validateOldMessageTree(messages: Message[]): void {
+    const rootMessages = messages.filter(m => !m.parent_message_id);
     if (rootMessages.length !== 1) {
       throw new Error(`Submission must have exactly one root message, found ${rootMessages.length}`);
     }
 
     const messageIds = new Set(messages.map(m => m.id));
     for (const message of messages) {
-      if (message.parent_message_id !== null && !messageIds.has(message.parent_message_id)) {
+      if (message.parent_message_id && !messageIds.has(message.parent_message_id)) {
         throw new Error(`Message ${message.id} references non-existent parent ${message.parent_message_id}`);
       }
 
@@ -130,6 +143,85 @@ export class SubmissionStore {
 
     // Check for cycles
     this.detectCycles(messages);
+  }
+
+  private validateBranchTree(messages: Message[]): void {
+    // Validate each message has at least one branch
+    for (const message of messages) {
+      if (!message.branches || message.branches.length === 0) {
+        throw new Error(`Message ${message.id} must have at least one branch`);
+      }
+
+      // Validate active_branch_id points to an existing branch
+      if (!message.active_branch_id) {
+        throw new Error(`Message ${message.id} must have active_branch_id`);
+      }
+      
+      const activeBranch = message.branches.find(b => b.id === message.active_branch_id);
+      if (!activeBranch) {
+        throw new Error(`Message ${message.id} has active_branch_id ${message.active_branch_id} that doesn't exist in branches`);
+      }
+
+      // Validate model_info for model branches
+      for (const branch of message.branches) {
+        if (branch.participant_type === 'model' && !branch.model_info) {
+          throw new Error(`Branch ${branch.id} in message ${message.id} is type 'model' but missing model_info`);
+        }
+      }
+    }
+
+    // Find root branches (branches with no parent_branch_id)
+    const allBranches: Array<{ messageId: string; branch: Message['branches'][0] }> = [];
+    for (const message of messages) {
+      if (message.branches) {
+        for (const branch of message.branches) {
+          allBranches.push({ messageId: message.id, branch });
+        }
+      }
+    }
+
+    const rootBranches = allBranches.filter(({ branch }) => !branch.parent_branch_id);
+
+    if (rootBranches.length === 0) {
+      throw new Error('Submission must have at least one root branch (branch with no parent_branch_id)');
+    }
+
+    // Validate branch relationships and detect cycles
+    const branchIdMap = new Map<string, { messageId: string; branch: Message['branches'][0] }>();
+    for (const { messageId, branch } of allBranches) {
+      branchIdMap.set(branch.id, { messageId, branch });
+    }
+
+    // Check for cycles in branch tree
+    const visited = new Set<string>();
+    const recursionStack = new Set<string>();
+
+    const dfs = (branchId: string): boolean => {
+      visited.add(branchId);
+      recursionStack.add(branchId);
+
+      const { branch } = branchIdMap.get(branchId)!;
+      if (branch.parent_branch_id) {
+        if (!visited.has(branch.parent_branch_id)) {
+          if (dfs(branch.parent_branch_id)) {
+            return true;
+          }
+        } else if (recursionStack.has(branch.parent_branch_id)) {
+          return true; // Cycle detected
+        }
+      }
+
+      recursionStack.delete(branchId);
+      return false;
+    };
+
+    for (const branchId of branchIdMap.keys()) {
+      if (!visited.has(branchId)) {
+        if (dfs(branchId)) {
+          throw new Error('Cycle detected in branch tree');
+        }
+      }
+    }
   }
 
   private detectCycles(messages: Message[]): void {
